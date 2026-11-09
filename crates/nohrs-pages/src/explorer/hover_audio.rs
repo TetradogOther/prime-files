@@ -300,10 +300,163 @@ mod platform {
 
 #[cfg(not(target_os = "windows"))]
 mod platform {
-    use super::Command;
+    //! The sound is played by `ffplay`, the player of ffmpeg, which reads
+    //! every format the preview reads and is installed wherever ffmpeg is.
+
+    use super::{Command, set_progress};
+    use std::process::{Child, Command as Process, Stdio};
     use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    /// How often the position of the sound playing is published.
+    const TICK: Duration = Duration::from_millis(40);
 
     pub fn run(commands: &mpsc::Receiver<Command>) {
-        while commands.recv().is_ok() {}
+        let mut playing: Option<Playing> = None;
+        loop {
+            let received = if playing.is_some() {
+                match commands.recv_timeout(TICK) {
+                    Ok(command) => Some(command),
+                    Err(mpsc::RecvTimeoutError::Timeout) => None,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+            } else {
+                match commands.recv() {
+                    Ok(command) => Some(command),
+                    Err(_) => break,
+                }
+            };
+            let Some(mut command) = received else {
+                // Nothing to say: the sound playing moves on.
+                if let Some(current) = playing.as_mut() {
+                    current.publish();
+                    if current.finished() {
+                        set_progress(None);
+                        playing = None;
+                    }
+                }
+                continue;
+            };
+            // Sweeping the mouse over a column of sounds queues a play and a
+            // stop per file; only the last one still means anything.
+            while let Ok(next) = commands.try_recv() {
+                command = next;
+            }
+            match command {
+                Command::Play(path, volume) => {
+                    stop(&mut playing);
+                    match start(&path, volume) {
+                        Ok(current) => {
+                            set_progress(Some((path, 0.0)));
+                            playing = Some(current);
+                        }
+                        Err(error) => {
+                            tracing::warn!("hover player could not open {path}: {error}");
+                            set_progress(None);
+                        }
+                    }
+                }
+                Command::Stop => stop(&mut playing),
+            }
+        }
+        stop(&mut playing);
+    }
+
+    /// The sound playing and where it is.
+    struct Playing {
+        child: Child,
+        path: String,
+        started: Instant,
+        duration: Option<f64>,
+    }
+
+    impl Playing {
+        /// Publishes how far the sound has played.
+        fn publish(&self) {
+            let Some(duration) = self.duration else {
+                return;
+            };
+            if duration <= 0.0 {
+                return;
+            }
+            let elapsed = self.started.elapsed().as_secs_f64();
+            let fraction = (elapsed / duration).clamp(0.0, 1.0) as f32;
+            set_progress(Some((self.path.clone(), fraction)));
+        }
+
+        /// Whether the sound is over: the player is gone.
+        fn finished(&mut self) -> bool {
+            matches!(self.child.try_wait(), Ok(Some(_)))
+        }
+    }
+
+    /// Starts the sound, with the player that is installed.
+    fn start(path: &str, volume: f64) -> Result<Playing, String> {
+        let duration = duration(path);
+        let mut child = play(path, volume)?;
+        // The player writes its own messages; nobody reads them.
+        let _ = child.stdout.take();
+        Ok(Playing { child, path: path.to_string(), started: Instant::now(), duration })
+    }
+
+    /// The player, with the volume the settings say.
+    fn play(path: &str, volume: f64) -> Result<Child, String> {
+        let percent = (volume.clamp(0.0, 1.0) * 100.0).round() as u32;
+        let mut command = Process::new("ffplay");
+        command
+            .arg("-nodisp")
+            .arg("-autoexit")
+            .arg("-vn")
+            .arg("-loglevel")
+            .arg("quiet")
+            .arg("-volume")
+            .arg(percent.to_string())
+            .arg(path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        match command.spawn() {
+            Ok(child) => Ok(child),
+            Err(error) => {
+                // ffmpeg's own player is not everywhere; mpv is the other
+                // one a desktop has.
+                let mut command = Process::new("mpv");
+                command
+                    .arg("--no-video")
+                    .arg("--really-quiet")
+                    .arg(format!("--volume={percent}"))
+                    .arg(path)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+                command.spawn().map_err(|_| error.to_string())
+            }
+        }
+    }
+
+    /// Stops the sound and frees the file it holds.
+    fn stop(playing: &mut Option<Playing>) {
+        let Some(mut current) = playing.take() else {
+            return;
+        };
+        set_progress(None);
+        let _ = current.child.kill();
+        let _ = current.child.wait();
+    }
+
+    /// How long the sound is, as `ffprobe` says.
+    fn duration(path: &str) -> Option<f64> {
+        let output = Process::new("ffprobe")
+            .arg("-v")
+            .arg("quiet")
+            .arg("-show_entries")
+            .arg("format=duration")
+            .arg("-of")
+            .arg("default=noprint_wrappers=1:nokey=1")
+            .arg(path)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        String::from_utf8_lossy(&output.stdout).trim().parse().ok()
     }
 }

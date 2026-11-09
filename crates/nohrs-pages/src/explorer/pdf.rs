@@ -150,11 +150,144 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    use super::Update;
+    //! The pages are rendered by `pdftoppm`, the program of poppler that
+    //! every Linux desktop already has: it draws the page and writes it as a
+    //! PNG, one page at a time.
 
-    pub fn render(_path: &str, sender: &async_channel::Sender<Update>) {
-        sender
-            .send_blocking(Update::Failed("PDF preview is only available on Windows".into()))
-            .ok();
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    use super::{MAX_PAGES, PAGE_WIDTH, Update, to_render_image};
+
+    pub fn render(path: &str, sender: &async_channel::Sender<Update>) {
+        if let Err(error) = pages(path, sender) {
+            sender.send_blocking(Update::Failed(error)).ok();
+        }
+    }
+
+    /// A folder of its own for the pages, so two previews of two documents
+    /// do not write over each other.
+    fn folder() -> Option<PathBuf> {
+        let base = dirs::cache_dir()?;
+        let folder = base.join("prime-files").join("pdf");
+        std::fs::create_dir_all(&folder).ok()?;
+        Some(folder)
+    }
+
+    fn pages(path: &str, sender: &async_channel::Sender<Update>) -> Result<(), String> {
+        let folder = folder().ok_or("no cache folder for the pages")?;
+        // The pages of this document, in a folder of their own.
+        let name = format!("{:x}-{}", std::process::id(), path.len());
+        let output = folder.join(&name);
+        std::fs::create_dir_all(&output).map_err(|error| error.to_string())?;
+
+        let total = page_count(path);
+        if let Some(total) = total
+            && sender.send_blocking(Update::Total(total)).is_err()
+        {
+            return Ok(());
+        }
+
+        let rendered = Command::new("pdftoppm")
+            .arg("-png")
+            .arg("-r")
+            // The width the pages are drawn at, in points of the page's own
+            // size; poppler takes a resolution, so the page's own width is
+            // what the width comes from.
+            .arg(resolution(path))
+            .arg("-f")
+            .arg("1")
+            .arg("-l")
+            .arg(MAX_PAGES.to_string())
+            .arg(path)
+            .arg(output.join("page"))
+            .output()
+            .map_err(|error| format!("pdftoppm could not be run: {error}"))?;
+        if !rendered.status.success() {
+            let message = String::from_utf8_lossy(&rendered.stderr).trim().to_string();
+            return Err(if message.is_empty() {
+                "the PDF could not be rendered".to_string()
+            } else {
+                message
+            });
+        }
+
+        let mut pages = read_pages(&output);
+        pages.sort();
+        for page in pages {
+            let Some(image) = page.as_ref().and_then(|bytes| to_render_image(bytes)) else {
+                continue;
+            };
+            // Nobody listening: the preview moved on to another file.
+            if sender.send_blocking(Update::Page(image)).is_err() {
+                break;
+            }
+        }
+        let _ = std::fs::remove_dir_all(&output);
+        Ok(())
+    }
+
+    /// The pages poppler wrote, as their bytes.
+    fn read_pages(folder: &Path) -> Vec<Option<Vec<u8>>> {
+        let Ok(read) = std::fs::read_dir(folder) else {
+            return Vec::new();
+        };
+        let mut pages: Vec<(u32, Option<Vec<u8>>)> = read
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().extension().is_some_and(|extension| extension == "png"))
+            .filter_map(|entry| {
+                let number = entry
+                    .file_name()
+                    .to_string_lossy()
+                    .rsplit('-')
+                    .next()
+                    .and_then(|number| number.trim_end_matches(".png").parse::<u32>().ok())?;
+                let bytes = std::fs::read(entry.path()).ok();
+                Some((number, bytes))
+            })
+            .collect();
+        pages.sort_by_key(|(number, _)| *number);
+        pages.into_iter().map(|(_, bytes)| bytes).collect()
+    }
+
+    /// How many pages the document has, as `pdfinfo` says.
+    fn page_count(path: &str) -> Option<u32> {
+        let output = Command::new("pdfinfo").arg(path).output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find_map(|line| {
+                let (key, value) = line.split_once(':')?;
+                (key.trim() == "Pages").then(|| value.trim().parse::<u32>().ok())?
+            })
+    }
+
+    /// The resolution that draws a page `PAGE_WIDTH` pixels wide. The page's
+    /// own size is asked for; a page whose size is not known is drawn at
+    /// the usual 72 points per inch.
+    fn resolution(path: &str) -> String {
+        let width = Command::new("pdfinfo")
+            .arg(path)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .find_map(|line| {
+                        let (key, value) = line.split_once(':')?;
+                        Some((key.trim() == "Page size").then(|| value.trim().to_string())?)
+                    })
+            })
+            .and_then(|size| {
+                let points: f64 = size.split_whitespace().next()?.parse().ok()?;
+                Some(points)
+            });
+        match width {
+            Some(points) if points > 0.0 => format!("{:.0}", (PAGE_WIDTH as f64 * 72.0 / points).round()),
+            _ => "72".to_string(),
+        }
     }
 }

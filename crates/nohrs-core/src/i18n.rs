@@ -13,6 +13,7 @@
 //! it only needs the windows to repaint.
 
 mod arabic;
+mod catalan;
 mod extra;
 mod hungarian;
 mod strings;
@@ -30,6 +31,8 @@ pub enum Lang {
     En,
     /// Español.
     Es,
+    /// Català.
+    Ca,
     /// Français.
     Fr,
     /// Deutsch.
@@ -50,10 +53,11 @@ pub enum Lang {
 
 impl Lang {
     /// Every language, in the order the settings page lists them.
-    pub const ALL: [Lang; 11] = [
+    pub const ALL: [Lang; 12] = [
         Lang::Pt,
         Lang::En,
         Lang::Es,
+        Lang::Ca,
         Lang::Fr,
         Lang::De,
         Lang::It,
@@ -70,6 +74,7 @@ impl Lang {
             Lang::Pt => "pt-BR",
             Lang::En => "en",
             Lang::Es => "es",
+            Lang::Ca => "ca",
             Lang::Fr => "fr",
             Lang::De => "de",
             Lang::It => "it",
@@ -88,6 +93,7 @@ impl Lang {
             Lang::Pt => "Português",
             Lang::En => "English",
             Lang::Es => "Español",
+            Lang::Ca => "Català",
             Lang::Fr => "Français",
             Lang::De => "Deutsch",
             Lang::It => "Italiano",
@@ -108,6 +114,7 @@ impl Lang {
             "pt" => Some(Lang::Pt),
             "en" => Some(Lang::En),
             "es" => Some(Lang::Es),
+            "ca" => Some(Lang::Ca),
             "fr" => Some(Lang::Fr),
             "de" => Some(Lang::De),
             "it" => Some(Lang::It),
@@ -136,6 +143,10 @@ impl Lang {
         const JAPANESE: &[&str] = &["JP"];
         const CHINESE: &[&str] = &["CN", "SG"];
         const HUNGARIAN: &[&str] = &["HU"];
+        // Andorra: the one country where Catalan is the language of the
+        // place. In Spain the language of the place is Spanish, and the one
+        // of the person's own choice is read from the session.
+        const CATALAN: &[&str] = &["AD"];
         const ARABIC: &[&str] = &[
             "SA", "AE", "EG", "MA", "DZ", "TN", "LY", "IQ", "JO", "LB", "SY", "KW", "QA", "BH", "OM", "YE",
             "SD", "PS", "MR",
@@ -153,6 +164,7 @@ impl Lang {
             (CHINESE, Lang::Zh),
             (ARABIC, Lang::Ar),
             (HUNGARIAN, Lang::Hu),
+            (CATALAN, Lang::Ca),
         ]
         .into_iter()
         .find(|(countries, _)| countries.contains(&country))
@@ -176,7 +188,7 @@ impl Lang {
             Lang::Ru => Some(3),
             Lang::Ja => Some(4),
             Lang::Zh => Some(5),
-            Lang::Pt | Lang::En | Lang::Es | Lang::Ar | Lang::Hu => None,
+            Lang::Pt | Lang::En | Lang::Es | Lang::Ca | Lang::Ar | Lang::Hu => None,
         }
     }
 }
@@ -246,6 +258,11 @@ fn hungarian_table() -> &'static HashMap<&'static str, &'static str> {
     TABLE.get_or_init(|| hungarian::HUNGARIAN.iter().copied().collect())
 }
 
+fn catalan_table() -> &'static HashMap<&'static str, &'static str> {
+    static TABLE: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
+    TABLE.get_or_init(|| catalan::CATALAN.iter().copied().collect())
+}
+
 /// `key` in a given language. A language missing the row falls back to
 /// English, which more people read than Portuguese.
 pub fn tr_in(lang: Lang, key: &'static str) -> &'static str {
@@ -253,6 +270,10 @@ pub fn tr_in(lang: Lang, key: &'static str) -> &'static str {
         Lang::Pt => key,
         Lang::En => table().get(key).map_or(key, |row| row.0),
         Lang::Es => table().get(key).map_or(key, |row| row.1),
+        Lang::Ca => match catalan_table().get(key) {
+            Some(text) => text,
+            None => tr_in(Lang::En, key),
+        },
         Lang::Ar => match arabic_table().get(key) {
             Some(text) => text,
             None => tr_in(Lang::En, key),
@@ -485,6 +506,30 @@ mod tests {
         assert_eq!(tr_in(Lang::Hu, "Copiar"), "Másolás");
         assert_eq!(Lang::parse("hu-HU"), Some(Lang::Hu));
         assert_eq!(Lang::for_country("HU"), Some(Lang::Hu));
+    }
+
+    #[test]
+    fn every_row_has_catalan_with_its_placeholders() {
+        let catalan: std::collections::HashMap<&str, &str> = catalan::CATALAN.iter().copied().collect();
+        assert_eq!(catalan.len(), catalan::CATALAN.len(), "duplicated row in i18n/catalan.rs");
+        let mut missing = Vec::new();
+        for &(pt, _, _) in strings::STRINGS {
+            match catalan.get(pt) {
+                Some(text) => {
+                    assert!(!text.trim().is_empty(), "empty Catalan for {pt:?}");
+                    assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                }
+                None => missing.push(pt),
+            }
+        }
+        assert!(missing.is_empty(), "no row in i18n/catalan.rs for:
+{missing:#?}");
+        for (pt, _) in catalan::CATALAN {
+            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in catalan.rs without one in strings.rs: {pt:?}");
+        }
+        assert_eq!(tr_in(Lang::Ca, "Copiar"), "Copia");
+        assert_eq!(Lang::parse("ca-ES"), Some(Lang::Ca));
+        assert_eq!(Lang::for_country("AD"), Some(Lang::Ca));
     }
 
     #[test]

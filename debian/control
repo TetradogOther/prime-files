@@ -1,0 +1,36 @@
+Source: prime-files
+Section: utils
+Priority: optional
+Maintainer: Gabriel Cortés <gabriel.cat.developer@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               cargo,
+               rustc
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: prime-files
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         fonts-dejavu-core,
+         libfontconfig1,
+         libvulkan1,
+         libwayland-client0,
+         libwayland-cursor0,
+         libwayland-egl1,
+         libx11-6,
+         libxcb1,
+         libxkbcommon0
+Recommends: ffmpeg,
+            poppler-utils
+Description: Fast file manager with tabs, previews and a built-in terminal
+ Prime Files is a file explorer written in Rust: tabs in the title bar, a
+ split view, previews of images, video, audio, PDF, 3D models and text, an
+ embedded terminal and a quick search over the disk.
+ .
+ It is the Linux port of the Windows program of the same name, which keeps
+ its own name inside the code (the crates are still called nohrs-*).
+ .
+ The Windows-only parts are not there: the Explorer's context menu, the
+ NTFS index in the Everything style, the Listary plugin, the Shell
+ thumbnails and the in-app auto-updater.

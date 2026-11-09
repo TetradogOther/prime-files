@@ -726,14 +726,302 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    use super::{Command, Update};
-    use std::sync::mpsc;
+    //! The sound is played by `ffplay`, the player of ffmpeg, and the
+    //! picture of a video is drawn by `ffmpeg` itself: the frame at the
+    //! playhead, scaled to the size of the preview.
+    //!
+    //! The engine of Windows hands the frames over as they are decoded; here
+    //! the frame is asked for when the playhead moves, which is a little
+    //! slower but plays every format ffmpeg reads.
 
-    pub fn run(_path: &str, _commands: &mpsc::Receiver<Command>, updates: &async_channel::Sender<Update>) {
-        updates.send_blocking(Update::Failed("Playback is only available on Windows".into())).ok();
+    use std::process::{Child, Command as Process, Stdio};
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    use super::{Command, MAX_FRAME, Update};
+
+    /// How often the position is published and the frame asked for.
+    const TICK: Duration = Duration::from_millis(40);
+    /// How often a new frame is drawn while a video plays.
+    const FRAME_EVERY: Duration = Duration::from_millis(200);
+
+    pub fn run(path: &str, commands: &mpsc::Receiver<Command>, updates: &async_channel::Sender<Update>) {
+        let Some(info) = probe(path) else {
+            updates.send_blocking(Update::Failed("the file could not be read".into())).ok();
+            return;
+        };
+        if updates
+            .send_blocking(Update::State {
+                position: 0.0,
+                duration: info.duration,
+                playing: false,
+                has_video: info.has_video,
+            })
+            .is_err()
+        {
+            return;
+        }
+        // The first frame, so the preview shows the video before it plays.
+        if info.has_video
+            && let Some(frame) = frame_at(path, 0.0)
+            && updates.send_blocking(Update::Frame(frame)).is_err()
+        {
+            return;
+        }
+
+        let mut player: Option<Player> = None;
+        let mut volume = 1.0f64;
+        let mut playing = false;
+        let mut position = 0.0f64;
+        let mut last = Instant::now();
+        let mut last_frame = Instant::now();
+
+        loop {
+            let received = commands.recv_timeout(TICK);
+            match received {
+                Ok(command) => match command {
+                    Command::Play => {
+                        playing = true;
+                        last = Instant::now();
+                        restart(&mut player, path, position, volume);
+                    }
+                    Command::Pause => {
+                        playing = false;
+                        stop(&mut player);
+                    }
+                    Command::Seek(seconds) => {
+                        position = seconds.max(0.0);
+                        if playing {
+                            restart(&mut player, path, position, volume);
+                        }
+                    }
+                    Command::Volume(value) => {
+                        volume = value.clamp(0.0, 1.0);
+                        if playing {
+                            restart(&mut player, path, position, volume);
+                        }
+                    }
+                },
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+
+            if playing {
+                position += last.elapsed().as_secs_f64();
+                last = Instant::now();
+                if info.duration > 0.0 && position >= info.duration {
+                    position = info.duration;
+                    playing = false;
+                    stop(&mut player);
+                }
+                if info.has_video && last_frame.elapsed() >= FRAME_EVERY {
+                    last_frame = Instant::now();
+                    if let Some(frame) = frame_at(path, position) {
+                        updates.send_blocking(Update::Frame(frame)).ok();
+                    }
+                }
+            }
+            if updates
+                .send_blocking(Update::State { position, duration: info.duration, playing, has_video: info.has_video })
+                .is_err()
+            {
+                break;
+            }
+        }
+        stop(&mut player);
     }
 
-    pub fn waveform(_path: &str, _updates: &async_channel::Sender<Update>) {}
+    /// The sound playing, and where it is.
+    struct Player {
+        child: Child,
+        started: Instant,
+    }
+
+    /// Starts the sound at `position`, with the volume.
+    fn restart(player: &mut Option<Player>, path: &str, position: f64, volume: f64) {
+        stop(player);
+        let Ok(child) = spawn_player(path, position, volume) else {
+            return;
+        };
+        *player = Some(Player { child, started: Instant::now() });
+    }
+
+    /// Starts the sound at `position`.
+    fn spawn_player(path: &str, position: f64, volume: f64) -> Result<Child, std::io::Error> {
+        let percent = (volume.clamp(0.0, 1.0) * 100.0).round() as u32;
+        let mut command = Process::new("ffplay");
+        command
+            .arg("-nodisp")
+            .arg("-autoexit")
+            .arg("-loglevel")
+            .arg("quiet")
+            .arg("-volume")
+            .arg(percent.to_string());
+        if position > 0.0 {
+            command.arg("-ss").arg(format!("{position:.3}"));
+        }
+        command
+            .arg(path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+    }
+
+    /// Stops the sound and frees the file it holds.
+    fn stop(player: &mut Option<Player>) {
+        let Some(mut current) = player.take() else {
+            return;
+        };
+        let _ = current.child.kill();
+        let _ = current.child.wait();
+    }
+
+    /// What `ffprobe` says about the file: how long it is and whether it has
+    /// a picture.
+    struct Info {
+        duration: f64,
+        has_video: bool,
+    }
+
+    fn probe(path: &str) -> Option<Info> {
+        let output = Process::new("ffprobe")
+            .arg("-v")
+            .arg("quiet")
+            .arg("-show_entries")
+            .arg("format=duration:stream=codec_type")
+            .arg("-of")
+            .arg("default=noprint_wrappers=1")
+            .arg(path)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut duration = 0.0;
+        let mut has_video = false;
+        for line in text.lines() {
+            match line.split_once('=') {
+                Some(("duration", value)) => duration = value.trim().parse().unwrap_or(0.0),
+                Some(("codec_type", value)) if value.trim() == "video" => has_video = true,
+                _ => {}
+            }
+        }
+        Some(Info { duration, has_video })
+    }
+
+    /// The frame of the video at `position`, scaled to the size of the
+    /// preview.
+    fn frame_at(path: &str, position: f64) -> Option<gpui::RenderImage> {
+        let mut command = Process::new("ffmpeg");
+        command
+            .arg("-v")
+            .arg("quiet")
+            .arg("-ss")
+            .arg(format!("{position:.3}"))
+            .arg("-i")
+            .arg(path)
+            .arg("-frames:v")
+            .arg("1")
+            .arg("-vf")
+            .arg(format!("scale={}:{}:force_original_aspect_ratio=decrease", MAX_FRAME.0, MAX_FRAME.1))
+            .arg("-f")
+            .arg("image2pipe")
+            .arg("-vcodec")
+            .arg("png")
+            .arg("pipe:1")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        let output = command.output().ok()?;
+        if !output.status.success() || output.stdout.is_empty() {
+            return None;
+        }
+        to_frame(&output.stdout)
+    }
+
+    /// The picture of a frame, in the layout the preview draws it in: BGRA,
+    /// premultiplied.
+    fn to_frame(bytes: &[u8]) -> Option<gpui::RenderImage> {
+        let decoded = image::load_from_memory(bytes).ok()?.into_rgba8();
+        let (width, height) = decoded.dimensions();
+        let mut bgra = decoded.into_raw();
+        for pixel in bgra.chunks_exact_mut(4) {
+            let alpha = u16::from(pixel[3]);
+            let premultiply = |channel: u8| ((u16::from(channel) * alpha + 127) / 255) as u8;
+            let (red, green, blue) = (pixel[0], pixel[1], pixel[2]);
+            pixel[0] = premultiply(blue);
+            pixel[1] = premultiply(green);
+            pixel[2] = premultiply(red);
+        }
+        crate::explorer::thumbnails::render_image(width, height, bgra)
+    }
+
+    /// The loudest sample of each hundredth of a second of the sound, read
+    /// from the file with ffmpeg.
+    fn read_peaks(path: &str) -> Result<Option<Vec<f32>>, std::io::Error> {
+        use std::io::Read as _;
+
+        const RATE: usize = 8000;
+        const BLOCKS_PER_SECOND: usize = super::PEAK_BLOCKS_PER_SECOND;
+
+        let mut child = Process::new("ffmpeg")
+            .arg("-v")
+            .arg("quiet")
+            .arg("-i")
+            .arg(path)
+            .arg("-ac")
+            .arg("1")
+            .arg("-ar")
+            .arg(RATE.to_string())
+            .arg("-f")
+            .arg("s16le")
+            .arg("pipe:1")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()?;
+        let Some(mut stdout) = child.stdout.take() else {
+            return Err(std::io::Error::other("the samples could not be read"));
+        };
+        let mut samples = Vec::new();
+        let mut buffer = [0u8; 8192];
+        loop {
+            let read = stdout.read(&mut buffer)?;
+            if read == 0 {
+                break;
+            }
+            samples.extend_from_slice(&buffer[..read]);
+        }
+        let _ = child.wait();
+        if samples.is_empty() {
+            return Ok(None);
+        }
+
+        let block = (RATE / BLOCKS_PER_SECOND).max(1) * 2;
+        let mut peaks = Vec::new();
+        for chunk in samples.chunks(block) {
+            let mut loudest = 0f32;
+            for pair in chunk.chunks_exact(2) {
+                let sample = i16::from_le_bytes([pair[0], pair[1]]);
+                loudest = loudest.max(f32::from(sample.abs()) / 32768.0);
+            }
+            peaks.push(loudest);
+        }
+        Ok(Some(peaks))
+    }
+
+    /// Reads `path`'s sound from start to end and sends its peaks, a stretch
+    /// at a time, until the file ends or the preview is closed.
+    pub fn waveform(path: &str, updates: &async_channel::Sender<Update>) {
+        let Ok(Some(peaks)) = read_peaks(path) else {
+            return;
+        };
+        // A stretch at a time, as the engine sends them.
+        for chunk in peaks.chunks(512) {
+            if updates.send_blocking(Update::Peaks(chunk.to_vec())).is_err() {
+                return;
+            }
+        }
+    }
 }
 
 

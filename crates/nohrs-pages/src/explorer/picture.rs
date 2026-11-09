@@ -140,8 +140,80 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    pub fn decode(_path: &str, _edge: u32) -> Result<(u32, u32, Vec<u8>), String> {
-        Err("decoded by WIC on Windows only".into())
+    //! The image is decoded by the `image` crate, which reads the formats
+    //! every Linux desktop reads too, and scaled with the same cubic filter
+    //! WIC uses.
+
+    use std::io::BufReader;
+
+    use image::{GenericImageView as _, ImageReader};
+
+    use super::fitted;
+
+    pub fn decode(path: &str, edge: u32) -> Result<(u32, u32, Vec<u8>), String> {
+        let file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+        let reader = ImageReader::new(BufReader::new(file))
+            .with_guessed_format()
+            .map_err(|error| error.to_string())?;
+        let picture = reader.decode().map_err(|error| error.to_string())?;
+        // The photo's EXIF orientation: the pixels are stored the way the
+        // sensor saw them, turned for showing.
+        let picture = match orientation(path) {
+            Some(turn) => turn(picture),
+            None => picture,
+        };
+        let (width, height) = picture.dimensions();
+        let (fit_width, fit_height) = fitted(width, height, edge);
+        let picture = if (fit_width, fit_height) == (width, height) {
+            picture
+        } else {
+            picture.resize(fit_width, fit_height, image::imageops::FilterType::Lanczos3)
+        };
+        let (width, height) = picture.dimensions();
+        let rgba = picture.to_rgba8();
+        Ok((width, height, premultiplied_bgra(rgba.as_raw())))
+    }
+
+    /// The pixels in the layout the panel draws them in: BGRA, with the
+    /// colour multiplied by its own transparency.
+    fn premultiplied_bgra(rgba: &[u8]) -> Vec<u8> {
+        let mut bgra = rgba.to_vec();
+        for pixel in bgra.chunks_exact_mut(4) {
+            let alpha = u16::from(pixel[3]);
+            let premultiply = |channel: u8| ((u16::from(channel) * alpha + 127) / 255) as u8;
+            let (red, green, blue) = (pixel[0], pixel[1], pixel[2]);
+            pixel[0] = premultiply(blue);
+            pixel[1] = premultiply(green);
+            pixel[2] = premultiply(red);
+        }
+        bgra
+    }
+
+    /// How the photo was turned when it was taken, as the EXIF block says.
+    ///
+    /// The eight orientations as the operations that produce them: mirrored
+    /// ones are a turn followed by a flip.
+    fn orientation(path: &str) -> Option<fn(image::DynamicImage) -> image::DynamicImage> {
+        let file = std::fs::File::open(path).ok()?;
+        let mut reader = std::io::BufReader::new(file);
+        let exif = exif::Reader::new().read_from_container(&mut reader).ok()?;
+        let field = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY)?;
+        let exif::Value::Short(values) = &field.value else {
+            return None;
+        };
+        let Some(value) = values.first().copied() else {
+            return None;
+        };
+        Some(match value {
+            2 => |image| image.fliph(),
+            3 => |image| image.rotate180(),
+            4 => |image| image.flipv(),
+            5 => |image| image.rotate90().fliph(),
+            6 => |image| image.rotate90(),
+            7 => |image| image.rotate90().flipv(),
+            8 => |image| image.rotate270(),
+            _ => |image| image,
+        })
     }
 }
 

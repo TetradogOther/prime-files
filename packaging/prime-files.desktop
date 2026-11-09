@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Prime Files
+Comment=Explorador de arquivos rápido, com abas, prévias e terminal embutido
+Exec=prime-files %f
+Icon=prime-files
+Terminal=false
+Categories=System;FileManager;FileTools;
+MimeType=inode/directory;
+Keywords=arquivos;pastas;explorador;gerenciador;fitxers;carpetes;archivos;carpetas;gestor;
+Actions=open;open-new-window;
+
+[Desktop Action open]
+Name=Abrir
+Exec=prime-files %f
+
+[Desktop Action open-new-window]
+Name=Abrir em uma nova janela
+Exec=prime-files

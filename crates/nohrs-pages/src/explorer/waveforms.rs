@@ -700,10 +700,75 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
+    //! The sound is read by ffmpeg, which every Linux desktop has: it is
+    //! decoded to plain samples and the loudest of each stretch kept, the
+    //! same the Windows engine's samples give.
+
+    use std::process::{Command, Stdio};
+
+    use super::{BARS, bucket, normalize};
+
+    /// How many blocks a second the samples are grouped in.
+    const BLOCKS_PER_SECOND: usize = 100;
+    /// The rate the samples are read at; high enough for the peaks to be
+    /// the shape of the sound, low enough to read a long file quickly.
+    const RATE: &str = "8000";
+
     pub fn init_thread() {}
 
-    pub fn peaks(_path: &str, _cancelled: &dyn Fn() -> bool) -> std::io::Result<Option<Vec<u8>>> {
-        Err(std::io::Error::other("waveforms are only decoded on Windows"))
+    /// The file's `BARS` heights, or `None` when `cancelled` said stop.
+    pub fn peaks(path: &str, cancelled: &dyn Fn() -> bool) -> std::io::Result<Option<Vec<u8>>> {
+        let mut child = Command::new("ffmpeg")
+            .arg("-v")
+            .arg("quiet")
+            .arg("-i")
+            .arg(path)
+            .arg("-ac")
+            .arg("1")
+            .arg("-ar")
+            .arg(RATE)
+            .arg("-f")
+            .arg("s16le")
+            .arg("pipe:1")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()?;
+        let Some(mut stdout) = child.stdout.take() else {
+            return Err(std::io::Error::other("the samples could not be read"));
+        };
+        let mut samples = Vec::new();
+        let mut buffer = [0u8; 8192];
+        use std::io::Read as _;
+        loop {
+            if cancelled() {
+                let _ = child.kill();
+                return Ok(None);
+            }
+            let read = stdout.read(&mut buffer)?;
+            if read == 0 {
+                break;
+            }
+            samples.extend_from_slice(&buffer[..read]);
+        }
+        let _ = child.wait();
+        if samples.is_empty() {
+            return Err(std::io::Error::other("the file has no sound"));
+        }
+
+        // Every sample a signed 16-bit number; the loudest of each block of
+        // a hundredth of a second.
+        let rate: usize = RATE.parse().unwrap_or(8000);
+        let block = (rate / BLOCKS_PER_SECOND).max(1) * 2;
+        let mut blocks = Vec::new();
+        for chunk in samples.chunks(block) {
+            let mut loudest = 0f32;
+            for pair in chunk.chunks_exact(2) {
+                let sample = i16::from_le_bytes([pair[0], pair[1]]);
+                loudest = loudest.max(f32::from(sample.abs()) / 32768.0);
+            }
+            blocks.push(loudest);
+        }
+        Ok(Some(normalize(&bucket(&blocks))))
     }
 }
 

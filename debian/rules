@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+# Builds the Debian package of Prime Files.
+#
+# The program is the `nohrs` crate: the Windows program kept the name it was
+# born with inside the code (the crates are still nohrs-*), and the package
+# installs it as `prime-files`, so the command in the README, the desktop
+# entry and the package all use the same name.
+#
+# Build the binary package from the root of the source tree:
+#
+#     dpkg-buildpackage -b -us -uc
+#
+# The .deb lands next to the source tree. `dpkg-buildpackage -b` is used
+# rather than the default because this is a native package (3.0 (native))
+# whose version carries a Debian revision; `dpkg-source` refuses to build
+# the .dsc of a native package with a revision.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --release -p nohrs --locked
+
+# The test suite drives the GUI, which needs a display and a Vulkan driver;
+# it is not run while the package is built.
+override_dh_auto_test:
+
+override_dh_auto_install:
+	install -d debian/prime-files/usr/bin
+	install -m 0755 target/release/nohrs debian/prime-files/usr/bin/prime-files
+	install -d debian/prime-files/usr/share/applications
+	install -m 0644 packaging/prime-files.desktop debian/prime-files/usr/share/applications/prime-files.desktop
+	install -d debian/prime-files/usr/share/icons/hicolor/256x256/apps
+	install -m 0644 packaging/prime-files.png debian/prime-files/usr/share/icons/hicolor/256x256/apps/prime-files.png

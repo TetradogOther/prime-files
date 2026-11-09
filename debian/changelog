@@ -1,0 +1,7 @@
+prime-files (0.3.9-1) unstable; urgency=medium
+
+  * Linux port: Debian package (debhelper), freedesktop desktop entry and a
+    user-level installer script, with the documentation of the three ways to
+    install the program on Debian.
+
+ -- Gabriel Cortés <gabriel.cat.developer@gmail.com>  Tue, 10 Nov 2026 00:00:00 +0100
