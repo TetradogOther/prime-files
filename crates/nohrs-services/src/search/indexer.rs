@@ -15,13 +15,17 @@ pub struct IndexManager {
 }
 
 impl IndexManager {
-    /// Opens (or creates) the default index under `~/.nohrs/index` rooted at `~/Documents`.
+    /// Opens (or creates) the default index under `~/.nohrs/index`, rooted at
+    /// the folder the user keeps their documents in.
     pub fn new() -> Result<Self> {
         let home_dir = dirs::home_dir().context("Could not determine home directory")?;
         let nohrs_dir = home_dir.join(".nohrs");
         let index_path = nohrs_dir.join("index");
 
-        let documents_dir = home_dir.join("Documents");
+        // The folder the desktop named for the documents, which is not always
+        // `~/Documents`: on a system in Spanish it is `~/Documentos`, and on
+        // one without a `user-dirs.dirs` it is whatever the user has.
+        let documents_dir = nohrs_core::config::paths::documents_dir();
         Self::new_internal(index_path, documents_dir)
     }
 

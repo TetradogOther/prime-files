@@ -240,4 +240,10 @@ pub(super) static LINUX: &[(&str, &str, &str, &str)] = &[
         "Búsqueda rápida, el Listary de Prime Files",
         "Cerca ràpida, el Listary del Prime Files",
     ),
+    (
+        "Procura uma versão nova ao abrir, baixa em segundo plano e instala quando você fecha o Prime Files.",
+        "Looks for a new version when it opens and downloads it in the background; the package manager installs it.",
+        "Busca una versión nueva al abrir y la descarga en segundo plano; el gestor de paquetes la instala.",
+        "Busca una versió nova en obrir i la baixa en segon pla; el gestor de paquets la instal·la.",
+    ),
 ];

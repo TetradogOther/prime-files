@@ -48,6 +48,13 @@ enum Step {
 
 const STEPS: [Step; 7] = [Step::Look, Step::Window, Step::Files, Step::Sound, Step::System, Step::Search, Step::Done];
 
+/// What the step of the system's own parts is called: on Windows it is
+/// Windows, on the other systems it is the desktop.
+#[cfg(windows)]
+const SYSTEM_LABEL: &str = "Windows";
+#[cfg(not(windows))]
+const SYSTEM_LABEL: &str = "Sistema";
+
 impl Step {
     fn label(self) -> &'static str {
         match self {
@@ -55,7 +62,7 @@ impl Step {
             Self::Window => t!("Janela"),
             Self::Files => t!("Pastas"),
             Self::Sound => t!("Mídia"),
-            Self::System => "Windows",
+            Self::System => SYSTEM_LABEL,
             Self::Search => t!("Busca"),
             Self::Done => t!("Pronto"),
         }
@@ -512,15 +519,19 @@ impl WelcomePage {
                 )
             })
             .child(group_label(t!("Botão direito")))
-            .child(self.config_card(
-                "welcome-classic-menu",
-                "icons/menu-square.svg",
-                t!("Menu clássico do Windows"),
-                t!("O botão direito abre direto o menu antigo do Windows, com Renomear, Copiar e Colar escritos, sem passar por \"Mostrar mais opções\"."),
-                self.config.menu.classic,
-                ("menu", "classic"),
-                cx,
-            ))
+            // The classic menu is the Explorer's own: on the other systems
+            // there is no such menu to open.
+            .when(cfg!(windows), |this| {
+                this.child(self.config_card(
+                    "welcome-classic-menu",
+                    "icons/menu-square.svg",
+                    t!("Menu clássico do Windows"),
+                    t!("O botão direito abre direto o menu antigo do Windows, com Renomear, Copiar e Colar escritos, sem passar por \"Mostrar mais opções\"."),
+                    self.config.menu.classic,
+                    ("menu", "classic"),
+                    cx,
+                ))
+            })
     }
 
     fn step_sound(&self, cx: &mut Context<Self>) -> Div {
@@ -603,17 +614,19 @@ impl WelcomePage {
                     );
                 }),
             ))
-            .child(option_card(
-                "welcome-reveal",
-                "icons/film.svg",
-                t!("\"Mostrar na pasta\" abre aqui"),
-                t!("Premiere (Revelar no Explorador), Chrome, Edge e Firefox (Mostrar na pasta, depois de baixar) e o menu Iniciar (Abrir local do arquivo) abrem a pasta no Prime Files, com o arquivo selecionado e piscando em destaque."),
-                Some(reveal),
-                false,
-                cx.listener(move |page, _, _, cx| {
-                    page.write("explorer", "reveal_from_other_apps", (!reveal).to_string(), cx);
-                }),
-            ))
+            .when(cfg!(windows), |this| {
+                this.child(option_card(
+                    "welcome-reveal",
+                    "icons/film.svg",
+                    t!("\"Mostrar na pasta\" abre aqui"),
+                    t!("Premiere (Revelar no Explorador), Chrome, Edge e Firefox (Mostrar na pasta, depois de baixar) e o menu Iniciar (Abrir local do arquivo) abrem a pasta no Prime Files, com o arquivo selecionado e piscando em destaque."),
+                    Some(reveal),
+                    false,
+                    cx.listener(move |page, _, _, cx| {
+                        page.write("explorer", "reveal_from_other_apps", (!reveal).to_string(), cx);
+                    }),
+                ))
+            })
             .child(choice_card(
                 "icons/layers.svg",
                 t!("Pastas abertas de outros programas"),
@@ -641,7 +654,7 @@ impl WelcomePage {
                     page.change(move |exe| crate::default_explorer::set_starts_with_windows(exe, enable), cx);
                 }),
             ))
-            .when(reveal && starts == Some(false), |this| {
+            .when(cfg!(windows) && reveal && starts == Some(false), |this| {
                 this.child(note(t!("\"Mostrar na pasta\" só chega aqui enquanto o Prime Files está aberto. Para valer sempre, ligue \"Iniciar com o Windows\".")))
             })
             .child(self.config_card(
@@ -694,17 +707,22 @@ impl WelcomePage {
         };
         steps_column()
             .child(self.quick_search_card(cx))
-            .child(option_card(
-                "welcome-mft",
-                "icons/database.svg",
-                t!("Indexação instantânea"),
-                t!("Lê a tabela dos discos NTFS como o Everything: o índice do computador fica pronto em segundos, também depois de reiniciar. Instala um serviço do Windows, com permissão de administrador uma vez."),
-                Some(mft_on),
-                mft_busy,
-                cx.listener(move |_page, _, _, cx| mft::set(!mft_on, cx)),
-            ))
+            // The instant index reads the NTFS tables of a Windows disk; on
+            // the other systems the index is built by walking the folders.
+            .when(cfg!(windows), |this| {
+                this.child(option_card(
+                    "welcome-mft",
+                    "icons/database.svg",
+                    t!("Indexação instantânea"),
+                    t!("Lê a tabela dos discos NTFS como o Everything: o índice do computador fica pronto em segundos, também depois de reiniciar. Instala um serviço do Windows, com permissão de administrador uma vez."),
+                    Some(mft_on),
+                    mft_busy,
+                    cx.listener(move |_page, _, _, cx| mft::set(!mft_on, cx)),
+                ))
+            })
             .when_some(mft_error, |this, error| this.child(note_text(tf!("Não deu certo: {error}", error = error))))
-            .child(listary_card)
+            // The Listary is a Windows program.
+            .when(cfg!(windows), |this| this.child(listary_card))
             .child(note(t!("Dentro da janela: Ctrl+E busca no computador inteiro e Ctrl+T abre a busca numa aba nova.")))
     }
 

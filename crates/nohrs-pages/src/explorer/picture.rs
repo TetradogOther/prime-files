@@ -167,11 +167,30 @@ mod platform {
         let picture = if (fit_width, fit_height) == (width, height) {
             picture
         } else {
-            picture.resize(fit_width, fit_height, image::imageops::FilterType::Lanczos3)
+            picture.resize(fit_width, fit_height, filter(width, height, fit_width))
         };
         let (width, height) = picture.dimensions();
         let rgba = picture.to_rgba8();
         Ok((width, height, premultiplied_bgra(rgba.as_raw())))
+    }
+
+    /// The filter the picture is scaled with.
+    ///
+    /// A photo of 48 megapixels scaled to a panel of 1200 pixels is read and
+    /// written some forty times over, and the cubic filter reads every
+    /// neighbour of every pixel it writes: that is seconds of work for a
+    /// glance at the picture. Past a certain shrink the bilinear filter is
+    /// used instead, which is a fraction of the work for a difference no eye
+    /// sees at the size the panel shows it. A picture that is barely scaled
+    /// keeps the sharp filter.
+    fn filter(width: u32, height: u32, fit_width: u32) -> image::imageops::FilterType {
+        let source = width.max(height) as f64;
+        let target = fit_width.max(1) as f64;
+        if source / target >= 4.0 {
+            image::imageops::FilterType::Triangle
+        } else {
+            image::imageops::FilterType::Lanczos3
+        }
     }
 
     /// The pixels in the layout the panel draws them in: BGRA, with the

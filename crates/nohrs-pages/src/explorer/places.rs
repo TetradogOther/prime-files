@@ -625,13 +625,16 @@ mod platform {
 
     /// The filesystems mounted on the machine, as the units of the sidebar.
     pub fn drive_places() -> Vec<Place> {
-        drives::mount_points()
+        drives::mounts()
             .into_iter()
-            .map(|mount| {
+            .map(|(mount, device)| {
+                // The root of the machine is named after the disk it is on,
+                // as the other mounts are named after their own folder.
                 let name = mount
                     .file_name()
                     .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| mount.to_string_lossy().into_owned());
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or_else(|| device.clone());
                 Place {
                     name,
                     path: Some(mount.to_string_lossy().into_owned()),
@@ -669,7 +672,8 @@ mod platform {
 
     /// The folders the user bookmarked, as the GTK file manager lists them:
     /// `~/.config/gtk-3.0/bookmarks`, one folder per line, the name after
-    /// the path when the folder was given another name.
+    /// the path when the folder was given another name. The paths are
+    /// written as URIs, with the escapes of the characters they hold.
     fn bookmarks() -> Vec<Place> {
         let Some(home) = dirs::home_dir() else {
             return Vec::new();
@@ -681,24 +685,30 @@ mod platform {
         text.lines()
             .filter(|line| !line.trim().is_empty())
             .filter_map(|line| {
-                let (folder, name) = match line.split_once(char::is_whitespace) {
-                    Some((folder, name)) => (folder, Some(name.trim())),
+                let (uri, name) = match line.split_once(char::is_whitespace) {
+                    Some((uri, name)) => (uri, Some(name.trim())),
                     None => (line.trim(), None),
                 };
-                let folder = folder.trim();
+                // "file:///home/gabriel/M%C3%BAsica" is the folder of the
+                // user's music, written the way a URI writes it.
+                let folder = uri.strip_prefix("file://").unwrap_or(uri);
+                let folder = linux::percent_decoded(folder);
                 if folder.is_empty() {
                     return None;
                 }
-                let name = name.filter(|name| !name.is_empty()).map(str::to_string).unwrap_or_else(|| {
-                    std::path::Path::new(folder)
-                        .file_name()
-                        .map(|name| name.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| folder.to_string())
-                });
+                let name = name
+                    .filter(|name| !name.is_empty())
+                    .map(linux::percent_decoded)
+                    .unwrap_or_else(|| {
+                        std::path::Path::new(&folder)
+                            .file_name()
+                            .map(|name| name.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| folder.clone())
+                    });
                 Some(Place {
                     name,
-                    path: Some(folder.to_string()),
-                    parsing_name: folder.to_string(),
+                    path: Some(folder.clone()),
+                    parsing_name: folder,
                     pinned: true,
                 })
             })

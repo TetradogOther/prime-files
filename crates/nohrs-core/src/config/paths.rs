@@ -79,6 +79,44 @@ pub fn log_dir() -> PathBuf {
     state_dir().join("logs")
 }
 
+/// The folder the user keeps their documents in: the one the desktop named
+/// in `~/.config/user-dirs.dirs` (`XDG_DOCUMENTS_DIR`), or `~/Documents`
+/// when it named none.
+///
+/// The folder is created when it is not there: the index of the search
+/// covers it, and a watcher of a folder that is not there is a watcher of
+/// nothing.
+pub fn documents_dir() -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let from_the_file = || {
+        let file = home.join(".config/user-dirs.dirs");
+        let text = std::fs::read_to_string(file).ok()?;
+        let named = text
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.starts_with('#'))
+            .find_map(|line| {
+                let (key, value) = line.split_once('=')?;
+                let value = value.trim().trim_matches('"');
+                (key.trim() == "XDG_DOCUMENTS_DIR")
+                    .then(|| value.replace("$HOME", &home.to_string_lossy()))
+                    .filter(|value| !value.is_empty())
+            })?;
+        Some(PathBuf::from(named))
+    };
+    let named = std::env::var_os("XDG_DOCUMENTS_DIR")
+        .map(PathBuf::from)
+        .or_else(from_the_file)
+        .filter(|path| path.is_absolute())
+        .unwrap_or_else(|| home.join("Documents"));
+    if !named.is_dir()
+        && let Err(error) = std::fs::create_dir_all(&named)
+    {
+        tracing::warn!("could not create the documents folder {}: {error}", named.display());
+    }
+    named
+}
+
 /// Full path to `config.toml`.
 pub fn config_file() -> PathBuf {
     config_dir().join("config.toml")

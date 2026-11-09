@@ -303,6 +303,9 @@ pub fn user_dirs() -> Vec<(String, PathBuf)> {
         let value = value.trim().trim_matches('"');
         // "$HOME/Desktop" is written the way the shell would expand it.
         let value = value.strip_prefix("$HOME").map_or_else(|| value.to_string(), |rest| home.join(rest).to_string_lossy().into_owned());
+        // The desktop writes the names of the folders with the escapes of a
+        // URI, so "Música" is written "M%C3%BAsica".
+        let value = percent_decoded(&value);
         if name.is_empty() || value.is_empty() {
             continue;
         }
@@ -312,6 +315,27 @@ pub fn user_dirs() -> Vec<(String, PathBuf)> {
         }
     }
     dirs
+}
+
+/// The text of a URI with the `%XX` escapes read as the characters they
+/// stand for.
+pub fn percent_decoded(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok();
+            if let Some(byte) = hex.and_then(|hex| u8::from_str_radix(hex, 16).ok()) {
+                out.push(byte);
+                index += 3;
+                continue;
+            }
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The folders the user's own program keeps its files in, created on first

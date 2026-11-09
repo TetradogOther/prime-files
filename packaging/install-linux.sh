@@ -140,6 +140,7 @@ fi
 # The program to install: the one given, or the one this tree built.
 if [ -z "$BINARY" ]; then
     for candidate in \
+        "$SCRIPT_DIR/../target/dist/nohrs" \
         "$SCRIPT_DIR/../target/release/nohrs" \
         "$SCRIPT_DIR/../target/debug/nohrs" \
         "$SCRIPT_DIR/../../target/release/nohrs"

@@ -85,10 +85,24 @@ pub(crate) fn mount_points() -> Vec<std::path::PathBuf> {
     platform::mount_points()
 }
 
+/// The filesystems mounted on this machine, with the name of the disk each
+/// is on.
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn mounts() -> Vec<(std::path::PathBuf, String)> {
+    platform::mounts()
+}
+
 /// The filesystems mounted on this machine, as the units of the sidebar.
 #[cfg(target_os = "windows")]
 pub(crate) fn mount_points() -> Vec<std::path::PathBuf> {
     platform::read_all().into_keys().map(std::path::PathBuf::from).collect()
+}
+
+/// The filesystems mounted on this machine, with the name of the disk each
+/// is on.
+#[cfg(target_os = "windows")]
+pub(crate) fn mounts() -> Vec<(std::path::PathBuf, String)> {
+    platform::read_all().into_keys().map(|root| (std::path::PathBuf::from(root), String::new())).collect()
 }
 
 /// The space on the drive whose root is `path`, if known; asks Windows again
@@ -169,9 +183,9 @@ mod platform {
     /// A Linux machine mounts far more than a person looks at — the pseudo
     /// filesystems the kernel offers (`proc`, `sysfs`, `cgroup`…) are never
     /// in the way. They are left out.
-    pub fn mount_points() -> Vec<PathBuf> {
+    pub fn mounts() -> Vec<(PathBuf, String)> {
         let Ok(text) = std::fs::read_to_string(MOUNTS) else {
-            return vec![PathBuf::from("/")];
+            return vec![(PathBuf::from("/"), String::new())];
         };
         let mut points = Vec::new();
         for line in text.lines() {
@@ -187,14 +201,26 @@ mod platform {
                 continue;
             }
             let path = PathBuf::from(mount);
-            if !points.contains(&path) {
-                points.push(path);
+            if points.iter().any(|(known, _)| known == &path) {
+                continue;
             }
+            // The name of the disk, as the device says it: the root of the
+            // machine has no name of its own.
+            let name = Path::new(device)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| device.to_string());
+            points.push((path, name));
         }
         if points.is_empty() {
-            points.push(PathBuf::from("/"));
+            points.push((PathBuf::from("/"), String::new()));
         }
         points
+    }
+
+    /// The filesystems a person browses, by their path.
+    pub fn mount_points() -> Vec<PathBuf> {
+        mounts().into_iter().map(|(path, _)| path).collect()
     }
 
     /// Whether a mount is a disk, a disk partition or a network share, as

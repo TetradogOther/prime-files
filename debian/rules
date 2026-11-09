@@ -28,7 +28,7 @@ override_dh_auto_configure:
 override_dh_auto_clean:
 
 override_dh_auto_build:
-	cargo build --release -p nohrs --locked
+	cargo build --profile dist -p nohrs --locked
 
 # The test suite drives the GUI, which needs a display and a Vulkan driver;
 # it is not run while the package is built.
@@ -36,7 +36,7 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 	install -d debian/prime-files/usr/bin
-	install -m 0755 target/release/nohrs debian/prime-files/usr/bin/prime-files
+	install -m 0755 target/dist/nohrs debian/prime-files/usr/bin/prime-files
 	install -d debian/prime-files/usr/share/applications
 	install -m 0644 packaging/prime-files.desktop debian/prime-files/usr/share/applications/prime-files.desktop
 	install -d debian/prime-files/usr/share/icons/hicolor/256x256/apps
