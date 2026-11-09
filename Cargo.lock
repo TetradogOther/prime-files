@@ -4516,6 +4516,7 @@ dependencies = [
  "gpui-component",
  "image",
  "kamadak-exif",
+ "md-5",
  "nohrs-core",
  "nohrs-indexer",
  "nohrs-models",

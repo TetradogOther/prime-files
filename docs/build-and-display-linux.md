@@ -175,6 +175,98 @@ python3 xwd2png.py /tmp/nohrs.xwd /tmp/nohrs.png
 
 ---
 
+## 5. Debian にインストールする
+
+ビルドしたプログラムは 3 つの方法で Debian にインストールできる。
+3 つとも同じプログラムで、同じ設定を使う。
+
+### 5.1 `.deb` パッケージ（システム全体）
+
+`debian/` に debhelper 用のパッケージのファイルがある。
+リポジトリのルートでビルドする。
+
+```bash
+dpkg-buildpackage -b -us -uc
+sudo apt install ../prime-files_0.3.9-1_amd64.deb
+```
+
+インストールされる場所:
+
+| 場所 | 内容 |
+| --- | --- |
+| `/usr/bin/prime-files` | プログラム本体 |
+| `/usr/share/applications/prime-files.desktop` | メニューへの項目 |
+| `/usr/share/icons/hicolor/256x256/apps/prime-files.png` | アイコン |
+
+アイコンは `assets/icon/prime-files.png`（512x512）を 256x256 に小さくしたもの。
+`packaging/prime-files.png` にある。
+
+### 5.2 ユーザー用のスクリプト（root 不要）
+
+```bash
+cargo build --release -p nohrs
+./packaging/install-linux.sh
+```
+
+次の 3 つのファイルにインストールする。
+
+- `~/.local/bin/prime-files`
+- `~/.local/share/icons/hicolor/256x256/apps/prime-files.png`
+- `~/.local/share/applications/prime-files.desktop`
+
+`~/.local/bin` が PATH にないときは、次のように追加する。
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+```
+
+アンインストールはこうする（入れた 3 つのファイルだけを削除する）。
+
+```bash
+./packaging/install-linux.sh --uninstall
+```
+
+### 5.3 `cargo install`
+
+```bash
+cargo install --path crates/nohrs
+```
+
+インストールされるのは `~/.cargo/bin/nohrs`。
+バイナリ名は内部名のまま（`prime-files` ではない）。
+
+### 5.4 実行時に必要なパッケージ
+
+```bash
+sudo apt install libxkbcommon0 libwayland-client0 libwayland-cursor0 libwayland-egl1 \
+                 libx11-6 libxcb1 libvulkan1 libfontconfig1 fonts-dejavu-core
+```
+
+PDF のプレビューには poppler の `pdftoppm` を使う（推奨）。
+
+```bash
+sudo apt install poppler-utils
+```
+
+### 5.5 起動する
+
+```bash
+prime-files
+```
+
+ディスプレイが自動で見つからないときは、`DISPLAY` を指定する。
+
+```bash
+DISPLAY=:0 prime-files
+```
+
+> 手順 2 の `--features gui` は古い構成のためのもので、現在のワークスペースでは
+> 不要。現在のビルドコマンドは `cargo build --release -p nohrs`。
+> `cargo build --release -p nohrs --locked` は Debian パッケージの `debian/rules` が
+> 使っているコマンド。
+
+---
+
 ## トラブルシューティング
 
 | 症状 | 原因 / 対処 |

@@ -7,6 +7,9 @@ Build-Depends: debhelper-compat (= 13),
                rustc
 Standards-Version: 4.6.2
 Rules-Requires-Root: no
+# The crate the binary comes from: the program kept the name it was born with
+# inside the code, and the package installs it under the name of the program.
+X-Cargo-Crate: nohrs
 
 Package: prime-files
 Architecture: any

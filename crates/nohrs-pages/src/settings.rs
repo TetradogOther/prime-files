@@ -1824,7 +1824,9 @@ impl SettingsPage {
     }
 
     fn integrations(&self, cx: &mut Context<Self>) -> Vec<Group> {
+        #[cfg(windows)]
         let reveal = self.config.explorer.reveal_from_other_apps;
+        #[cfg(windows)]
         let listary_control = match self.listary {
             None => checking().into_any_element(),
             Some(crate::listary::State::NotInstalled) => div()
@@ -1839,7 +1841,7 @@ impl SettingsPage {
         };
         // Three cards by what they are about, each row one short line with
         // the rest behind its "?".
-        vec![
+        let mut groups = vec![
             Group::titled(t!("Pastas do Windows"), vec![
                 Row::hint(
                     t!("Explorador padrão do Windows"),
@@ -1852,6 +1854,7 @@ impl SettingsPage {
                     },
                 )
                 .more(t!("Pastas, drives, Win+E e o ícone do Explorador na barra de tarefas abrem no Prime Files. Só neste usuário do Windows; desligar devolve tudo ao Explorador.")),
+                #[cfg(windows)]
                 Row::hint(
                     t!("\"Mostrar na pasta\" abre aqui"),
                     t!("Premiere, navegadores e o menu Iniciar mostram o arquivo aqui."),
@@ -1877,11 +1880,15 @@ impl SettingsPage {
                 )
                 .more(t!("Abre a busca do computador por cima de qualquer programa, como o Listary. Numa janela de abrir ou salvar arquivo, o que você escolher vai para ela. Ctrl+K também abre, dentro do Prime Files.")),
             ]),
-            Group::titled("Listary", vec![
-                Row::hint(t!("Abrir as pastas do Listary aqui"), t!("O Listary é reiniciado ao mudar."), listary_control)
-                    .more(t!("Pastas abertas pelo Listary abrem no Prime Files. O Listary é reiniciado ao mudar.")),
-            ]),
-        ]
+        ];
+        // The Listary is a Windows program: on the other systems there is
+        // nothing to integrate with.
+        #[cfg(windows)]
+        groups.push(Group::titled("Listary", vec![
+            Row::hint(t!("Abrir as pastas do Listary aqui"), t!("O Listary é reiniciado ao mudar."), listary_control)
+                .more(t!("Pastas abertas pelo Listary abrem no Prime Files. O Listary é reiniciado ao mudar.")),
+        ]));
+        groups
     }
 
     // A key pressed while the quick search waits for its shortcut: a

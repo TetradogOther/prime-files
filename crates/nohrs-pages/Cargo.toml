@@ -77,6 +77,11 @@ fbxcel = { version = "0.9", features = ["tree"] }
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs"] }
 
+# The name the desktop's thumbnail cache keeps the picture of a file under
+# is the MD5 of the file's path.
+[target.'cfg(not(windows))'.dependencies]
+md-5 = "0.10"
+
 # Thumbnails come from the Shell's own extractor (`IShellItemImageFactory`), the
 # one Explorer uses: it covers images, video frames, PDFs and program icons in one
 # call and reads the system thumbnail cache. Pinned to the version gpui already

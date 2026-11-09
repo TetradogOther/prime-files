@@ -16,6 +16,8 @@ mod arabic;
 mod catalan;
 mod extra;
 mod hungarian;
+#[cfg(not(target_os = "windows"))]
+mod linux;
 mod strings;
 
 use std::collections::HashMap;
@@ -263,9 +265,34 @@ fn catalan_table() -> &'static HashMap<&'static str, &'static str> {
     TABLE.get_or_init(|| catalan::CATALAN.iter().copied().collect())
 }
 
+/// The texts that are different on Linux, for the English, the Spanish and
+/// the Catalan.
+#[cfg(not(target_os = "windows"))]
+fn linux_table() -> &'static HashMap<&'static str, (&'static str, &'static str, &'static str)> {
+    static TABLE: OnceLock<HashMap<&'static str, (&'static str, &'static str, &'static str)>> = OnceLock::new();
+    TABLE.get_or_init(|| linux::LINUX.iter().map(|&(key, en, es, ca)| (key, (en, es, ca))).collect())
+}
+
 /// `key` in a given language. A language missing the row falls back to
 /// English, which more people read than Portuguese.
 pub fn tr_in(lang: Lang, key: &'static str) -> &'static str {
+    let text = base_text(lang, key);
+    // On Linux some strings name the desktop's programs, not the Windows
+    // ones, and the table of those comes first.
+    #[cfg(not(target_os = "windows"))]
+    if let Some(row) = linux_table().get(key) {
+        return match lang {
+            Lang::En => row.0,
+            Lang::Es => row.1,
+            Lang::Ca => row.2,
+            _ => text,
+        };
+    }
+    text
+}
+
+/// `key` in a given language, as the main table has it.
+fn base_text(lang: Lang, key: &'static str) -> &'static str {
     match lang {
         Lang::Pt => key,
         Lang::En => table().get(key).map_or(key, |row| row.0),
@@ -530,6 +557,28 @@ mod tests {
         assert_eq!(tr_in(Lang::Ca, "Copiar"), "Copia");
         assert_eq!(Lang::parse("ca-ES"), Some(Lang::Ca));
         assert_eq!(Lang::for_country("AD"), Some(Lang::Ca));
+    }
+
+    #[test]
+    fn every_linux_text_has_its_key_and_its_placeholders() {
+        let rows: std::collections::HashMap<&str, (&str, &str, &str)> =
+            linux::LINUX.iter().map(|&(key, en, es, ca)| (key, (en, es, ca))).collect();
+        assert_eq!(rows.len(), linux::LINUX.len(), "duplicated row in i18n/linux.rs");
+        for &(pt, _, _) in strings::STRINGS {
+            if let Some((en, es, ca)) = rows.get(pt) {
+                for text in [en, es, ca] {
+                    assert!(!text.trim().is_empty(), "empty Linux text for {pt:?}");
+                    assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                }
+            }
+        }
+        // Every row of the Linux table must be a key of the main table: a
+        // key that is not used anywhere would be a text nobody ever sees.
+        for (pt, _) in rows.iter() {
+            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in linux.rs without one in strings.rs: {pt:?}");
+        }
+        assert_eq!(tr_in(Lang::Ca, "Explorador do Windows"), "Gestor de fitxers");
+        assert_eq!(tr_in(Lang::Es, "Explorador do Windows"), "Explorador de archivos");
     }
 
     #[test]

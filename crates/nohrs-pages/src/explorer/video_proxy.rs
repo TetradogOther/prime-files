@@ -40,8 +40,9 @@ pub(crate) fn ffmpeg() -> Option<&'static Path> {
     static FOUND: OnceLock<Option<PathBuf>> = OnceLock::new();
     FOUND
         .get_or_init(|| {
-            let beside = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("ffmpeg.exe")));
-            beside.into_iter().chain(on_path("ffmpeg.exe")).find(|candidate| candidate.is_file())
+            let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+            let beside = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(name)));
+            beside.into_iter().chain(on_path(name)).find(|candidate| candidate.is_file())
         })
         .as_deref()
 }

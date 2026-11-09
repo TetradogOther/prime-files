@@ -1026,22 +1026,86 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    use super::{Choice, MenuItem, Request};
+    //! The desktop has no menu of its own that a program may read: what the
+    //! Explorer shows is built by the Explorer. What the desktop does offer
+    //! is the list of programs that open a kind of file, and that is what
+    //! the menu shows under "Open with".
+
+    use std::path::Path;
+
+    use super::{Choice, ItemKind, MenuIcon, MenuItem, Request, Target};
+    use crate::linux;
 
     pub const FIRST_SHELL_ID: u32 = 0x1000;
 
-    pub struct ShellSession;
+    /// The programs of a prepared menu, by the id they were given.
+    #[derive(Default)]
+    pub struct ShellSession {
+        programs: Vec<(u32, String, String)>,
+    }
 
     pub fn show(_request: &Request) -> Choice {
+        // The menu of the program itself is drawn by the program; the
+        // desktop's own is not shown over it.
         Choice::Dismissed
     }
 
-    pub fn prepare(_request: &Request) -> Option<(Vec<MenuItem>, ShellSession)> {
-        None
+    /// The programs that open the kind of file, under one entry.
+    pub fn prepare(request: &Request) -> Option<(Vec<MenuItem>, ShellSession)> {
+        let Target::Items(paths) = &request.target else {
+            return None;
+        };
+        let path = paths.first()?;
+        let kind = linux::mime_type(Path::new(path))?;
+        let handlers = linux::handlers_for(&kind);
+        if handlers.is_empty() {
+            return None;
+        }
+        let mut programs = Vec::new();
+        let mut children = Vec::new();
+        for (index, file) in handlers.iter().enumerate() {
+            let id = FIRST_SHELL_ID + index as u32;
+            programs.push((id, file.id.clone(), path.clone()));
+            children.push(MenuItem {
+                id,
+                label: file.name.clone(),
+                shortcut: None,
+                icon: MenuIcon::None,
+                enabled: true,
+                checked: false,
+                radio: false,
+                bold: false,
+                from_windows: true,
+                kind: ItemKind::Command,
+            });
+        }
+        let entry = MenuItem {
+            id: 0,
+            label: nohrs_core::t!("Abrir com").to_string(),
+            shortcut: None,
+            icon: MenuIcon::None,
+            enabled: true,
+            checked: false,
+            radio: false,
+            bold: false,
+            from_windows: true,
+            kind: ItemKind::Submenu(children),
+        };
+        Some((vec![entry], ShellSession { programs }))
     }
 
-    pub fn run(_session: ShellSession, _id: u32, _intercept: &[String]) -> Choice {
-        Choice::Dismissed
+    /// Runs the program the entry named.
+    pub fn run(session: ShellSession, id: u32, _intercept: &[String]) -> Choice {
+        let Some((_, desktop, path)) = session.programs.iter().find(|(program, _, _)| *program == id) else {
+            return Choice::Dismissed;
+        };
+        match linux::open_with(Path::new(path), desktop) {
+            Ok(()) => Choice::Ran,
+            Err(error) => {
+                tracing::warn!("could not open {path} with {desktop}: {error}");
+                Choice::Dismissed
+            }
+        }
     }
 }
 

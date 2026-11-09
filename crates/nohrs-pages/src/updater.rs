@@ -59,11 +59,29 @@ pub enum Status {
 static PENDING: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 /// Whether this copy was installed (so it may update itself).
+#[cfg(windows)]
 pub fn is_installed() -> bool {
     std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.join("unins000.exe").is_file()))
         .unwrap_or(false)
+}
+
+/// Whether this copy was installed (so it may update itself): on Linux, a
+/// program that was put in a folder of the system, or in the user's own
+/// `bin`, and not one run from a build folder.
+#[cfg(not(windows))]
+pub fn is_installed() -> bool {
+    let Some(exe) = std::env::current_exe().ok() else {
+        return false;
+    };
+    let Some(folder) = exe.parent() else {
+        return false;
+    };
+    ["/usr/bin", "/usr/local/bin", "/opt"]
+        .iter()
+        .any(|system| folder == Path::new(system))
+        || dirs::home_dir().is_some_and(|home| folder == home.join(".local/bin"))
 }
 
 /// This build's version. `PRIME_FILES_PRETEND_VERSION` overrides it, to try
@@ -76,8 +94,14 @@ pub fn current_version() -> Version {
 }
 
 fn curl() -> Command {
-    let system = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
-    let mut command = Command::new(system.join("System32").join("curl.exe"));
+    #[cfg(windows)]
+    let program = {
+        let system = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+        system.join("System32").join("curl.exe")
+    };
+    #[cfg(not(windows))]
+    let program = PathBuf::from("/usr/bin/curl");
+    let mut command = Command::new(program);
     command.args(["--silent", "--show-error", "--location", "--fail", "--max-time", "600"]);
     command.args(["--user-agent", "PrimeFiles-Updater"]);
     hide_window(&mut command);
@@ -140,8 +164,18 @@ fn parse_release(json: &[u8]) -> Option<Release> {
             wanted(name).then(|| Some((name.to_string(), asset.get("browser_download_url")?.as_str()?.to_string())))?
         })
     };
-    let expected = format!("{INSTALLER_PREFIX}{version}.exe");
-    let (installer_name, installer_url) = url_of(&|name| name == expected)?;
+    // The file of the release that installs this program: on Windows the
+    // installer, on Linux the package.
+    #[cfg(windows)]
+    let wanted = format!("{INSTALLER_PREFIX}{version}.exe");
+    #[cfg(not(windows))]
+    let wanted = String::new();
+    #[cfg(windows)]
+    let (installer_name, installer_url) = url_of(&|name| name == wanted)?;
+    #[cfg(not(windows))]
+    let (installer_name, installer_url) = url_of(&|name| {
+        name.ends_with(".deb") || name.ends_with(".AppImage") || name.ends_with(".tar.gz")
+    })?;
     let (_, sums_url) = url_of(&|name| name == SUMS_NAME)?;
     Some(Release { version, installer_name, installer_url, sums_url })
 }
@@ -200,6 +234,7 @@ fn check_and_download(on_progress: &dyn Fn(Status)) -> Result<Option<(Version, P
 
 /// Starts the installer silently, detached from this process. With
 /// `relaunch`, it opens the app again when done.
+#[cfg(windows)]
 pub fn run_installer(installer: &Path, relaunch: bool) -> io::Result<()> {
     let mut command = Command::new(installer);
     command.args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/CLOSEAPPLICATIONS"]);
@@ -216,8 +251,18 @@ pub fn run_installer(installer: &Path, relaunch: bool) -> io::Result<()> {
     command.spawn().map(drop)
 }
 
+/// Opens the package that was downloaded, in the file manager: a package of
+/// the system is installed by the system, and that needs an administrator
+/// this program does not ask for.
+#[cfg(not(windows))]
+pub fn run_installer(installer: &Path, _relaunch: bool) -> io::Result<()> {
+    let folder = installer.parent().unwrap_or(Path::new("."));
+    Command::new("xdg-open").arg(folder).spawn().map(drop)
+}
+
 /// Runs the update downloaded during this session, if automatic updates
 /// left one waiting. Called by `main` after the window has closed.
+#[cfg(windows)]
 pub fn install_pending_on_exit() {
     let pending = PENDING.lock().map(|mut pending| pending.take()).unwrap_or(None);
     if let Some(installer) = pending {
@@ -225,6 +270,17 @@ pub fn install_pending_on_exit() {
         if let Err(error) = run_installer(&installer, false) {
             tracing::error!("could not start the update {}: {error}", installer.display());
         }
+    }
+}
+
+/// On Linux the package is not installed silently: the system installs it,
+/// and it needs an administrator this program does not ask for. The package
+/// stays in the temporary folder, and the settings page says where it is.
+#[cfg(not(windows))]
+pub fn install_pending_on_exit() {
+    let pending = PENDING.lock().map(|mut pending| pending.take()).unwrap_or(None);
+    if let Some(installer) = pending {
+        tracing::info!("the update {} is ready to be installed", installer.display());
     }
 }
 

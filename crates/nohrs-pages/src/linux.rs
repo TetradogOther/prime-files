@@ -139,6 +139,59 @@ fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopFile> {
     (file.name.is_empty() || file.exec.is_empty()).then_some(file)
 }
 
+/// The kind of file the desktop says `path` is, as the MIME type the
+/// programs are registered for.
+///
+/// The desktop's own command answers it; a small table of the common kinds
+/// answers for the files it does not know.
+pub fn mime_type(path: &Path) -> Option<String> {
+    if let Ok(output) = std::process::Command::new("xdg-mime")
+        .arg("query")
+        .arg("filetype")
+        .arg(path)
+        .output()
+        && output.status.success()
+    {
+        let kind = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !kind.is_empty() && kind != "application/octet-stream" {
+            return Some(kind);
+        }
+    }
+    let extension = path.extension()?.to_string_lossy().to_lowercase();
+    let kind = match extension.as_str() {
+        "txt" | "log" | "md" | "toml" | "rs" | "c" | "h" | "cpp" | "py" | "js" | "ts" | "sh" => "text/plain",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "pdf" => "application/pdf",
+        "zip" => "application/zip",
+        "tar" | "gz" | "bz2" | "xz" | "zst" => "application/x-tar",
+        "7z" => "application/x-7z-compressed",
+        "mp3" => "audio/mpeg",
+        "flac" => "audio/flac",
+        "ogg" | "oga" => "audio/ogg",
+        "opus" => "audio/opus",
+        "wav" => "audio/x-wav",
+        "m4a" => "audio/mp4",
+        "mp4" | "m4v" => "video/mp4",
+        "mkv" => "video/x-matroska",
+        "webm" => "video/webm",
+        "avi" => "video/x-msvideo",
+        "mov" => "video/quicktime",
+        "doc" => "application/msword",
+        "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xls" => "application/vnd.ms-excel",
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "ppt" => "application/vnd.ms-powerpoint",
+        "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        _ => return None,
+    };
+    Some(kind.to_string())
+}
+
 /// The programs that say they open this kind of file, the user's own first.
 ///
 /// The kind is asked for by the name the desktop gives it; the caller passes

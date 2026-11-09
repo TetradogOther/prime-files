@@ -22,6 +22,50 @@ O instalador não é assinado digitalmente: o Windows pode mostrar "O Windows pr
 
 Requer Windows 10 (1903) ou mais novo, 64 bits.
 
+## Linux / Debian
+
+Existe uma porta do Prime Files para Linux/Debian, feita em Rust e com a mesma interface. O pacote Debian instala o executável com o nome do programa, `prime-files`, mesmo que dentro do código ele ainda se chame `nohrs` (os crates são `nohrs-*`).
+
+Três formas de instalar:
+
+**Pacote `.deb` (sistema inteiro).** O repositório tem os arquivos do `debhelper` em `debian/`:
+
+```bash
+dpkg-buildpackage -b -us -uc
+sudo apt install ../prime-files_0.3.9-1_amd64.deb
+```
+
+**Script de usuário (sem root).** Instala em `~/.local`, para o seu usuário:
+
+```bash
+cargo build --release -p nohrs
+./packaging/install-linux.sh
+```
+
+O mesmo script com `--uninstall` remove o que ele instalou.
+
+**Cargo:**
+
+```bash
+cargo install --path crates/nohrs
+```
+
+O `.deb` também traz o ícone (`/usr/share/icons/hicolor/256x256/apps/prime-files.png`) e a entrada do menu (`/usr/share/applications/prime-files.desktop`).
+
+Dependências de execução: `libxkbcommon0`, `libwayland-client0`, `libwayland-cursor0`, `libwayland-egl1`, `libx11-6`, `libxcb1`, `libvulkan1`, `libfontconfig1` e `fonts-dejavu-core` (a fonte do terminal). `ffmpeg` (prévias de vídeo) e `poppler-utils` (prévias de PDF, pelo `pdftoppm`) são recomendados.
+
+No Linux ainda não existem estas partes, que são do Windows:
+
+- o menu do botão direito do Explorador;
+- o índice NTFS no estilo do Everything (a busca varre as pastas, em vez de ler o índice do disco);
+- o plugin do Listary;
+- as miniaturas do Shell do Windows (o visualizador abre as imagens ele mesmo, mas não há o cache de miniaturas do Windows);
+- a atualização automática dentro do programa (o instalador do Windows é quem se atualiza; no Linux a versão vem pelo pacote).
+
+O resto funciona igual: abas, divisão em dois painéis, visualizador, terminal embutido, busca, atalhos e o modo compacto. Registrar o Prime Files como o programa que abre pastas também funciona, do jeito do desktop (pelo `mimeapps.list`).
+
+Mais detalhes em [`docs/build-and-display-linux.md`](docs/build-and-display-linux.md).
+
 ## O que tem
 
 - **Abas** na barra de título, divisão em dois painéis, abas restauradas ao reabrir
@@ -44,6 +88,12 @@ Precisa do [Rust](https://rustup.rs) (stable) e do Windows.
 
 ```bash
 cargo build --release -p nohrs
+```
+
+No Linux, o build precisa também dos pacotes de desenvolvimento do Vulkan, do Wayland e do X11 (o gpui liga neles):
+
+```bash
+sudo apt install libvulkan-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev
 ```
 
 O programa fica em `target/release/nohrs.exe` (o código usa internamente o nome `nohrs`: crates `nohrs-*` e a pasta de configuração). O instalador sai de `installer/prime-files.iss` com o [Inno Setup 6](https://jrsoftware.org/isinfo.php); o workflow `.github/workflows/release.yml` faz os dois e publica a release a cada tag `v*`. O ícone é gerado por `assets/icon/make_icon.py`.

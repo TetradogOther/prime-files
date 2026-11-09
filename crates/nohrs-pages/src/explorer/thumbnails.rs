@@ -926,6 +926,130 @@ mod tests {
         assert!(!platform::icon_is_per_class("lnk"));
         assert!(!platform::icon_is_per_class("ico"));
     }
+
+    /// A folder to write a cache of the desktop into.
+    #[cfg(not(windows))]
+    fn temp_folder() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap_or_else(|error| panic!("a folder for the test: {error}"))
+    }
+
+    /// The cache of the desktop keeps the picture of a file under the MD5
+    /// of its URI, in the folder of the size asked for.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_thumbnail_cache_is_looked_up_by_the_md5_of_the_file_uri() {
+        let cache = temp_folder();
+        let normal = cache.path().join("thumbnails/normal");
+        std::fs::create_dir_all(&normal).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        let path = "/tmp/a picture.png";
+        let name = platform::md5_hex(b"file:///tmp/a%20picture.png");
+        image::RgbaImage::new(128, 96)
+            .save(normal.join(format!("{name}.png")))
+            .unwrap_or_else(|error| panic!("the picture: {error}"));
+
+        let found = platform::cached_thumbnail_in(&cache.path().join("thumbnails"), path, 128);
+        let Some(found) = found else {
+            panic!("the picture of the cache");
+        };
+        assert_eq!((found.size(0).width.0, found.size(0).height.0), (128, 96));
+    }
+
+    /// Some thumbnailers name the picture after the path of the file
+    /// itself, without the URI of it.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_thumbnail_cache_is_looked_up_by_the_md5_of_the_path_too() {
+        let cache = temp_folder();
+        let normal = cache.path().join("thumbnails/normal");
+        std::fs::create_dir_all(&normal).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        let path = "/tmp/a picture.png";
+        let name = platform::md5_hex(path.as_bytes());
+        image::RgbaImage::new(128, 96)
+            .save(normal.join(format!("{name}.png")))
+            .unwrap_or_else(|error| panic!("the picture: {error}"));
+
+        let found = platform::cached_thumbnail_in(&cache.path().join("thumbnails"), path, 128);
+        let Some(found) = found else {
+            panic!("the picture of the cache");
+        };
+        assert_eq!((found.size(0).width.0, found.size(0).height.0), (128, 96));
+    }
+
+    /// The picture of the cache that fits the size asked for is the one
+    /// given, even when a smaller one is there too.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_picture_of_the_cache_that_fits_the_size_is_the_one_given() {
+        let cache = temp_folder();
+        let thumbnails = cache.path().join("thumbnails");
+        let normal = thumbnails.join("normal");
+        let large = thumbnails.join("large");
+        std::fs::create_dir_all(&normal).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        std::fs::create_dir_all(&large).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        let path = "/tmp/a picture.png";
+        let name = platform::md5_hex(path.as_bytes());
+        image::RgbaImage::new(128, 128)
+            .save(normal.join(format!("{name}.png")))
+            .unwrap_or_else(|error| panic!("the picture: {error}"));
+        image::RgbaImage::new(256, 200)
+            .save(large.join(format!("{name}.png")))
+            .unwrap_or_else(|error| panic!("the picture: {error}"));
+
+        let found = platform::cached_thumbnail_in(&thumbnails, path, 256);
+        let Some(found) = found else {
+            panic!("the picture of the cache");
+        };
+        assert_eq!((found.size(0).width.0, found.size(0).height.0), (256, 200));
+    }
+
+    /// A file the cache knows nothing about has no picture.
+    #[cfg(not(windows))]
+    #[test]
+    fn a_file_the_cache_does_not_have_has_no_picture() {
+        let cache = temp_folder();
+        let found = platform::cached_thumbnail_in(&cache.path().join("thumbnails"), "/tmp/a picture.png", 128);
+        assert!(found.is_none());
+    }
+
+    /// The name of a picture in the cache is the MD5 of the URI of the
+    /// file, in the hexadecimal the cache uses.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_name_of_a_picture_in_the_cache_is_the_md5_of_the_uri() {
+        assert_eq!(platform::md5_hex(b"file:///tmp/a.png"), "a04bfd79b77efaccf5f6adb271b86f1e");
+        assert_eq!(platform::md5_hex(b""), "d41d8cd98f00b204e9800998ecf8427e");
+    }
+
+    /// On Linux the icon of a file follows its type, so every file of a
+    /// type the desktop knows shares the icon of that type.
+    #[cfg(not(windows))]
+    #[test]
+    fn icons_are_shared_only_where_the_desktop_knows_the_type() {
+        assert!(platform::icon_is_per_class("txt"));
+        assert!(platform::icon_is_per_class("png"));
+        assert!(!platform::icon_is_per_class("zzqqxx"));
+    }
+
+    /// Asks the desktop for each file in `NOHRS_PROBE` (separated by `|`) in
+    /// every mode and says what came back.
+    #[cfg(not(windows))]
+    #[test]
+    #[ignore]
+    fn probe_desktop_answers() {
+        let paths = std::env::var("NOHRS_PROBE").unwrap_or_default();
+        for path in paths.split('|').filter(|path| !path.is_empty()) {
+            for mode in [Mode::Icon, Mode::Cached, Mode::Generate] {
+                let answer = platform::extract(path, 256, mode);
+                println!(
+                    "{path} {mode:?}: {}",
+                    answer.map_or("none".to_string(), |image| {
+                        let size = image.size(0);
+                        format!("{}x{}", size.width.0, size.height.0)
+                    })
+                );
+            }
+        }
+    }
 }
 
 /// What [`platform::extract`] is asked for.
@@ -1141,28 +1265,554 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    //! Elsewhere the formats `image` decodes here (PNG and JPEG) get a scaled
-    //! copy; anything else keeps its icon.
+    //! The pictures of the files on Linux, from what the desktop already
+    //! has: the thumbnail cache of the freedesktop.org specification first,
+    //! the icon theme when the cache has nothing of the file, and the
+    //! formats the `image` crate reads for the rest.
+    //!
+    //! The cache is only read, never written: it belongs to the thumbnailer
+    //! of the desktop, which fills it as the files are seen.
+
+    use gpui::RenderImage;
+    use md5::Digest;
+    use nohrs_core::config::paths::{cache_home, config_home, data_home};
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
+    use std::sync::{Mutex, OnceLock};
 
     use super::Mode;
-    use gpui::RenderImage;
 
+    /// The folders of the thumbnail cache, and the size of the pictures
+    /// each of them keeps.
+    const CACHE_FOLDERS: [(&str, u32); 3] = [("normal", 128), ("large", 256), ("xl", 1024)];
+
+    /// The sizes the icon themes keep.
+    const ICON_SIZES: [u32; 8] = [16, 24, 32, 48, 64, 128, 256, 512];
+
+    /// The icon of a folder.
+    const FOLDER_ICON: &str = "folder";
+
+    /// The icon of a kind of file the desktop has no icon of its own for.
+    const GENERIC_ICON: &str = "text-x-generic";
+
+    /// The icons of the types a file manager is asked about most, as the
+    /// desktop names them. A type not listed here is shown by the name the
+    /// desktop's own naming gives it (`image/png` is shown as `image-png`).
+    const KNOWN_ICONS: [(&str, &str); 12] = [
+        ("text/plain", "text-plain"),
+        ("image/png", "image-png"),
+        ("image/jpeg", "image-jpeg"),
+        ("image/gif", "image-gif"),
+        ("image/svg+xml", "image-svg"),
+        ("application/pdf", "application-pdf"),
+        ("video/mp4", "video-x-generic"),
+        ("audio/mpeg", "audio-x-generic"),
+        ("application/zip", "application-zip"),
+        ("application/x-tar", "folder"),
+        ("inode/directory", "folder"),
+        ("application/x-executable", "application-x-executable"),
+    ];
+
+    /// The types of the extensions that are asked about most, for the
+    /// files whose extension the desktop's own database does not have.
+    const KNOWN_TYPES: [(&str, &str); 11] = [
+        ("txt", "text/plain"),
+        ("png", "image/png"),
+        ("jpg", "image/jpeg"),
+        ("jpeg", "image/jpeg"),
+        ("gif", "image/gif"),
+        ("svg", "image/svg+xml"),
+        ("pdf", "application/pdf"),
+        ("mp4", "video/mp4"),
+        ("mp3", "audio/mpeg"),
+        ("zip", "application/zip"),
+        ("tar", "application/x-tar"),
+    ];
+
+    /// The desktop has no apartment to join, and no thread to own: nothing
+    /// to set up before the work.
     pub fn init_thread() {}
 
-    /// Icons are not extracted here, so there is nothing to share.
-    pub fn icon_is_per_class(_extension: &str) -> bool {
-        false
+    /// The picture of a file at `size` pixels: its icon, the picture the
+    /// desktop's cache holds of it, or the one made from the file itself.
+    pub fn extract(path: &str, size: u32, mode: Mode) -> Option<RenderImage> {
+        match mode {
+            Mode::Icon => icon(path, size),
+            Mode::Cached => cached_thumbnail(path, size),
+            Mode::Generate => generated_thumbnail(path, size),
+        }
     }
 
-    pub fn extract(path: &str, size: u32, mode: Mode) -> Option<RenderImage> {
-        // No cache to ask here: everything is generated on the slow queue.
-        if mode != Mode::Generate {
+    /// Whether every file with this extension shows the same icon, as on
+    /// Windows the registry decides it. On Linux the icon follows the type
+    /// of the file, so every file of a type the desktop knows shares the
+    /// icon of that type; an extension it knows nothing about has no icon
+    /// to share.
+    pub fn icon_is_per_class(extension: &str) -> bool {
+        type_of_extension(extension).is_some()
+    }
+
+    /// The picture the desktop's cache holds of the file, if it has one.
+    fn cached_thumbnail(path: &str, size: u32) -> Option<RenderImage> {
+        cached_thumbnail_in(&cache_home().join("thumbnails"), path, size)
+    }
+
+    /// The picture in `cache`, the folder of the desktop's cache, of the
+    /// file at `path`.
+    pub fn cached_thumbnail_in(cache: &Path, path: &str, size: u32) -> Option<RenderImage> {
+        let absolute = std::path::absolute(path).ok()?;
+        // The smaller picture of a bigger one is kept for when nothing
+        // better is there: the caller scales it.
+        let mut smaller = None;
+        for name in cache_names(&absolute) {
+            for folder in cache_folders(size) {
+                let file = cache.join(folder).join(format!("{name}.png"));
+                if !file.is_file() {
+                    continue;
+                }
+                let Some(decoded) = decode(&file) else {
+                    continue;
+                };
+                let (width, height) = decoded.dimensions();
+                if width.max(height) >= size {
+                    return to_render_image(decoded);
+                }
+                if smaller.is_none() {
+                    smaller = Some(decoded);
+                }
+            }
+        }
+        smaller.and_then(to_render_image)
+    }
+
+    /// The picture made from the file itself, for the formats the `image`
+    /// crate reads.
+    fn generated_thumbnail(path: &str, size: u32) -> Option<RenderImage> {
+        let reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+        let decoded = reader.decode().ok()?.thumbnail(size, size).into_rgba8();
+        to_render_image(decoded)
+    }
+
+    /// The icon the theme of the desktop has for the file, at `size` pixels.
+    fn icon(path: &str, size: u32) -> Option<RenderImage> {
+        for name in icon_names(Path::new(path)) {
+            let Some(file) = find_icon(&name, size) else {
+                continue;
+            };
+            if let Some(image) = decode(&file).and_then(to_render_image) {
+                return Some(image);
+            }
+        }
+        None
+    }
+
+    /// The names the icon of a file may have, the likeliest first.
+    fn icon_names(path: &Path) -> Vec<String> {
+        if path.is_dir() {
+            return vec![FOLDER_ICON.to_string(), "inode-directory".to_string()];
+        }
+        let mut names = Vec::new();
+        if let Some(kind) = type_of_path(path) {
+            names.extend(icon_names_of_type(&kind));
+        }
+        names.push(GENERIC_ICON.to_string());
+        names
+    }
+
+    /// The names the icon of a type may have: the one the desktop gives
+    /// that type, then the one its own naming gives it, then the generic
+    /// icon of the kind it belongs to.
+    fn icon_names_of_type(kind: &str) -> Vec<String> {
+        let mut names = Vec::new();
+        if let Some((_, name)) = KNOWN_ICONS.iter().find(|(known, _)| *known == kind) {
+            names.push((*name).to_string());
+        }
+        let named = kind.replace('/', "-");
+        if !names.contains(&named) {
+            names.push(named);
+        }
+        if let Some((family, _)) = kind.split_once('/') {
+            let generic = format!("{family}-x-generic");
+            if !names.contains(&generic) {
+                names.push(generic);
+            }
+        }
+        names
+    }
+
+    /// The file of the icon `name` at `size`, in the themes of the
+    /// desktop. The themes do not change while the program runs, so where
+    /// an icon was found is kept.
+    fn find_icon(name: &str, size: u32) -> Option<PathBuf> {
+        let key = (name.to_string(), size);
+        if let Some(found) = icon_files().lock().ok().and_then(|files| files.get(&key).cloned()) {
+            return found;
+        }
+        let found = search_icon(name, size);
+        if let Ok(mut files) = icon_files().lock() {
+            files.insert(key, found.clone());
+        }
+        found
+    }
+
+    /// Where the icon `name` is, looked for in the themes of the desktop:
+    /// the one the toolkit is set to, then the one every desktop has, then
+    /// the others that are installed.
+    fn search_icon(name: &str, size: u32) -> Option<PathBuf> {
+        let sizes = icon_sizes(size);
+        for theme in themes() {
+            for directory in icon_directories() {
+                for edge in &sizes {
+                    for context in contexts(name) {
+                        let file = directory
+                            .join(&theme)
+                            .join(format!("{edge}x{edge}"))
+                            .join(context)
+                            .join(format!("{name}.png"));
+                        if file.is_file() {
+                            return Some(file);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// The themes to look in, with the ones they inherit from after each
+    /// of them: a theme shows the icon of the themes it inherits from
+    /// when it has none of its own.
+    fn themes() -> Vec<String> {
+        let mut themes = Vec::new();
+        if let Some(theme) = toolkit_theme() {
+            add_theme(&mut themes, &theme);
+        }
+        add_theme(&mut themes, "hicolor");
+        for theme in installed_themes() {
+            add_theme(&mut themes, &theme);
+        }
+        let mut inherited = Vec::new();
+        for theme in &themes {
+            for parent in inherited_themes(theme) {
+                add_theme(&mut inherited, &parent);
+            }
+        }
+        themes.extend(inherited);
+        themes
+    }
+
+    /// Adds a theme to the list, once.
+    fn add_theme(themes: &mut Vec<String>, theme: &str) {
+        if !theme.is_empty() && !themes.iter().any(|known| known == theme) {
+            themes.push(theme.to_string());
+        }
+    }
+
+    /// The theme the toolkit of the desktop is set to, as its settings
+    /// say.
+    fn toolkit_theme() -> Option<String> {
+        for toolkit in ["gtk-3.0", "gtk-4.0"] {
+            let path = config_home().join(toolkit).join("settings.ini");
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            for line in text.lines() {
+                let Some((key, value)) = line.split_once('=') else {
+                    continue;
+                };
+                if key.trim().eq_ignore_ascii_case("gtk-icon-theme-name") {
+                    let value = value.trim();
+                    if !value.is_empty() {
+                        return Some(value.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// The themes that are installed, by name.
+    fn installed_themes() -> Vec<String> {
+        let mut themes = Vec::new();
+        for directory in icon_directories() {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                continue;
+            };
+            for entry in entries.filter_map(Result::ok) {
+                let path = entry.path();
+                if !path.join("index.theme").is_file() {
+                    continue;
+                }
+                let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+                themes.push(name.to_string());
+            }
+        }
+        themes.sort();
+        themes.dedup();
+        themes
+    }
+
+    /// The themes a theme inherits the icons it has not got of its own
+    /// from, as its `index.theme` names them.
+    fn inherited_themes(theme: &str) -> Vec<String> {
+        let mut parents = Vec::new();
+        let mut pending = vec![theme.to_string()];
+        let mut seen = vec![theme.to_string()];
+        while let Some(current) = pending.pop() {
+            for parent in parents_of(&current) {
+                if seen.contains(&parent) {
+                    continue;
+                }
+                seen.push(parent.clone());
+                parents.push(parent.clone());
+                pending.push(parent);
+            }
+        }
+        parents
+    }
+
+    /// The themes a theme inherits from.
+    fn parents_of(theme: &str) -> Vec<String> {
+        for directory in icon_directories() {
+            let path = directory.join(theme).join("index.theme");
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let mut parents = Vec::new();
+            for line in text.lines() {
+                let Some((key, value)) = line.split_once('=') else {
+                    continue;
+                };
+                if key.trim().eq_ignore_ascii_case("Inherits") {
+                    parents.extend(
+                        value
+                            .split(',')
+                            .map(|parent| parent.trim().to_string())
+                            .filter(|parent| !parent.is_empty()),
+                    );
+                }
+            }
+            return parents;
+        }
+        Vec::new()
+    }
+
+    /// The places in a theme where an icon of this name is kept.
+    fn contexts(name: &str) -> &'static [&'static str] {
+        if name == FOLDER_ICON || name == "inode-directory" {
+            &["places", "files", "categories", "mimetypes"]
+        } else {
+            &["mimetypes", "files", "apps", "places"]
+        }
+    }
+
+    /// The sizes to look for: the one the size asked for, the closest
+    /// smaller, and the closest larger, for the themes that have none of
+    /// the size asked for.
+    fn icon_sizes(size: u32) -> Vec<u32> {
+        let index = ICON_SIZES
+            .iter()
+            .position(|candidate| *candidate >= size)
+            .unwrap_or(ICON_SIZES.len() - 1);
+        let mut sizes = vec![ICON_SIZES[index]];
+        if index > 0 {
+            sizes.push(ICON_SIZES[index - 1]);
+        }
+        if index + 1 < ICON_SIZES.len() {
+            sizes.push(ICON_SIZES[index + 1]);
+        }
+        sizes
+    }
+
+    /// Where the themes are: the user's own first, then the system's.
+    fn icon_directories() -> Vec<PathBuf> {
+        data_dirs().into_iter().map(|directory| directory.join("icons")).collect()
+    }
+
+    /// Where the desktop keeps its data, the user's own first.
+    fn data_dirs() -> Vec<PathBuf> {
+        let mut directories = vec![data_home()];
+        let from_environment = std::env::var_os("XDG_DATA_DIRS")
+            .into_iter()
+            .flat_map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
+            .filter(|directory| directory.is_absolute())
+            .collect::<Vec<_>>();
+        if from_environment.is_empty() {
+            directories.push(PathBuf::from("/usr/local/share"));
+            directories.push(PathBuf::from("/usr/share"));
+        } else {
+            directories.extend(from_environment);
+        }
+        directories
+    }
+
+    /// The folders of the cache, the one that fits the size asked for
+    /// first: the pictures of a size are in the folder of that size.
+    fn cache_folders(size: u32) -> Vec<&'static str> {
+        let mut folders = CACHE_FOLDERS.to_vec();
+        folders.sort_by_key(|(_, edge)| edge.abs_diff(size));
+        folders.into_iter().map(|(folder, _)| folder).collect()
+    }
+
+    /// The names the cache may keep the picture of a file under: the MD5
+    /// of the file's URI, which is what the thumbnailers of the desktop
+    /// write, and the MD5 of the path itself, which some of them write
+    /// instead.
+    fn cache_names(absolute: &Path) -> Vec<String> {
+        let path = absolute.to_string_lossy().into_owned();
+        let mut names = Vec::new();
+        for text in [file_uri(&path, true), file_uri(&path, false), path] {
+            let name = md5_hex(text.as_bytes());
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+        names
+    }
+
+    /// The URI of a path, as the desktop writes it: the characters a URI
+    /// does not allow are written as `%xx`.
+    fn file_uri(path: &str, escaped: bool) -> String {
+        let mut uri = String::from("file://");
+        for byte in path.bytes() {
+            match byte {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
+                    uri.push(char::from(byte));
+                }
+                other if escaped => {
+                    uri.push('%');
+                    uri.push_str(&format!("{other:02X}"));
+                }
+                other => uri.push(char::from(other)),
+            }
+        }
+        uri
+    }
+
+    /// The MD5 of some bytes, in the hexadecimal the cache names its
+    /// pictures with.
+    pub fn md5_hex(data: &[u8]) -> String {
+        const HEX: [u8; 16] = *b"0123456789abcdef";
+        let digest = md5::Md5::digest(data);
+        let mut hex = String::with_capacity(digest.len() * 2);
+        for byte in digest.iter() {
+            hex.push(char::from(HEX[usize::from(byte >> 4)]));
+            hex.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
+        hex
+    }
+
+    /// The type the desktop gives the file. `xdg-mime` reads the whole
+    /// database to answer, so it is asked once per extension: the type of
+    /// the files of an extension does not change from one to the next.
+    fn type_of_path(path: &Path) -> Option<String> {
+        let extension = path.extension()?.to_str()?.to_lowercase();
+        if let Some(kind) = known_types().lock().ok().and_then(|known| known.get(&extension).cloned()) {
+            return kind;
+        }
+        let kind = xdg_type(path).or_else(|| type_of_extension(&extension));
+        if let Ok(mut known) = known_types().lock() {
+            known.insert(extension, kind.clone());
+        }
+        kind
+    }
+
+    /// The type the desktop gives the files with this extension, if it
+    /// knows the extension at all.
+    fn type_of_extension(extension: &str) -> Option<String> {
+        let extension = extension.to_lowercase();
+        if let Some(kind) = type_database().get(&extension) {
+            return Some(kind.clone());
+        }
+        KNOWN_TYPES
+            .iter()
+            .find(|(known, _)| *known == extension)
+            .map(|(_, kind)| (*kind).to_string())
+    }
+
+    /// The type `xdg-mime` gives the file, when the desktop's tool is
+    /// installed.
+    fn xdg_type(path: &Path) -> Option<String> {
+        let output = std::process::Command::new("xdg-mime")
+            .arg("query")
+            .arg("filetype")
+            .arg(path)
+            .output()
+            .ok()?;
+        if !output.status.success() {
             return None;
         }
-        let decoded = image::open(path).ok()?.thumbnail(size, size).into_rgba8();
+        let kind = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        (!kind.is_empty() && kind != "application/octet-stream").then_some(kind)
+    }
+
+    /// The types the desktop gave the files of each extension, kept: the
+    /// answer is the same for every file of an extension.
+    fn known_types() -> &'static Mutex<HashMap<String, Option<String>>> {
+        static TYPES: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+        TYPES.get_or_init(|| Mutex::new(HashMap::new()))
+    }
+
+    /// The extensions the desktop's database knows, and the type of each.
+    /// It is read once and kept: it is the same for the whole session.
+    fn type_database() -> &'static HashMap<String, String> {
+        static DATABASE: OnceLock<HashMap<String, String>> = OnceLock::new();
+        DATABASE.get_or_init(read_type_database)
+    }
+
+    /// Reads the glob database of the desktop (`mime/globs2`), which lists
+    /// the name patterns of every type it knows, one per line, as
+    /// `weight:type:pattern`. The lines come by weight, so the first
+    /// pattern of an extension is the type the desktop shows for it.
+    fn read_type_database() -> HashMap<String, String> {
+        let mut types = HashMap::new();
+        for directory in data_dirs() {
+            let path = directory.join("mime").join("globs2");
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let mut fields = line.splitn(3, ':');
+                let (Some(_weight), Some(kind), Some(patterns)) = (fields.next(), fields.next(), fields.next()) else {
+                    continue;
+                };
+                for pattern in patterns.split(';') {
+                    let Some(extension) = pattern.strip_prefix("*.") else {
+                        continue;
+                    };
+                    types
+                        .entry(extension.to_lowercase())
+                        .or_insert_with(|| kind.to_string());
+                }
+            }
+        }
+        types
+    }
+
+    /// Where the icon of a name was found, kept: the themes do not change
+    /// while the program runs, and the same names are asked for again and
+    /// again (every folder of a listing asks for the icon of a folder).
+    fn icon_files() -> &'static Mutex<HashMap<(String, u32), Option<PathBuf>>> {
+        static FILES: OnceLock<Mutex<HashMap<(String, u32), Option<PathBuf>>>> = OnceLock::new();
+        FILES.get_or_init(|| Mutex::new(HashMap::new()))
+    }
+
+    /// The pixels of a picture of the desktop.
+    fn decode(file: &Path) -> Option<image::RgbaImage> {
+        Some(image::open(file).ok()?.into_rgba8())
+    }
+
+    /// The pixels `RenderImage` wants: BGRA, premultiplied.
+    fn to_render_image(decoded: image::RgbaImage) -> Option<RenderImage> {
         let (width, height) = decoded.dimensions();
         let mut bgra = decoded.into_raw();
-        for pixel in bgra.as_chunks_mut::<4>().0 {
+        for pixel in bgra.chunks_exact_mut(4) {
             let alpha = u16::from(pixel[3]);
             let premultiply = |channel: u8| ((u16::from(channel) * alpha + 127) / 255) as u8;
             let (red, green, blue) = (pixel[0], pixel[1], pixel[2]);

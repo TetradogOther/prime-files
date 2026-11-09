@@ -15,10 +15,17 @@
 # whose version carries a Debian revision; `dpkg-source` refuses to build
 # the .dsc of a native package with a revision.
 
-export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-
 %:
 	dh $@
+
+# The workspace is built by cargo and the binary is installed by hand, below:
+# debhelper's Rust machinery packages the crate as a library other packages
+# link against, and this program is a binary, not a library. The auto steps
+# are turned off so the build does not depend on which build system
+# debhelper happens to find in the tree.
+override_dh_auto_configure:
+
+override_dh_auto_clean:
 
 override_dh_auto_build:
 	cargo build --release -p nohrs --locked
