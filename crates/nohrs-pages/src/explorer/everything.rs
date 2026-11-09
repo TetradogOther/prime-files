@@ -2379,7 +2379,7 @@ mod platform {
 
 #[cfg(not(target_os = "windows"))]
 mod platform {
-    pub use super::list_std as list;
+    pub(super) use super::list_std as list;
 
     pub fn fixed_drives() -> Vec<String> {
         vec!["/".to_string()]

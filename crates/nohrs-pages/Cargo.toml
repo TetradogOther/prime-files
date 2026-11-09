@@ -43,6 +43,21 @@ raw-window-handle = "0.6"
 semver = "1"
 sha2 = "0.10"
 
+# Lists a .zip's entries in the preview pane. Built without codecs: the one
+# part that is decompressed (a document's XML) is inflated with flate2, which
+# also reads Premiere's gzipped projects.
+zip = { version = "2", default-features = false }
+flate2 = "1"
+
+# 3D models in the preview pane, one reader per format. glTF without its
+# image decoding: the preview draws flat colours, never textures.
+tobj = "4"
+stl_io = "0.8"
+gltf = { version = "1", default-features = false, features = ["import", "utils"] }
+# FBX (binary, 7.x): read as a node tree; geometry and model transforms are
+# taken from it by hand, as the DOM crates on top of it are unmaintained.
+fbxcel = { version = "0.9", features = ["tree"] }
+
 # Thumbnails come from the Shell's own extractor (`IShellItemImageFactory`), the
 # one Explorer uses: it covers images, video frames, PDFs and program icons in one
 # call and reads the system thumbnail cache. Pinned to the version gpui already
@@ -88,21 +103,6 @@ windows = { version = "0.61", features = [
 # dependency, at the version `windows` 0.61 itself uses (another copy is in the
 # tree, and its `IUnknownImpl` does not satisfy 0.61's interfaces).
 windows-core = "0.61"
-
-# Lists a .zip's entries in the preview pane. Built without codecs: the one
-# part that is decompressed (a document's XML) is inflated with flate2, which
-# also reads Premiere's gzipped projects.
-zip = { version = "2", default-features = false }
-flate2 = "1"
-
-# 3D models in the preview pane, one reader per format. glTF without its
-# image decoding: the preview draws flat colours, never textures.
-tobj = "4"
-stl_io = "0.8"
-gltf = { version = "1", default-features = false, features = ["import", "utils"] }
-# FBX (binary, 7.x): read as a node tree; geometry and model transforms are
-# taken from it by hand, as the DOM crates on top of it are unmaintained.
-fbxcel = { version = "0.9", features = ["tree"] }
 
 [dev-dependencies]
 # `test-support` gates `TestAppContext` and the `#[gpui::test]` macro. It is a
