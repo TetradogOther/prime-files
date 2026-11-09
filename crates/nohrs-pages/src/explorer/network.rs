@@ -22,7 +22,15 @@ use nohrs_services::fs::listing::FileEntryDto;
 use nohrs_store::{KvKey, KvStore, kv_key};
 
 /// The Network place, and the address a pane shows it at.
+#[cfg(windows)]
 pub(crate) const NETWORK: &str = "::{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}";
+
+/// The Network place, and the address a pane shows it at.
+///
+/// On Linux the shares are the ones the desktop's file manager has mounted,
+/// and they are reached by their own addresses (`smb://server/share`).
+#[cfg(not(windows))]
+pub(crate) const NETWORK: &str = "::network";
 
 /// What the Network place is called.
 pub(crate) const NETWORK_NAME: &str = nohrs_core::k!("Rede");
@@ -47,6 +55,7 @@ pub(crate) fn set_owner(hwnd: i64) {
 /// `https://host/x` and `http://host:8080/x` become the WebDAV redirector's
 /// `\\host@SSL\DavWWWRoot\x` and `\\host@8080\DavWWWRoot\x`. Anything else
 /// is returned as it was typed, without surrounding quotes or blanks.
+#[cfg(windows)]
 pub(crate) fn normalize_address(text: &str) -> String {
     let text = text.trim().trim_matches('"').trim();
     let lower = text.to_lowercase();
@@ -87,10 +96,33 @@ pub(crate) fn normalize_address(text: &str) -> String {
     text.to_string()
 }
 
+/// An address as other programs write it, in the form the desktop reads:
+/// `//host/share/x` becomes `smb://host/share/x`, and the other schemes are
+/// kept as they are: the desktop's own file manager mounts them itself.
+#[cfg(not(windows))]
+pub(crate) fn normalize_address(text: &str) -> String {
+    let text = text.trim().trim_matches('"').trim();
+    let lower = text.to_lowercase();
+    if lower.starts_with("smb://") {
+        return format!("smb://{}", text[6..].trim_matches('/'));
+    }
+    if text.starts_with("//") && !text.starts_with("///") {
+        return format!("smb://{}", text[2..].trim_matches('/'));
+    }
+    text.to_string()
+}
+
 /// Whether `path` is a network address (`\\server…`), not a device or
 /// long-path prefix (`\\?\`, `\\.\`).
+#[cfg(windows)]
 pub(crate) fn is_unc(path: &str) -> bool {
     path.starts_with("\\\\") && !path.starts_with("\\\\?\\") && !path.starts_with("\\\\.\\")
+}
+
+/// Whether `path` is a network address, and not a folder on disk.
+#[cfg(not(windows))]
+pub(crate) fn is_unc(path: &str) -> bool {
+    path.starts_with("smb://")
 }
 
 /// The server part of a network address, without the backslashes.
@@ -98,14 +130,14 @@ pub(crate) fn server_of(path: &str) -> Option<&str> {
     if !is_unc(path) {
         return None;
     }
-    let rest = &path[2..];
-    let server = rest.split('\\').next().unwrap_or(rest);
+    let rest = &path[platform::PREFIX.len()..];
+    let server = rest.split(platform::SEPARATOR).next().unwrap_or(rest);
     (!server.is_empty()).then_some(server)
 }
 
 /// Whether `path` is a server alone (`\\nas`), which lists its shares.
 pub(crate) fn is_server(path: &str) -> bool {
-    is_unc(path) && !path[2..].trim_end_matches('\\').contains('\\')
+    is_unc(path) && !path[platform::PREFIX.len()..].trim_end_matches(platform::SEPARATOR).contains(platform::SEPARATOR)
 }
 
 /// `\\server\share` of a path inside a share.
@@ -113,10 +145,10 @@ pub(crate) fn share_root(path: &str) -> Option<String> {
     if !is_unc(path) {
         return None;
     }
-    let mut parts = path[2..].split('\\').filter(|part| !part.is_empty());
+    let mut parts = path[platform::PREFIX.len()..].split(platform::SEPARATOR).filter(|part| !part.is_empty());
     let server = parts.next()?;
     let share = parts.next()?;
-    Some(format!("\\\\{server}\\{share}"))
+    Some(platform::address(server, share))
 }
 
 /// Where "up" leads from a network address: from a share's root to its
@@ -129,8 +161,8 @@ pub(crate) fn parent_location(path: &str) -> Option<String> {
         return Some(NETWORK.to_string());
     }
     let root = share_root(path)?;
-    if path.trim_end_matches('\\').eq_ignore_ascii_case(&root) {
-        return server_of(path).map(|server| format!("\\\\{server}"));
+    if path.trim_end_matches(platform::SEPARATOR).eq_ignore_ascii_case(&root) {
+        return server_of(path).map(|server| platform::address(server, ""));
     }
     None
 }
@@ -147,7 +179,7 @@ pub(crate) fn read_location(path: &str) -> Option<Result<Vec<FileEntryDto>, Stri
         return Some(platform::shares(server).map(|shares| {
             shares
                 .into_iter()
-                .map(|share| folder_row(share.rsplit('\\').next().unwrap_or(&share).to_string(), share.clone()))
+                .map(|share| folder_row(share.rsplit(platform::SEPARATOR).next().unwrap_or(&share).to_string(), share.clone()))
                 .collect()
         }));
     }
@@ -198,12 +230,12 @@ fn network_entries() -> Vec<FileEntryDto> {
     }
     for (drive, remote) in platform::mapped_drives() {
         if seen.insert(drive.to_lowercase()) {
-            rows.push(folder_row(format!("{} ({})", display_name(&remote), drive.trim_end_matches('\\')), drive));
+            rows.push(folder_row(format!("{} ({})", display_name(&remote), drive.trim_end_matches(platform::SEPARATOR)), drive));
         }
     }
     for computer in platform::computers() {
         if seen.insert(computer.to_lowercase()) {
-            rows.push(folder_row(computer.trim_start_matches('\\').to_string(), computer));
+            rows.push(folder_row(computer.trim_start_matches(platform::SEPARATOR).to_string(), computer));
         }
     }
     rows
@@ -215,7 +247,7 @@ pub(crate) fn display_name(path: &str) -> String {
     let Some(server) = server_of(path) else {
         return path.to_string();
     };
-    let last = path.trim_end_matches('\\').rsplit('\\').next().unwrap_or(server);
+    let last = path.trim_end_matches(platform::SEPARATOR).rsplit(platform::SEPARATOR).next().unwrap_or(server);
     if last.eq_ignore_ascii_case(server) {
         server.to_string()
     } else {
@@ -268,7 +300,7 @@ impl NetworkPlaces {
     /// address as kept, or `None` when it is not a network address.
     pub(crate) fn add(address: &str, cx: &mut App) -> Option<String> {
         let address = normalize_address(address);
-        let address = address.trim_end_matches('\\').to_string();
+        let address = address.trim_end_matches(platform::SEPARATOR).to_string();
         if !is_unc(&address) || server_of(&address).is_none() {
             return None;
         }
@@ -311,6 +343,20 @@ mod platform {
     //! safe binding.
 
     use std::sync::atomic::Ordering;
+
+    /// How a network address begins on Windows.
+    pub const PREFIX: &str = "\\\\";
+    /// What separates the parts of a network address on Windows.
+    pub const SEPARATOR: char = '\\';
+
+    /// The address of a server, or of a share of it.
+    pub fn address(server: &str, share: &str) -> String {
+        if share.is_empty() {
+            format!("\\\\{server}")
+        } else {
+            format!("\\\\{server}\\{share}")
+        }
+    }
 
     use windows::Win32::Foundation::{
         ERROR_ACCESS_DENIED, ERROR_MORE_DATA, ERROR_NO_MORE_ITEMS, HANDLE, HWND, NO_ERROR, WIN32_ERROR,
@@ -470,6 +516,20 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
+    /// How a network address begins on Linux.
+    pub const PREFIX: &str = "smb://";
+    /// What separates the parts of a network address on Linux.
+    pub const SEPARATOR: char = '/';
+
+    /// The address of a server, or of a share of it.
+    pub fn address(server: &str, share: &str) -> String {
+        if share.is_empty() {
+            format!("smb://{server}")
+        } else {
+            format!("smb://{server}/{share}")
+        }
+    }
+
     pub fn wants_login(_code: i32) -> bool {
         false
     }
@@ -477,13 +537,73 @@ mod platform {
         false
     }
     pub fn shares(_server: &str) -> Result<Vec<String>, String> {
-        Err("shares are listed on Windows only".into())
+        Err("as partilhas são listadas no Windows apenas".into())
     }
+
+    /// The shares the desktop has mounted, as the pairs the Network place
+    /// lists them: where they are and the address they are reached by.
     pub fn mapped_drives() -> Vec<(String, String)> {
-        Vec::new()
+        let Some(directory) = gvfs_directory() else {
+            return Vec::new();
+        };
+        let Ok(read) = std::fs::read_dir(&directory) else {
+            return Vec::new();
+        };
+        read.filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                let address = gvfs_address(&name)?;
+                Some((entry.path().to_string_lossy().into_owned(), address))
+            })
+            .collect()
     }
+
     pub fn computers() -> Vec<String> {
         Vec::new()
+    }
+
+    /// Where the desktop keeps the shares it has mounted.
+    fn gvfs_directory() -> Option<std::path::PathBuf> {
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from).or_else(|| {
+            std::env::var_os("UID").map(|uid| std::path::PathBuf::from(format!("/run/user/{}", uid.to_string_lossy()))).or_else(|| {
+                // The id of the user, not of the process: read from the
+                // process' own entry in the process list.
+                std::fs::read_to_string("/proc/self/status")
+                    .ok()
+                    .and_then(|status| {
+                        status.lines().find_map(|line| {
+                            line.strip_prefix("Uid:")
+                                .and_then(|rest| rest.split_whitespace().next())
+                                .map(str::to_string)
+                        })
+                    })
+                    .map(|uid| std::path::PathBuf::from(format!("/run/user/{uid}")))
+            })
+        })?;
+        Some(runtime.join("gvfs"))
+    }
+
+    /// The address of a mounted share, from the name the desktop gave it:
+    /// `smb-share:server=nas,share=edicao` is `smb://nas/edicao`.
+    fn gvfs_address(name: &str) -> Option<String> {
+        let (_, rest) = name.split_once(':')?;
+        let mut server = None;
+        let mut share = None;
+        for field in rest.split(',') {
+            match field.split_once('=') {
+                Some(("server", value)) => server = Some(value.to_string()),
+                Some(("share", value)) => share = Some(value.to_string()),
+                _ => {}
+            }
+        }
+        let server = server?;
+        let share = share.unwrap_or_default();
+        Some(if share.is_empty() {
+            format!("smb://{server}")
+        } else {
+            format!("smb://{server}/{share}")
+        })
     }
 }
 
@@ -491,6 +611,7 @@ mod platform {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
     #[test]
     fn addresses_from_other_programs_become_unc() {
         assert_eq!(normalize_address("smb://nas/edicao/2026"), r"\\nas\edicao\2026");
@@ -501,6 +622,17 @@ mod tests {
         assert_eq!(normalize_address(r"C:\Users"), r"C:\Users");
     }
 
+    #[cfg(not(windows))]
+    #[test]
+    fn addresses_from_other_programs_become_the_desktop_ones() {
+        assert_eq!(normalize_address("smb://nas/edicao/2026"), "smb://nas/edicao/2026");
+        assert_eq!(normalize_address("//192.168.1.10/media/"), "smb://192.168.1.10/media");
+        assert_eq!(normalize_address(" \"smb://nas/edicao\" "), "smb://nas/edicao");
+        assert_eq!(normalize_address("https://cloud.example/remote.php/dav"), "https://cloud.example/remote.php/dav");
+        assert_eq!(normalize_address("/home/user"), "/home/user");
+    }
+
+    #[cfg(windows)]
     #[test]
     fn up_from_a_share_goes_to_its_server_then_to_the_network() {
         assert_eq!(parent_location(r"\\nas\edicao").as_deref(), Some(r"\\nas"));
@@ -513,8 +645,28 @@ mod tests {
         assert_eq!(share_root(r"\\nas\edicao\2026\a.mp4").as_deref(), Some(r"\\nas\edicao"));
     }
 
+    #[cfg(not(windows))]
+    #[test]
+    fn up_from_a_share_goes_to_its_server_then_to_the_network() {
+        assert_eq!(parent_location("smb://nas/edicao").as_deref(), Some("smb://nas"));
+        assert_eq!(parent_location("smb://nas/edicao/").as_deref(), Some("smb://nas"));
+        assert_eq!(parent_location("smb://nas").as_deref(), Some(NETWORK));
+        assert_eq!(parent_location("smb://nas/edicao/2026"), None);
+        assert_eq!(parent_location("/home/user"), None);
+        assert!(!is_unc("/home/user"));
+        assert!(is_server("smb://nas/"));
+        assert_eq!(share_root("smb://nas/edicao/2026/a.mp4").as_deref(), Some("smb://nas/edicao"));
+    }
+
+    #[cfg(windows)]
     #[test]
     fn a_share_is_named_with_its_server() {
         assert_eq!(display_name(r"\\nas"), "nas");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_share_is_named_with_its_server() {
+        assert_eq!(display_name("smb://nas"), "nas");
     }
 }

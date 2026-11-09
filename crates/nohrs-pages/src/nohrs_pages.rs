@@ -21,6 +21,9 @@ pub mod ipc;
 pub mod listary;
 /// Which language "auto" means on this machine.
 pub mod locale;
+/// What the Linux desktop is asked: opening files, the programs that offer
+/// to open them, and the user's own folders.
+pub mod linux;
 /// A reusable 2-way split/tab container shared across pages.
 pub mod compact;
 /// Panels docked to any side: the shared gestures and drawing.

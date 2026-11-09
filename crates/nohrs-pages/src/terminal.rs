@@ -382,7 +382,7 @@ impl TerminalView {
 
 fn start(directory: &Path, listener: Listener) -> Result<Session, String> {
     let options = tty::Options {
-        shell: Some(tty::Shell::new(shell_program(), vec!["-NoLogo".to_string()])),
+        shell: Some(tty::Shell::new(shell_program(), shell_arguments())),
         working_directory: Some(directory.to_path_buf()),
         drain_on_exit: true,
         ..Default::default()
@@ -400,11 +400,35 @@ fn start(directory: &Path, listener: Listener) -> Result<Session, String> {
 }
 
 // PowerShell 7 when installed, the PowerShell every Windows has otherwise.
+#[cfg(windows)]
 fn shell_program() -> String {
     let found = std::env::var_os("PATH").is_some_and(|path| {
         std::env::split_paths(&path).any(|directory| directory.join("pwsh.exe").is_file())
     });
     if found { "pwsh.exe" } else { "powershell.exe" }.to_string()
+}
+
+/// The shell the user logs in with, which is the one their own programs are
+/// set up for; `bash` when the session says nothing.
+#[cfg(not(windows))]
+fn shell_program() -> String {
+    std::env::var("SHELL")
+        .ok()
+        .filter(|shell| !shell.trim().is_empty())
+        .unwrap_or_else(|| "/bin/bash".to_string())
+}
+
+/// PowerShell's own switch, which keeps it from printing its banner.
+#[cfg(windows)]
+fn shell_arguments() -> Vec<String> {
+    vec!["-NoLogo".to_string()]
+}
+
+/// A login shell, so the aliases, the paths and the prompt the user set up
+/// in their own configuration are the ones the terminal shows.
+#[cfg(not(windows))]
+fn shell_arguments() -> Vec<String> {
+    vec!["-l".to_string()]
 }
 
 fn window_size(layout: &Layout) -> WindowSize {
@@ -561,12 +585,42 @@ fn resolve(color: TermColor, colors: &Colors) -> Hsla {
 
 fn terminal_font(bold: bool, italic: bool) -> Font {
     Font {
-        family: "Cascadia Mono".into(),
+        family: terminal_family().into(),
         features: FontFeatures::default(),
-        fallbacks: Some(FontFallbacks::from_fonts(vec!["Consolas".to_string()])),
+        fallbacks: Some(FontFallbacks::from_fonts(terminal_fallbacks())),
         weight: if bold { FontWeight::BOLD } else { FontWeight::NORMAL },
         style: if italic { FontStyle::Italic } else { FontStyle::Normal },
     }
+}
+
+/// The monospaced face the terminal is drawn with.
+#[cfg(windows)]
+fn terminal_family() -> &'static str {
+    "Cascadia Mono"
+}
+
+/// The monospaced face the terminal is drawn with: the one every Linux
+/// desktop installs.
+#[cfg(not(windows))]
+fn terminal_family() -> &'static str {
+    "DejaVu Sans Mono"
+}
+
+/// The faces the terminal falls back to when the first is not installed.
+#[cfg(windows)]
+fn terminal_fallbacks() -> Vec<String> {
+    vec!["Consolas".to_string(), "Cascadia Code".to_string()]
+}
+
+/// The faces the terminal falls back to when the first is not installed.
+#[cfg(not(windows))]
+fn terminal_fallbacks() -> Vec<String> {
+    vec![
+        "Liberation Mono".to_string(),
+        "Noto Sans Mono".to_string(),
+        "Ubuntu Mono".to_string(),
+        "monospace".to_string(),
+    ]
 }
 
 // A stretch of one row painted with one style, placed by its first column so

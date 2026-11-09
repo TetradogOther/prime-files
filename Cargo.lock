@@ -4508,6 +4508,7 @@ dependencies = [
  "nohrs-ui",
  "notify 8.2.0",
  "raw-window-handle",
+ "rustix 1.1.4",
  "semver",
  "serde",
  "serde_json",

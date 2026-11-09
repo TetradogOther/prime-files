@@ -18,7 +18,16 @@ use super::file_ops::OpReport;
 use super::types::StatusLevel;
 
 /// The Recycle Bin's address, as the Shell parses it.
+#[cfg(windows)]
 pub const RECYCLE_BIN: &str = "::{645FF040-5081-101B-9F08-00AA002F954E}";
+
+/// The Recycle Bin's address.
+///
+/// On Linux the trash is a folder of its own (`~/.local/share/Trash`), but it
+/// is not a folder the user browses: it is listed here, with the name each
+/// item had and the date it went there, as the Windows one is.
+#[cfg(not(windows))]
+pub const RECYCLE_BIN: &str = "::trash";
 
 /// What the Recycle Bin is called before the Shell's own name is read.
 pub const RECYCLE_BIN_NAME: &str = k!("Lixeira");

@@ -58,6 +58,11 @@ gltf = { version = "1", default-features = false, features = ["import", "utils"]
 # taken from it by hand, as the DOM crates on top of it are unmaintained.
 fbxcel = { version = "0.9", features = ["tree"] }
 
+# `statvfs`, for how much space is left on a disk: the safe wrapper around
+# the system call, so no `unsafe` of ours is needed.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs"] }
+
 # Thumbnails come from the Shell's own extractor (`IShellItemImageFactory`), the
 # one Explorer uses: it covers images, video frames, PDFs and program icons in one
 # call and reads the system thumbnail cache. Pinned to the version gpui already

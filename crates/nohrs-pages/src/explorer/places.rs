@@ -104,22 +104,31 @@ pub fn network_children() -> Vec<Place> {
     platform::network_children()
 }
 
-/// Opens a place that has no folder on disk (Recycle Bin, Network) in
-/// Explorer, the only program that can show it.
+/// Opens a place that has no folder on disk (Recycle Bin, Network) in the
+/// program the desktop says handles folders.
 pub fn open_in_explorer(parsing_name: &str) {
+    crate::reveal::leave_next_explorer_window();
     let target = if parsing_name.starts_with("::") {
         format!("shell:{parsing_name}")
     } else {
         parsing_name.to_string()
     };
-    crate::reveal::leave_next_explorer_window();
     if let Err(error) = std::process::Command::new("explorer.exe").arg(target).spawn() {
         tracing::warn!("could not open {parsing_name} in Explorer: {error}");
     }
 }
 
 /// The tree node that holds the drives, and the address a pane shows it at.
+#[cfg(windows)]
 pub const THIS_PC: &str = "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}";
+
+/// The tree node that holds the drives, and the address a pane shows it at.
+///
+/// On Linux it is not a folder: the root of the machine is a folder like any
+/// other, and the places that are not folders on disk are named apart from
+/// it, the way the desktop's own file manager names them.
+#[cfg(not(windows))]
+pub const THIS_PC: &str = "::this-pc";
 
 /// What This PC is called when the Shell's own name has not been read yet.
 pub const THIS_PC_NAME: &str = nohrs_core::k!("Este Computador");
@@ -560,16 +569,85 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
+    //! The places of a Linux desktop: the folders the user keeps their things
+    //! in, the filesystems mounted on the machine, and the places that are
+    //! not folders on disk (the network, the trash).
+
     use super::{Place, Places};
+    use crate::explorer::drives;
+    use crate::linux;
+
+    /// The places that are not folders on disk.
+    const NETWORK: &str = "::network";
+    const TRASH: &str = "::trash";
 
     pub fn load() -> Places {
-        Places::default()
+        let mut quick_access = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            quick_access.push(place(&home.to_string_lossy(), &home));
+        }
+        // The folders the user named for themselves: Desktop, Documents,
+        // Downloads and the rest, as `~/.config/user-dirs.dirs` lists them.
+        for (_name, path) in linux::user_dirs() {
+            if quick_access.iter().any(|place: &Place| place.path.as_deref() == Some(path.to_string_lossy().as_ref())) {
+                continue;
+            }
+            quick_access.push(place(&path.to_string_lossy(), &path));
+        }
+
+        let mut other = Vec::new();
+        other.push(Place {
+            name: nohrs_core::i18n::tr(crate::explorer::network::NETWORK_NAME).to_string(),
+            path: None,
+            parsing_name: NETWORK.to_string(),
+            pinned: false,
+        });
+        other.push(Place {
+            name: nohrs_core::i18n::tr(crate::explorer::recycle_bin::RECYCLE_BIN_NAME).to_string(),
+            path: None,
+            parsing_name: TRASH.to_string(),
+            pinned: false,
+        });
+
+        Places {
+            quick_access,
+            favorites: bookmarks(),
+            this_pc: Some(Place {
+                name: nohrs_core::i18n::tr(super::THIS_PC_NAME).to_string(),
+                path: None,
+                parsing_name: super::THIS_PC.to_string(),
+                pinned: false,
+            }),
+            drives: drive_places(),
+            other,
+        }
     }
 
+    /// The filesystems mounted on the machine, as the units of the sidebar.
+    pub fn drive_places() -> Vec<Place> {
+        drives::mount_points()
+            .into_iter()
+            .map(|mount| {
+                let name = mount
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| mount.to_string_lossy().into_owned());
+                Place {
+                    name,
+                    path: Some(mount.to_string_lossy().into_owned()),
+                    parsing_name: mount.to_string_lossy().into_owned(),
+                    pinned: false,
+                }
+            })
+            .collect()
+    }
+
+    /// The filesystems and the folders of the root, as "This PC" lists them.
     pub fn this_pc() -> Vec<Place> {
-        Vec::new()
+        drive_places()
     }
 
+    /// The places of the network: the desktop's own file manager shows them.
     pub fn network_children() -> Vec<Place> {
         Vec::new()
     }
@@ -577,6 +655,54 @@ mod platform {
     pub fn is_hidden(path: &std::path::Path) -> bool {
         path.file_name()
             .is_some_and(|name| name.to_string_lossy().starts_with('.'))
+    }
+
+    /// A place for a folder, named after the folder itself.
+    fn place(name: &str, path: &std::path::Path) -> Place {
+        Place {
+            name: name.to_string(),
+            path: Some(path.to_string_lossy().into_owned()),
+            parsing_name: path.to_string_lossy().into_owned(),
+            pinned: false,
+        }
+    }
+
+    /// The folders the user bookmarked, as the GTK file manager lists them:
+    /// `~/.config/gtk-3.0/bookmarks`, one folder per line, the name after
+    /// the path when the folder was given another name.
+    fn bookmarks() -> Vec<Place> {
+        let Some(home) = dirs::home_dir() else {
+            return Vec::new();
+        };
+        let path = home.join(".config/gtk-3.0/bookmarks");
+        let Ok(text) = std::fs::read_to_string(path) else {
+            return Vec::new();
+        };
+        text.lines()
+            .filter(|line| !line.trim().is_empty())
+            .filter_map(|line| {
+                let (folder, name) = match line.split_once(char::is_whitespace) {
+                    Some((folder, name)) => (folder, Some(name.trim())),
+                    None => (line.trim(), None),
+                };
+                let folder = folder.trim();
+                if folder.is_empty() {
+                    return None;
+                }
+                let name = name.filter(|name| !name.is_empty()).map(str::to_string).unwrap_or_else(|| {
+                    std::path::Path::new(folder)
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| folder.to_string())
+                });
+                Some(Place {
+                    name,
+                    path: Some(folder.to_string()),
+                    parsing_name: folder.to_string(),
+                    pinned: true,
+                })
+            })
+            .collect()
     }
 }
 

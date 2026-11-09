@@ -63,8 +63,17 @@ struct Envelope {
 }
 
 fn endpoint_file() -> Option<PathBuf> {
-    let local = std::env::var_os("LOCALAPPDATA")?;
-    Some(PathBuf::from(local).join("nohrs").join("ipc.json"))
+    #[cfg(windows)]
+    {
+        let local = std::env::var_os("LOCALAPPDATA")?;
+        Some(PathBuf::from(local).join("nohrs").join("ipc.json"))
+    }
+    #[cfg(not(windows))]
+    {
+        // The desktop's own rule for a program's own files: the state
+        // directory, which is not kept between boots.
+        Some(crate::linux::state_home().join("nohrs").join("ipc.json"))
+    }
 }
 
 /// The native handle of `window`, for Win32 calls that need an owner.

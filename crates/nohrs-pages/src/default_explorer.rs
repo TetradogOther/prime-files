@@ -6,11 +6,24 @@
 //! and touches no other account; turning it off deletes only what was added
 //! here. Written through `reg.exe` rather than the registry API so each entry
 //! reads exactly like the line in the `.bat` that a person can check by hand.
+//!
+//! On Linux the same thing is done the way the desktop does it: a `.desktop`
+//! file in the user's own applications folder, and the `inode/directory` kind
+//! pointed at it in `mimeapps.list`.
 
+#[cfg(windows)]
 use nohrs_core::t;
 use std::io;
 use std::path::Path;
+
+#[cfg(windows)]
 use std::process::Command;
+
+/// The name of the program's `.desktop` file, without its extension.
+pub const DESKTOP_ID: &str = "prime-files";
+
+/// The kind of file the desktop asks for when a folder is opened.
+const FOLDER_MIME: &str = "inode/directory";
 
 // The verb added under `Directory\shell` and `Drive\shell`; the key's default
 // value names it, which makes it the double-click action.
@@ -28,6 +41,7 @@ const NEW_WINDOW_KEY: &str =
 // taskbar button kept opening Explorer (Prime Files issue #4).
 const OPEN_KEY: &str = r"HKCU\Software\Classes\CLSID\{52205fd8-5dfb-447d-801a-d0b52f2e83e1}\shell\open";
 
+#[cfg(windows)]
 fn reg(args: &[&str]) -> io::Result<std::process::Output> {
     let mut command = Command::new("reg.exe");
     command.args(args);
@@ -41,6 +55,7 @@ fn reg(args: &[&str]) -> io::Result<std::process::Output> {
     command.output()
 }
 
+#[cfg(windows)]
 fn reg_ok(args: &[&str]) -> io::Result<()> {
     let output = reg(args)?;
     if output.status.success() {
@@ -51,6 +66,7 @@ fn reg_ok(args: &[&str]) -> io::Result<()> {
 }
 
 /// Whether folders currently open in Nohrs for this user.
+#[cfg(windows)]
 pub fn is_default() -> bool {
     reg(&["query", r"HKCU\Software\Classes\Directory\shell", "/ve"])
         .map(|output| {
@@ -63,6 +79,7 @@ pub fn is_default() -> bool {
 }
 
 /// Makes `exe` open folders, drives, Win+E and the taskbar's Explorer button.
+#[cfg(windows)]
 pub fn enable(exe: &Path) -> io::Result<()> {
     let exe = exe.to_string_lossy();
     let quoted = format!("\"{exe}\"");
@@ -78,6 +95,7 @@ pub fn enable(exe: &Path) -> io::Result<()> {
 }
 
 // Without an argument Nohrs brings its open window forward, or opens one.
+#[cfg(windows)]
 fn launcher_verbs(quoted: &str) -> io::Result<()> {
     for key in [NEW_WINDOW_KEY, OPEN_KEY] {
         let command = format!(r"{key}\command");
@@ -91,6 +109,7 @@ fn launcher_verbs(quoted: &str) -> io::Result<()> {
 /// too: gives `open` the program `opennewwindow` already names. Never points
 /// either at the running executable, which may be a test copy; does nothing
 /// while Prime Files is not the default or `open` already has a command.
+#[cfg(windows)]
 pub fn repair() -> io::Result<()> {
     // Only the installed copy: a build run from the source tree, or a test
     // copy, must not change what the person's taskbar opens.
@@ -120,6 +139,7 @@ pub fn repair() -> io::Result<()> {
 }
 
 /// Gives folders back to Explorer, removing only what [`enable`] added.
+#[cfg(windows)]
 pub fn disable() -> io::Result<()> {
     for class in FOLDER_CLASSES {
         let shell = format!(r"HKCU\Software\Classes\{class}\shell");
@@ -141,6 +161,7 @@ pub fn disable() -> io::Result<()> {
 // Whether the default value of `key` points at this app, so a value some
 // other program set is left alone. The verb's name says "nohrs"; a command
 // names the executable, which the installer calls PrimeFiles.exe.
+#[cfg(windows)]
 fn is_ours(key: &str) -> bool {
     let exe_name = std::env::current_exe()
         .ok()
@@ -161,6 +182,7 @@ const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "Prime Files";
 
 /// Whether Prime Files starts, minimized, when this user signs in.
+#[cfg(windows)]
 pub fn starts_with_windows() -> bool {
     reg(&["query", RUN_KEY, "/v", RUN_VALUE]).is_ok_and(|output| output.status.success())
 }
@@ -168,6 +190,7 @@ pub fn starts_with_windows() -> bool {
 /// Makes `exe` start minimized at sign-in, or stops it. Started that way it
 /// is already running when Premiere or a browser asks for a folder, so the
 /// file opens here at once instead of in Explorer.
+#[cfg(windows)]
 pub fn set_starts_with_windows(exe: &Path, enable: bool) -> io::Result<()> {
     if enable {
         let command = format!("\"{}\" --background", exe.display());
@@ -176,5 +199,187 @@ pub fn set_starts_with_windows(exe: &Path, enable: bool) -> io::Result<()> {
         reg_ok(&["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
     } else {
         Ok(())
+    }
+}
+
+/// Whether Prime Files starts, minimized, when this user signs in.
+#[cfg(not(windows))]
+pub fn starts_with_windows() -> bool {
+    linux::autostart_file().is_some_and(|path| path.is_file())
+}
+
+/// Makes `exe` start minimized at sign-in, or stops it. Started that way it
+/// is already running when Premiere or a browser asks for a folder, so the
+/// file opens here at once instead of in Explorer.
+#[cfg(not(windows))]
+pub fn set_starts_with_windows(exe: &Path, enable: bool) -> io::Result<()> {
+    linux::set_autostart(exe, enable)
+}
+
+/// Whether folders currently open in Nohrs for this user.
+#[cfg(not(windows))]
+pub fn is_default() -> bool {
+    linux::is_default()
+}
+
+/// Makes `exe` open folders, drives, Win+E and the taskbar's Explorer button.
+#[cfg(not(windows))]
+pub fn enable(exe: &Path) -> io::Result<()> {
+    linux::enable(exe)
+}
+
+/// For a copy made the default before the taskbar's verb was taken over
+/// too: does nothing on Linux, where the desktop keeps no such second verb.
+#[cfg(not(windows))]
+pub fn repair() -> io::Result<()> {
+    Ok(())
+}
+
+/// Gives folders back to Explorer, removing only what [`enable`] added.
+#[cfg(not(windows))]
+pub fn disable() -> io::Result<()> {
+    linux::disable()
+}
+
+/// The desktop's own way of making a program the one that opens folders: a
+/// `.desktop` file for it, and the `inode/directory` kind pointed at that
+/// file in `mimeapps.list`.
+#[cfg(not(windows))]
+mod linux {
+    use super::{DESKTOP_ID, FOLDER_MIME};
+    use std::io;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    /// The file the desktop reads the program's own entries from.
+    fn desktop_file() -> PathBuf {
+        crate::linux::data_home().join("applications").join(format!("{DESKTOP_ID}.desktop"))
+    }
+
+    /// The file the desktop reads the user's own choices from.
+    fn mimeapps_file() -> PathBuf {
+        crate::linux::config_home().join("mimeapps.list")
+    }
+
+    /// Whether the desktop opens folders in this program.
+    pub fn is_default() -> bool {
+        let output = Command::new("xdg-mime").arg("query").arg("default").arg(FOLDER_MIME).output();
+        match output {
+            Ok(output) if output.status.success() => {
+                String::from_utf8_lossy(&output.stdout).trim() == format!("{DESKTOP_ID}.desktop")
+            }
+            // Without the command, the user's own file is the answer.
+            _ => mimeapps_default().is_some_and(|entry| entry == format!("{DESKTOP_ID}.desktop")),
+        }
+    }
+
+    /// The program the user's own file names for folders.
+    fn mimeapps_default() -> Option<String> {
+        let text = std::fs::read_to_string(mimeapps_file()).ok()?;
+        let mut in_section = false;
+        for line in text.lines() {
+            let line = line.trim();
+            if line.starts_with('[') {
+                in_section = line == "[Default Applications]";
+                continue;
+            }
+            if !in_section {
+                continue;
+            }
+            if let Some((kind, value)) = line.split_once('=')
+                && kind.trim() == FOLDER_MIME
+            {
+                let value = value.trim();
+                if !value.is_empty() {
+                    return Some(value.to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Makes `exe` open folders: the program's own `.desktop` file, and the
+    /// desktop's list pointing folders at it.
+    pub fn enable(exe: &Path) -> io::Result<()> {
+        let path = desktop_file();
+        let directory = path.parent().unwrap_or(Path::new("/"));
+        std::fs::create_dir_all(directory)?;
+        let icon = icon_path();
+        let text = format!(
+            "[Desktop Entry]\nType=Application\nName=Prime Files\nComment=Explorador de arquivos\nExec={} %f\nIcon={}\nTerminal=false\nCategories=System;FileManager;FileTools;\nMimeType={};\n",
+            exe.display(),
+            icon,
+            FOLDER_MIME
+        );
+        std::fs::write(&path, text)?;
+
+        // The desktop's own command writes the list in the file it keeps.
+        let written = Command::new("xdg-mime")
+            .arg("default")
+            .arg(format!("{DESKTOP_ID}.desktop"))
+            .arg(FOLDER_MIME)
+            .status();
+        if written.as_ref().is_ok_and(|status| !status.success()) {
+            return Err(io::Error::other("the desktop refused the change"));
+        }
+        // The program is started with a folder as its argument; the desktop
+        // gives it the file's URI, which it does not read.
+        Ok(())
+    }
+
+    /// The icon the program's own file points at.
+    fn icon_path() -> String {
+        if let Ok(data) = std::env::var("XDG_DATA_HOME") {
+            return format!("{data}/icons/hicolor/256x256/apps/{DESKTOP_ID}.png");
+        }
+        let home = dirs::home_dir().unwrap_or_default();
+        format!("{}/.local/share/icons/hicolor/256x256/apps/{DESKTOP_ID}.png", home.display())
+    }
+
+    /// Gives folders back to the desktop, removing only what [`enable`]
+    /// added: the program's own file, and the name it had in the user's
+    /// list.
+    pub fn disable() -> io::Result<()> {
+        let path = desktop_file();
+        if path.is_file() {
+            std::fs::remove_file(&path)?;
+        }
+        let list = mimeapps_file();
+        if let Ok(text) = std::fs::read_to_string(&list) {
+            let kept = text
+                .lines()
+                .filter(|line| !line.trim_start().starts_with(&format!("{FOLDER_MIME}=")) || !line.contains(DESKTOP_ID))
+                .collect::<Vec<_>>()
+                .join("\n");
+            std::fs::write(&list, kept)?;
+        }
+        Ok(())
+    }
+
+    /// Where the desktop keeps the programs that start at sign-in.
+    pub(super) fn autostart_file() -> Option<PathBuf> {
+        Some(crate::linux::config_home().join("autostart").join(format!("{DESKTOP_ID}.desktop")))
+    }
+
+    /// Starts `exe` at sign-in, or stops it.
+    pub fn set_autostart(exe: &Path, enable: bool) -> io::Result<()> {
+        let path = match autostart_file() {
+            Some(path) => path,
+            None => return Err(io::Error::other("no autostart folder")),
+        };
+        if !enable {
+            if path.is_file() {
+                std::fs::remove_file(&path)?;
+            }
+            return Ok(());
+        }
+        if let Some(directory) = path.parent() {
+            std::fs::create_dir_all(directory)?;
+        }
+        let text = format!(
+            "[Desktop Entry]\nType=Application\nName=Prime Files\nExec={} --background\nIcon=prime-files\nTerminal=false\nX-GNOME-Autostart-enabled=true\nNoDisplay=false\n",
+            exe.display()
+        );
+        std::fs::write(&path, text)
     }
 }

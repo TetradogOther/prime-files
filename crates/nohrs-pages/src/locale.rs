@@ -74,10 +74,21 @@ fn system_locale() -> SystemLocale {
 
 #[cfg(not(windows))]
 fn system_locale() -> SystemLocale {
-    SystemLocale {
-        locale: std::env::var("LANG").ok().map(|value| value.split('.').next().unwrap_or_default().to_string()),
-        ..SystemLocale::default()
-    }
+    // The desktop's own rules, in the order they are read: the locale of
+    // everything (`LC_ALL`), the one of the messages (`LC_MESSAGES`), the
+    // session's (`LANG`) and the list of languages the user prefers
+    // (`LANGUAGE`, a colon-separated list, the first one first).
+    let read = |name: &str| {
+        std::env::var(name).ok().map(|value| value.split('.').next().unwrap_or_default().to_string())
+    };
+    let locale = read("LC_ALL").or_else(|| read("LC_MESSAGES")).or_else(|| read("LANG"));
+    let ui_language = std::env::var("LANGUAGE").ok().and_then(|value| {
+        value
+            .split(':')
+            .map(|language| language.split('.').next().unwrap_or_default().to_string())
+            .find(|language| !language.is_empty())
+    });
+    SystemLocale { locale, country: None, ui_language }
 }
 
 #[cfg(test)]

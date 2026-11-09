@@ -59,6 +59,7 @@ impl Global for Spaces {}
 
 /// `C:\` for any spelling of a drive's root (`c:`, `C:\`, `c:/`); `None` for
 /// anything that is not one.
+#[cfg(target_os = "windows")]
 pub(crate) fn drive_root(path: &str) -> Option<String> {
     let mut chars = path.chars();
     let letter = chars.next().filter(char::is_ascii_alphabetic)?;
@@ -69,6 +70,25 @@ pub(crate) fn drive_root(path: &str) -> Option<String> {
         "" | "\\" | "/" => Some(format!("{}:\\", letter.to_ascii_uppercase())),
         _ => None,
     }
+}
+
+/// The root of the unit that holds `path`: on Linux, the mounted filesystem
+/// it belongs to (`/`, `/home`, a disk mounted on `/mnt/disk`).
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn drive_root(path: &str) -> Option<String> {
+    platform::root_of(path)
+}
+
+/// The filesystems mounted on this machine, as the units of the sidebar.
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn mount_points() -> Vec<std::path::PathBuf> {
+    platform::mount_points()
+}
+
+/// The filesystems mounted on this machine, as the units of the sidebar.
+#[cfg(target_os = "windows")]
+pub(crate) fn mount_points() -> Vec<std::path::PathBuf> {
+    platform::read_all().into_keys().map(std::path::PathBuf::from).collect()
 }
 
 /// The space on the drive whose root is `path`, if known; asks Windows again
@@ -133,11 +153,148 @@ mod platform {
 
 #[cfg(not(target_os = "windows"))]
 mod platform {
-    use super::Space;
-    use std::collections::HashMap;
+    //! The units of a Linux machine: the filesystems mounted on it, and how
+    //! much space is left on each one.
 
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
+
+    use super::Space;
+
+    /// Where the kernel lists what is mounted.
+    const MOUNTS: &str = "/proc/mounts";
+
+    /// The filesystems a person browses: the disks and the network shares.
+    ///
+    /// A Linux machine mounts far more than a person looks at — the pseudo
+    /// filesystems the kernel offers (`proc`, `sysfs`, `cgroup`…) are never
+    /// in the way. They are left out.
+    pub fn mount_points() -> Vec<PathBuf> {
+        let Ok(text) = std::fs::read_to_string(MOUNTS) else {
+            return vec![PathBuf::from("/")];
+        };
+        let mut points = Vec::new();
+        for line in text.lines() {
+            let mut fields = line.split_whitespace();
+            let (Some(device), Some(mount)) = (fields.next(), fields.next()) else {
+                continue;
+            };
+            if !is_a_real_filesystem(device) {
+                continue;
+            }
+            let mount = unescape_mount(mount);
+            if mount.is_empty() {
+                continue;
+            }
+            let path = PathBuf::from(mount);
+            if !points.contains(&path) {
+                points.push(path);
+            }
+        }
+        if points.is_empty() {
+            points.push(PathBuf::from("/"));
+        }
+        points
+    }
+
+    /// Whether a mount is a disk, a disk partition or a network share, as
+    /// opposed to one of the kernel's own pseudo-filesystems.
+    fn is_a_real_filesystem(device: &str) -> bool {
+        !device.starts_with("proc")
+            && !device.starts_with("sysfs")
+            && !device.starts_with("devtmpfs")
+            && !device.starts_with("devpts")
+            && !device.starts_with("tmpfs")
+            && !device.starts_with("cgroup")
+            && !device.starts_with("cgroup2")
+            && !device.starts_with("securityfs")
+            && !device.starts_with("debugfs")
+            && !device.starts_with("tracefs")
+            && !device.starts_with("pstore")
+            && !device.starts_with("mqueue")
+            && !device.starts_with("hugetlbfs")
+            && !device.starts_with("configfs")
+            && !device.starts_with("fusectl")
+            && !device.starts_with("bpf")
+            && !device.starts_with("binfmt_misc")
+            && !device.starts_with("autofs")
+            && !device.starts_with("efivarfs")
+            && !device.starts_with("rpc_pipefs")
+            && !device.starts_with("nsfs")
+    }
+
+    /// The octal escapes the kernel writes for a space and other characters.
+    fn unescape_mount(mount: &str) -> String {
+        let mut out = String::with_capacity(mount.len());
+        let mut characters = mount.chars();
+        while let Some(character) = characters.next() {
+            if character != '\\' {
+                out.push(character);
+                continue;
+            }
+            let Some(escape) = characters.next() else {
+                out.push('\\');
+                break;
+            };
+            match escape {
+                '0'..='7' => {
+                    let mut code = escape.to_digit(8).unwrap_or(0);
+                    for _ in 0..2 {
+                        let Some(next) = characters.next() else { break };
+                        let Some(digit) = next.to_digit(8) else {
+                            out.push(next);
+                            break;
+                        };
+                        code = code * 8 + digit;
+                    }
+                    out.push(char::from_u32(code).unwrap_or('\u{fffd}'));
+                }
+                other => out.push(other),
+            }
+        }
+        out
+    }
+
+    /// The root of the unit that holds `path`: the mounted filesystem it
+    /// belongs to, the deepest one that is above it.
+    pub fn root_of(path: &str) -> Option<String> {
+        let path = Path::new(path);
+        let mut root: Option<PathBuf> = None;
+        for mount in mount_points() {
+            if !path.starts_with(&mount) {
+                continue;
+            }
+            let deeper = root.as_ref().is_none_or(|current| mount.components().count() > current.components().count());
+            if deeper {
+                root = Some(mount);
+            }
+        }
+        root.map(|root| root.to_string_lossy().into_owned())
+    }
+
+    /// How much space is left on every mounted filesystem.
     pub fn read_all() -> HashMap<String, Space> {
-        HashMap::new()
+        let mut spaces = HashMap::new();
+        for mount in mount_points() {
+            let Some(space) = space_of(&mount) else {
+                continue;
+            };
+            spaces.insert(mount.to_string_lossy().into_owned(), space);
+        }
+        spaces
+    }
+
+    /// The space of one filesystem: what is free for this user, and what it
+    /// holds in all.
+    fn space_of(path: &Path) -> Option<Space> {
+        let stat = rustix::fs::statvfs(path).ok()?;
+        // The size a block takes on this filesystem, and the number of
+        // blocks: the total is what the disk has, the free is what this user
+        // may still use.
+        let block = if stat.f_frsize > 0 { stat.f_frsize } else { stat.f_bsize };
+        let total = stat.f_blocks.saturating_mul(block);
+        let free = stat.f_bavail.saturating_mul(block);
+        (total > 0).then_some(Space { free, total })
     }
 }
 
