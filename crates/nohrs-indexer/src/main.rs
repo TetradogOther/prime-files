@@ -16,7 +16,12 @@ fn main() -> std::process::ExitCode {
     use nohrs_indexer::{client, install, is_sid, protocol, service};
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let value = |flag: &str| arguments.windows(2).find(|pair| pair[0] == flag).map(|pair| pair[1].clone());
+    let value = |flag: &str| {
+        arguments
+            .windows(2)
+            .find(|pair| pair[0] == flag)
+            .map(|pair| pair[1].clone())
+    };
     let allow = value("--allow").filter(|sid| is_sid(sid));
     // The elevated runs have no console the person sees: what went wrong is
     // written where the app that asked can read it.
@@ -91,7 +96,11 @@ fn main() -> std::process::ExitCode {
                 }
             }
             let prefix = value("--find").unwrap_or_default().to_lowercase();
-            let mut find = Find { prefix, paths: Vec::new(), found: Vec::new() };
+            let mut find = Find {
+                prefix,
+                paths: Vec::new(),
+                found: Vec::new(),
+            };
             let result = client::snapshot(&mut find);
             for path in &find.found {
                 println!("{path}");
@@ -103,14 +112,24 @@ fn main() -> std::process::ExitCode {
             let started = std::time::Instant::now();
             let result = nohrs_indexer::mft::read_volume(&root).map(|table| {
                 let read = started.elapsed();
-                let policy = nohrs_indexer::mft::Policy { profiles: Vec::new(), allowed: Vec::new() };
+                let policy = nohrs_indexer::mft::Policy {
+                    profiles: Vec::new(),
+                    allowed: Vec::new(),
+                };
                 let volume = nohrs_indexer::mft::tree(&table, &root, &policy);
-                println!("{root}: {} records, {} names, read {read:?}, total {:?}", table.records.len(), volume.len(), started.elapsed());
+                println!(
+                    "{root}: {} records, {} names, read {read:?}, total {:?}",
+                    table.records.len(),
+                    volume.len(),
+                    started.elapsed()
+                );
             });
             report(result)
         }
         _ => {
-            eprintln!("prime-files-indexer: see the comment at the top of main.rs for the commands");
+            eprintln!(
+                "prime-files-indexer: see the comment at the top of main.rs for the commands"
+            );
             ExitCode::FAILURE
         }
     }

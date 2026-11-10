@@ -51,7 +51,11 @@ pub(super) fn read_entries() -> Result<Vec<FileEntryDto>, String> {
     Ok(items
         .into_iter()
         .map(|item| {
-            let size = if item.is_dir { 0 } else { std::fs::metadata(&item.id).map_or(0, |metadata| metadata.len()) };
+            let size = if item.is_dir {
+                0
+            } else {
+                std::fs::metadata(&item.id).map_or(0, |metadata| metadata.len())
+            };
             FileEntryDto {
                 name: item.file_name(),
                 path: item.id.clone(),
@@ -72,39 +76,43 @@ enum Action {
 // Runs `action` on the items whose ids are `ids` (all of them when `None`),
 // on a thread of its own.
 fn run(action: Action, ids: Option<Vec<String>>) -> OpReport {
-    let worker = std::thread::Builder::new().name("recycle-bin".into()).spawn(move || {
-        let mut report = OpReport::default();
-        let mut store = match store() {
-            Ok(store) => store,
-            Err(error) => {
-                report.failed(error);
-                return report;
-            }
-        };
-        let items = match store.list() {
-            Ok(items) => items,
-            Err(error) => {
-                report.failed(error.to_string());
-                return report;
-            }
-        };
-        for item in items {
-            if let Some(ids) = &ids
-                && !ids.iter().any(|id| id.eq_ignore_ascii_case(&item.id))
-            {
-                continue;
-            }
-            let done = match action {
-                Action::Restore => store.restore(&item),
-                Action::Purge => store.purge(&item),
+    let worker = std::thread::Builder::new()
+        .name("recycle-bin".into())
+        .spawn(move || {
+            let mut report = OpReport::default();
+            let mut store = match store() {
+                Ok(store) => store,
+                Err(error) => {
+                    report.failed(error);
+                    return report;
+                }
             };
-            match done {
-                Ok(()) => {}
-                Err(error) => report.failed(format!("{}: {error}", item.original_path.display())),
+            let items = match store.list() {
+                Ok(items) => items,
+                Err(error) => {
+                    report.failed(error.to_string());
+                    return report;
+                }
+            };
+            for item in items {
+                if let Some(ids) = &ids
+                    && !ids.iter().any(|id| id.eq_ignore_ascii_case(&item.id))
+                {
+                    continue;
+                }
+                let done = match action {
+                    Action::Restore => store.restore(&item),
+                    Action::Purge => store.purge(&item),
+                };
+                match done {
+                    Ok(()) => {}
+                    Err(error) => {
+                        report.failed(format!("{}: {error}", item.original_path.display()))
+                    }
+                }
             }
-        }
-        report
-    });
+            report
+        });
     match worker.map(|thread| thread.join()) {
         Ok(Ok(report)) => report,
         Ok(Err(_)) | Err(_) => {
@@ -123,7 +131,11 @@ impl ExplorerPane {
             return;
         }
         let total = ids.len();
-        let label = i18n::plural(total, k!("{n} item restaurado"), k!("{n} itens restaurados"));
+        let label = i18n::plural(
+            total,
+            k!("{n} item restaurado"),
+            k!("{n} itens restaurados"),
+        );
         self.run_fs_op(total, label, cx, move || run(Action::Restore, Some(ids)));
     }
 
@@ -153,10 +165,16 @@ impl ExplorerPane {
     /// Answers a double click on an item of the Recycle Bin: it cannot be
     /// opened from there, as in the Explorer.
     pub(crate) fn explain_recycle_bin_item(&mut self, path: &str, cx: &mut Context<Self>) {
-        let name = Path::new(path).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = Path::new(path)
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
         self.set_status(
             StatusLevel::Info,
-            tf!("Para abrir {name}, restaure o item primeiro (botão direito › Restaurar).", name = name),
+            tf!(
+                "Para abrir {name}, restaure o item primeiro (botão direito › Restaurar).",
+                name = name
+            ),
         );
         cx.notify();
     }

@@ -68,7 +68,9 @@ pub(crate) fn parent_location(path: &str) -> Option<String> {
     if bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
         return Some(super::places::THIS_PC.to_string());
     }
-    std::path::Path::new(path).parent().map(|parent| parent.to_string_lossy().into_owned())
+    std::path::Path::new(path)
+        .parent()
+        .map(|parent| parent.to_string_lossy().into_owned())
 }
 
 fn read_folder(path: &str) -> Listing {
@@ -469,16 +471,27 @@ impl ExplorerPane {
             // whole selection goes when the activated file is part of it, so
             // several files can be sent at once; folders in it are skipped.
             let selected = self.picked_files();
-            let paths = if selected.contains(&item.path) { selected } else { vec![item.path] };
+            let paths = if selected.contains(&item.path) {
+                selected
+            } else {
+                vec![item.path]
+            };
             self.send_to_dialog(paths, window, cx);
         } else if let Some((copied, total)) =
             nohrs_services::fs::ops::transfers::progress(std::path::Path::new(&item.path))
         {
             // Half of it is on the disk: the program would call it corrupt.
-            let percent = if total > 0 { copied.saturating_mul(100) / total } else { 0 };
+            let percent = if total > 0 {
+                copied.saturating_mul(100) / total
+            } else {
+                0
+            };
             self.set_status(
                 StatusLevel::Warning,
-                nohrs_core::tf!("Este arquivo ainda está sendo copiado ({percent}%). Abra quando terminar.", percent = percent),
+                nohrs_core::tf!(
+                    "Este arquivo ainda está sendo copiado ({percent}%). Abra quando terminar.",
+                    percent = percent
+                ),
             );
             cx.notify();
         } else {
@@ -500,13 +513,20 @@ impl ExplorerPane {
     /// Hands `paths` to the browser dialog waiting on Nohrs. Sent, Nohrs
     /// steps aside, back to the browser the files went to, as the Windows
     /// dialog closing does (the owner, 07/11/2026).
-    pub(crate) fn send_to_dialog(&mut self, paths: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn send_to_dialog(
+        &mut self,
+        paths: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if crate::file_dialog::deliver(&paths) {
             window.minimize_window();
         } else {
             self.set_status(
                 StatusLevel::Warning,
-                nohrs_core::t!("A janela do navegador não recebeu o arquivo. Ela voltou para a tela."),
+                nohrs_core::t!(
+                    "A janela do navegador não recebeu o arquivo. Ela voltou para a tela."
+                ),
             );
         }
         cx.notify();
@@ -547,34 +567,47 @@ mod platform {
     #[allow(unsafe_code)]
     pub(super) fn open_default(path: &str) {
         use std::os::windows::ffi::OsStrExt;
-        use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize};
+        use windows::Win32::System::Com::{
+            COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
+        };
         use windows::Win32::UI::Shell::{SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, ShellExecuteExW};
         use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
         use windows::core::PCWSTR;
 
         let path = path.to_owned();
-        let spawned = std::thread::Builder::new().name("open-default".into()).spawn(move || {
-            let wide: Vec<u16> = std::ffi::OsStr::new(&path).encode_wide().chain(Some(0)).collect();
-            let initialized = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) }.is_ok();
-            let mut info = SHELLEXECUTEINFOW {
-                cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
-                fMask: SEE_MASK_NOASYNC,
-                lpFile: PCWSTR(wide.as_ptr()),
-                nShow: SW_SHOWNORMAL.0,
-                ..Default::default()
-            };
-            if let Err(error) = unsafe { ShellExecuteExW(&mut info) } {
-                // "No program is associated" and the like: the Explorer's own
-                // answer to it is the "open with" dialog, which it shows.
-                tracing::warn!("ShellExecuteEx({path}) failed: {error}; asking the Explorer");
-                if let Err(error) = std::process::Command::new("explorer.exe").arg(&path).spawn() {
-                    tracing::error!("could not open {path}: {error}");
+        let spawned = std::thread::Builder::new()
+            .name("open-default".into())
+            .spawn(move || {
+                let wide: Vec<u16> = std::ffi::OsStr::new(&path)
+                    .encode_wide()
+                    .chain(Some(0))
+                    .collect();
+                let initialized = unsafe {
+                    CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
                 }
-            }
-            if initialized {
-                unsafe { CoUninitialize() };
-            }
-        });
+                .is_ok();
+                let mut info = SHELLEXECUTEINFOW {
+                    cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+                    fMask: SEE_MASK_NOASYNC,
+                    lpFile: PCWSTR(wide.as_ptr()),
+                    nShow: SW_SHOWNORMAL.0,
+                    ..Default::default()
+                };
+                if let Err(error) = unsafe { ShellExecuteExW(&mut info) } {
+                    // "No program is associated" and the like: the Explorer's own
+                    // answer to it is the "open with" dialog, which it shows.
+                    tracing::warn!("ShellExecuteEx({path}) failed: {error}; asking the Explorer");
+                    if let Err(error) = std::process::Command::new("explorer.exe")
+                        .arg(&path)
+                        .spawn()
+                    {
+                        tracing::error!("could not open {path}: {error}");
+                    }
+                }
+                if initialized {
+                    unsafe { CoUninitialize() };
+                }
+            });
         if let Err(error) = spawned {
             tracing::error!("could not start the thread that opens files: {error}");
         }

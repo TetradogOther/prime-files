@@ -11,10 +11,10 @@ use std::path::{Path, PathBuf};
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
+use gpui_component::Sizable as _;
 use gpui_component::WindowExt as _;
 use gpui_component::dialog::DialogButtonProps;
 use gpui_component::input::{Input, InputState};
-use gpui_component::Sizable as _;
 use nohrs_core::i18n;
 use nohrs_core::telemetry::LogErr as _;
 use nohrs_core::{k, t, tf};
@@ -52,7 +52,13 @@ pub(crate) fn new_names(items: &[(String, bool)], rule: &Rule) -> Vec<String> {
         }
         Rule::Replace { find, with } => items
             .iter()
-            .map(|(name, _)| if find.is_empty() { name.clone() } else { replace_ignoring_case(name, find, with) })
+            .map(|(name, _)| {
+                if find.is_empty() {
+                    name.clone()
+                } else {
+                    replace_ignoring_case(name, find, with)
+                }
+            })
             .collect(),
     }
 }
@@ -108,8 +114,12 @@ pub(crate) fn refused(pairs: &[(PathBuf, String)]) -> Vec<(PathBuf, String)> {
         }
         // Another item of the batch leaves that name free; the item itself
         // (a change of capitals only) is not in its own way.
-        if target_key != key(path) && !sources.contains(&target_key) && ops::would_conflict(&target) {
-            refused.push((path.clone(), tf!("“{name}” já existe nesta pasta", name = name)));
+        if target_key != key(path) && !sources.contains(&target_key) && ops::would_conflict(&target)
+        {
+            refused.push((
+                path.clone(),
+                tf!("“{name}” já existe nesta pasta", name = name),
+            ));
         }
     }
     refused
@@ -118,7 +128,9 @@ pub(crate) fn refused(pairs: &[(PathBuf, String)]) -> Vec<(PathBuf, String)> {
 /// Renames each (path, new name) and says which went, as (old, new) paths.
 /// Names that other items of the batch still hold are freed first through a
 /// temporary name, so `a → b, b → a` works.
-pub(crate) fn rename_all(pairs: Vec<(PathBuf, String)>) -> (super::file_ops::OpReport, Vec<(PathBuf, PathBuf)>) {
+pub(crate) fn rename_all(
+    pairs: Vec<(PathBuf, String)>,
+) -> (super::file_ops::OpReport, Vec<(PathBuf, PathBuf)>) {
     let mut report = super::file_ops::OpReport::default();
     let refused = refused(&pairs);
     for (path, why) in &refused {
@@ -127,7 +139,9 @@ pub(crate) fn rename_all(pairs: Vec<(PathBuf, String)>) -> (super::file_ops::OpR
     let refused: HashSet<&PathBuf> = refused.iter().map(|(path, _)| path).collect();
     let pairs: Vec<(PathBuf, String)> = pairs
         .into_iter()
-        .filter(|(path, name)| !refused.contains(path) && path.file_name().is_some_and(|old| old != name.as_str()))
+        .filter(|(path, name)| {
+            !refused.contains(path) && path.file_name().is_some_and(|old| old != name.as_str())
+        })
         .collect();
 
     let key = |path: &Path| path.to_string_lossy().to_lowercase();
@@ -137,8 +151,9 @@ pub(crate) fn rename_all(pairs: Vec<(PathBuf, String)>) -> (super::file_ops::OpR
     let mut now: Vec<Option<PathBuf>> = Vec::with_capacity(pairs.len());
     for (ix, (path, name)) in pairs.iter().enumerate() {
         let target = path.parent().map(|parent| parent.join(name));
-        let blocked_by_batch =
-            target.as_ref().is_some_and(|target| key(target) != key(path) && sources.contains(&key(target)));
+        let blocked_by_batch = target
+            .as_ref()
+            .is_some_and(|target| key(target) != key(path) && sources.contains(&key(target)));
         if !blocked_by_batch {
             now.push(Some(path.clone()));
             continue;
@@ -188,25 +203,47 @@ pub(crate) struct BatchRenameForm {
 }
 
 impl BatchRenameForm {
-    fn new(items: Vec<(PathBuf, String, bool)>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    fn new(
+        items: Vec<(PathBuf, String, bool)>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         // The first item's name, without its extension, to start from.
         let first = items
             .first()
             .map(|(_, name, is_dir)| {
-                if *is_dir { name.clone() } else { name[..name.len() - extension_of(name).len()].to_string() }
+                if *is_dir {
+                    name.clone()
+                } else {
+                    name[..name.len() - extension_of(name).len()].to_string()
+                }
             })
             .unwrap_or_default();
         let base = cx.new(|cx| InputState::new(window, cx).default_value(first));
         let find = cx.new(|cx| InputState::new(window, cx).placeholder(t!("Texto a procurar")));
-        let with = cx.new(|cx| InputState::new(window, cx).placeholder(t!("Trocar por (vazio apaga)")));
-        let observers = [&base, &find, &with].into_iter().map(|input| cx.observe(input, |_, _, cx| cx.notify())).collect();
+        let with =
+            cx.new(|cx| InputState::new(window, cx).placeholder(t!("Trocar por (vazio apaga)")));
+        let observers = [&base, &find, &with]
+            .into_iter()
+            .map(|input| cx.observe(input, |_, _, cx| cx.notify()))
+            .collect();
         base.update(cx, |state, cx| state.focus(window, cx));
-        Self { items, mode: Mode::Numbered, base, find, with, _observers: observers }
+        Self {
+            items,
+            mode: Mode::Numbered,
+            base,
+            find,
+            with,
+            _observers: observers,
+        }
     }
 
     fn rule(&self, cx: &App) -> Rule {
         match self.mode {
-            Mode::Numbered => Rule::Numbered { base: self.base.read(cx).value().to_string(), start: 1 },
+            Mode::Numbered => Rule::Numbered {
+                base: self.base.read(cx).value().to_string(),
+                start: 1,
+            },
             Mode::Replace => Rule::Replace {
                 find: self.find.read(cx).value().to_string(),
                 with: self.with.read(cx).value().to_string(),
@@ -216,14 +253,26 @@ impl BatchRenameForm {
 
     /// Each item and its new name.
     pub(crate) fn plan(&self, cx: &App) -> Vec<(PathBuf, String)> {
-        let names: Vec<(String, bool)> = self.items.iter().map(|(_, name, is_dir)| (name.clone(), *is_dir)).collect();
+        let names: Vec<(String, bool)> = self
+            .items
+            .iter()
+            .map(|(_, name, is_dir)| (name.clone(), *is_dir))
+            .collect();
         let new = new_names(&names, &self.rule(cx));
-        self.items.iter().map(|(path, _, _)| path.clone()).zip(new).collect()
+        self.items
+            .iter()
+            .map(|(path, _, _)| path.clone())
+            .zip(new)
+            .collect()
     }
 
     fn set_mode(&mut self, mode: Mode, window: &mut Window, cx: &mut Context<Self>) {
         self.mode = mode;
-        let field = if mode == Mode::Numbered { &self.base } else { &self.find };
+        let field = if mode == Mode::Numbered {
+            &self.base
+        } else {
+            &self.find
+        };
         field.update(cx, |state, cx| state.focus(window, cx));
         cx.notify();
     }
@@ -235,7 +284,10 @@ impl Render for BatchRenameForm {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let plan = self.plan(cx);
         let refused: HashSet<PathBuf> = refused(&plan).into_iter().map(|(path, _)| path).collect();
-        let mode_chip = |id: &'static str, label: &'static str, mode: Mode, cx: &mut Context<Self>| {
+        let mode_chip = |id: &'static str,
+                         label: &'static str,
+                         mode: Mode,
+                         cx: &mut Context<Self>| {
             let on = self.mode == mode;
             div()
                 .id(id)
@@ -248,7 +300,9 @@ impl Render for BatchRenameForm {
                 .text_sm()
                 .map(|this| {
                     if on {
-                        this.bg(rgb(theme::accent())).border_color(rgb(theme::accent())).text_color(rgb(theme::accent_fg()))
+                        this.bg(rgb(theme::accent()))
+                            .border_color(rgb(theme::accent()))
+                            .text_color(rgb(theme::accent_fg()))
                     } else {
                         this.cursor_pointer()
                             .border_color(rgb(theme::border_hover()))
@@ -264,7 +318,12 @@ impl Render for BatchRenameForm {
                 .flex()
                 .flex_col()
                 .gap(px(4.0))
-                .child(div().text_xs().text_color(rgb(theme::fg_secondary())).child(label))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme::fg_secondary()))
+                        .child(label),
+                )
                 .child(Input::new(input).small())
         };
         let hidden = plan.len().saturating_sub(SHOWN);
@@ -276,15 +335,24 @@ impl Render for BatchRenameForm {
                 div()
                     .flex()
                     .gap(px(6.0))
-                    .child(mode_chip("batch-rename-numbered", t!("Nome e número"), Mode::Numbered, cx))
-                    .child(mode_chip("batch-rename-replace", t!("Trocar texto"), Mode::Replace, cx)),
+                    .child(mode_chip(
+                        "batch-rename-numbered",
+                        t!("Nome e número"),
+                        Mode::Numbered,
+                        cx,
+                    ))
+                    .child(mode_chip(
+                        "batch-rename-replace",
+                        t!("Trocar texto"),
+                        Mode::Replace,
+                        cx,
+                    )),
             )
             .map(|this| match self.mode {
                 Mode::Numbered => this.child(field(t!("Novo nome"), &self.base)).child(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(theme::muted()))
-                        .child(t!("Cada item fica “Nome (1)”, “Nome (2)”…, com a extensão que já tinha.")),
+                    div().text_xs().text_color(rgb(theme::muted())).child(t!(
+                        "Cada item fica “Nome (1)”, “Nome (2)”…, com a extensão que já tinha."
+                    )),
                 ),
                 Mode::Replace => this
                     .child(field(t!("Procurar"), &self.find))
@@ -298,58 +366,74 @@ impl Render for BatchRenameForm {
                     .p(px(8.0))
                     .rounded(px(6.0))
                     .bg(rgb(theme::bg_secondary()))
-                    .children(plan.iter().take(SHOWN).zip(&self.items).map(|((path, new), (_, old, _))| {
-                        let changed = new != old;
-                        let bad = refused.contains(path);
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(8.0))
-                            .text_xs()
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w(px(0.0))
-                                    .overflow_hidden()
-                                    .text_ellipsis()
-                                    .whitespace_nowrap()
-                                    .text_color(rgb(theme::fg_secondary()))
-                                    .child(old.clone()),
-                            )
-                            .child(div().flex_shrink_0().text_color(rgb(theme::muted())).child("→"))
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w(px(0.0))
-                                    .overflow_hidden()
-                                    .text_ellipsis()
-                                    .whitespace_nowrap()
-                                    .text_color(rgb(if bad {
-                                        theme::danger()
-                                    } else if changed {
-                                        theme::accent()
-                                    } else {
-                                        theme::muted()
-                                    }))
-                                    .child(new.clone()),
-                            )
-                    }))
+                    .children(plan.iter().take(SHOWN).zip(&self.items).map(
+                        |((path, new), (_, old, _))| {
+                            let changed = new != old;
+                            let bad = refused.contains(path);
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(8.0))
+                                .text_xs()
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w(px(0.0))
+                                        .overflow_hidden()
+                                        .text_ellipsis()
+                                        .whitespace_nowrap()
+                                        .text_color(rgb(theme::fg_secondary()))
+                                        .child(old.clone()),
+                                )
+                                .child(
+                                    div()
+                                        .flex_shrink_0()
+                                        .text_color(rgb(theme::muted()))
+                                        .child("→"),
+                                )
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w(px(0.0))
+                                        .overflow_hidden()
+                                        .text_ellipsis()
+                                        .whitespace_nowrap()
+                                        .text_color(rgb(if bad {
+                                            theme::danger()
+                                        } else if changed {
+                                            theme::accent()
+                                        } else {
+                                            theme::muted()
+                                        }))
+                                        .child(new.clone()),
+                                )
+                        },
+                    ))
                     .when(hidden > 0, |this| {
                         this.child(
                             div()
                                 .pt(px(2.0))
                                 .text_xs()
                                 .text_color(rgb(theme::muted()))
-                                .child(i18n::plural(hidden, k!("e mais {n} item"), k!("e mais {n} itens"))),
+                                .child(i18n::plural(
+                                    hidden,
+                                    k!("e mais {n} item"),
+                                    k!("e mais {n} itens"),
+                                )),
                         )
                     }),
             )
             .when(!refused.is_empty(), |this| {
-                this.child(div().text_xs().text_color(rgb(theme::danger())).child(i18n::plural(
-                    refused.len(),
-                    k!("{n} item fica com o nome antigo: o novo nome já está em uso"),
-                    k!("{n} itens ficam com o nome antigo: o novo nome já está em uso"),
-                )))
+                this.child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme::danger()))
+                        .child(i18n::plural(
+                            refused.len(),
+                            k!("{n} item fica com o nome antigo: o novo nome já está em uso"),
+                            k!("{n} itens ficam com o nome antigo: o novo nome já está em uso"),
+                        )),
+                )
             })
     }
 }
@@ -359,7 +443,10 @@ impl ExplorerPane {
     /// selection of several that includes `row`.
     pub(crate) fn rename_at(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         let selected = self.selected_paths();
-        let row_selected = self.filtered_entries.get(row).is_some_and(|entry| self.selection.contains(&entry.path));
+        let row_selected = self
+            .filtered_entries
+            .get(row)
+            .is_some_and(|entry| self.selection.contains(&entry.path));
         if selected.len() > 1 && row_selected {
             self.open_batch_rename(window, cx);
         } else {
@@ -373,7 +460,13 @@ impl ExplorerPane {
             .filtered_entries
             .iter()
             .filter(|entry| self.selection.contains(&entry.path))
-            .map(|entry| (PathBuf::from(&entry.path), entry.name.clone(), entry.kind == "dir"))
+            .map(|entry| {
+                (
+                    PathBuf::from(&entry.path),
+                    entry.name.clone(),
+                    entry.kind == "dir",
+                )
+            })
             .collect();
         if items.len() < 2 {
             return;
@@ -388,11 +481,16 @@ impl ExplorerPane {
                 .title(tf!("Renomear {count} itens", count = count))
                 .w(px(520.0))
                 .confirm()
-                .button_props(DialogButtonProps::default().ok_text(t!("Renomear")).cancel_text(t!("Cancelar")))
+                .button_props(
+                    DialogButtonProps::default()
+                        .ok_text(t!("Renomear"))
+                        .cancel_text(t!("Cancelar")),
+                )
                 .child(form.clone())
                 .on_ok(move |_, _window, cx| {
                     let plan = form.read(cx).plan(cx);
-                    weak.update(cx, |pane, cx| pane.rename_batch(plan, cx)).log_err();
+                    weak.update(cx, |pane, cx| pane.rename_batch(plan, cx))
+                        .log_err();
                     true
                 })
         });
@@ -425,32 +523,48 @@ mod tests {
     use super::{Rule, new_names, refused, rename_all};
 
     fn items(names: &[&str]) -> Vec<(String, bool)> {
-        names.iter().map(|name| (name.to_string(), !name.contains('.'))).collect()
+        names
+            .iter()
+            .map(|name| (name.to_string(), !name.contains('.')))
+            .collect()
     }
 
     #[test]
     fn numbered_names_keep_each_extension() {
-        let rule = Rule::Numbered { base: "Viagem".into(), start: 1 };
+        let rule = Rule::Numbered {
+            base: "Viagem".into(),
+            start: 1,
+        };
         assert_eq!(
             new_names(&items(&["a.jpg", "b.PNG", "pasta", ".gitignore"]), &rule),
-            ["Viagem (1).jpg", "Viagem (2).PNG", "Viagem (3)", "Viagem (4)"]
+            [
+                "Viagem (1).jpg",
+                "Viagem (2).PNG",
+                "Viagem (3)",
+                "Viagem (4)"
+            ]
         );
     }
 
     #[test]
     fn an_empty_name_changes_nothing() {
-        let rule = Rule::Numbered { base: "  ".into(), start: 1 };
+        let rule = Rule::Numbered {
+            base: "  ".into(),
+            start: 1,
+        };
         assert_eq!(new_names(&items(&["a.jpg"]), &rule), ["a.jpg"]);
     }
 
     #[test]
     fn replace_ignores_capitals_and_keeps_the_rest() {
-        let rule = Rule::Replace { find: "img".into(), with: "Foto".into() };
-        assert_eq!(new_names(&items(&["IMG_01.jpg", "img-img.jpg", "outro.jpg"]), &rule), [
-            "Foto_01.jpg",
-            "Foto-Foto.jpg",
-            "outro.jpg"
-        ]);
+        let rule = Rule::Replace {
+            find: "img".into(),
+            with: "Foto".into(),
+        };
+        assert_eq!(
+            new_names(&items(&["IMG_01.jpg", "img-img.jpg", "outro.jpg"]), &rule),
+            ["Foto_01.jpg", "Foto-Foto.jpg", "outro.jpg"]
+        );
     }
 
     #[test]
@@ -464,8 +578,14 @@ mod tests {
         ]);
         assert!(report.failures().is_empty(), "{:?}", report.failures());
         assert_eq!(done.len(), 2);
-        assert_eq!(std::fs::read_to_string(dir.path().join("a.txt")).unwrap(), "B");
-        assert_eq!(std::fs::read_to_string(dir.path().join("b.txt")).unwrap(), "A");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+            "B"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("b.txt")).unwrap(),
+            "A"
+        );
     }
 
     #[test]
@@ -480,15 +600,27 @@ mod tests {
         ]);
         assert!(!report.failures().is_empty());
         assert_eq!(done.len(), 1, "the other one still goes");
-        assert_eq!(std::fs::read_to_string(dir.path().join("fora.txt")).unwrap(), "FORA");
-        assert_eq!(std::fs::read_to_string(dir.path().join("a.txt")).unwrap(), "A");
-        assert_eq!(std::fs::read_to_string(dir.path().join("c.txt")).unwrap(), "B");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("fora.txt")).unwrap(),
+            "FORA"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+            "A"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("c.txt")).unwrap(),
+            "B"
+        );
     }
 
     #[test]
     fn the_same_new_name_twice_is_refused_once() {
         let dir = tempfile::tempdir().unwrap();
-        let pairs = vec![(dir.path().join("a.txt"), "x.txt".to_string()), (dir.path().join("b.txt"), "X.txt".to_string())];
+        let pairs = vec![
+            (dir.path().join("a.txt"), "x.txt".to_string()),
+            (dir.path().join("b.txt"), "X.txt".to_string()),
+        ];
         let refused = refused(&pairs);
         assert_eq!(refused.len(), 1);
         assert_eq!(refused[0].0, dir.path().join("b.txt"));

@@ -105,13 +105,21 @@ impl Index {
     /// cut short.
     fn stale(&self) -> bool {
         // Read from the MFT, a refresh costs seconds: worth it far sooner.
-        let after = if mft::running() { STALE_WITH_MFT } else { STALE_AFTER };
-        self.segments.iter().any(|segment| !segment.complete) || self.built.elapsed().map_or(true, |age| age > after)
+        let after = if mft::running() {
+            STALE_WITH_MFT
+        } else {
+            STALE_AFTER
+        };
+        self.segments.iter().any(|segment| !segment.complete)
+            || self.built.elapsed().map_or(true, |age| age > after)
     }
 
     /// How many names it holds.
     pub fn len(&self) -> usize {
-        self.segments.iter().map(|segment| segment.entries.len()).sum()
+        self.segments
+            .iter()
+            .map(|segment| segment.entries.len())
+            .sum()
     }
 }
 
@@ -139,12 +147,16 @@ impl Segment {
 
     fn name(&self, entry: &Entry) -> &str {
         let start = entry.name as usize;
-        self.names.get(start..start + entry.name_len as usize).unwrap_or("")
+        self.names
+            .get(start..start + entry.name_len as usize)
+            .unwrap_or("")
     }
 
     fn lower(&self, entry: &Entry) -> &str {
         let start = entry.lower as usize;
-        self.lower.get(start..start + entry.lower_len as usize).unwrap_or("")
+        self.lower
+            .get(start..start + entry.lower_len as usize)
+            .unwrap_or("")
     }
 
     fn path(&self, index: u32) -> String {
@@ -180,7 +192,9 @@ impl Segment {
                 return Vec::new();
             }
         }
-        let threads = std::thread::available_parallelism().map_or(4, usize::from).clamp(1, 16);
+        let threads = std::thread::available_parallelism()
+            .map_or(4, usize::from)
+            .clamp(1, 16);
         let chunk = self.entries.len().div_ceil(threads).max(1);
         std::thread::scope(|scope| {
             let workers: Vec<_> = self
@@ -204,7 +218,10 @@ impl Segment {
                     })
                 })
                 .collect();
-            workers.into_iter().flat_map(|worker| worker.join().unwrap_or_default()).collect()
+            workers
+                .into_iter()
+                .flat_map(|worker| worker.join().unwrap_or_default())
+                .collect()
         })
     }
 }
@@ -347,7 +364,11 @@ fn tokenize(text: &str) -> Vec<Token> {
             }
             continue;
         }
-        let token = current.get_or_insert_with(|| Token { text: String::new(), negated: false, literal: false });
+        let token = current.get_or_insert_with(|| Token {
+            text: String::new(),
+            negated: false,
+            literal: false,
+        });
         match character {
             '"' => {
                 if token.text.is_empty() {
@@ -355,7 +376,9 @@ fn tokenize(text: &str) -> Vec<Token> {
                 }
                 quoted = !quoted;
             }
-            '-' if token.text.is_empty() && !token.negated && !token.literal => token.negated = true,
+            '-' if token.text.is_empty() && !token.negated && !token.literal => {
+                token.negated = true
+            }
             other => token.text.push(other),
         }
     }
@@ -386,39 +409,56 @@ const GB: u64 = 1024 * MB;
 const DAY: i64 = 86_400;
 
 const IMAGES: &[&str] = &[
-    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "heic", "heif", "avif", "svg", "ico", "psd", "raw", "cr2",
-    "cr3", "nef", "arw", "dng", "exr", "tga",
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "heic", "heif", "avif", "svg",
+    "ico", "psd", "raw", "cr2", "cr3", "nef", "arw", "dng", "exr", "tga",
 ];
-const VIDEOS: &[&str] =
-    &["mp4", "mov", "mkv", "avi", "webm", "wmv", "m4v", "flv", "mpg", "mpeg", "ts", "mts", "m2ts", "3gp", "mxf"];
-const SOUNDS: &[&str] = &["mp3", "wav", "flac", "aac", "ogg", "opus", "m4a", "wma", "aif", "aiff", "mid", "midi"];
-const DOCUMENTS: &[&str] =
-    &["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "txt", "md", "csv", "epub"];
-const ARCHIVES: &[&str] = &["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "zst", "iso", "cab", "zxp"];
+const VIDEOS: &[&str] = &[
+    "mp4", "mov", "mkv", "avi", "webm", "wmv", "m4v", "flv", "mpg", "mpeg", "ts", "mts", "m2ts",
+    "3gp", "mxf",
+];
+const SOUNDS: &[&str] = &[
+    "mp3", "wav", "flac", "aac", "ogg", "opus", "m4a", "wma", "aif", "aiff", "mid", "midi",
+];
+const DOCUMENTS: &[&str] = &[
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "txt", "md",
+    "csv", "epub",
+];
+const ARCHIVES: &[&str] = &[
+    "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "zst", "iso", "cab", "zxp",
+];
 const CODE: &[&str] = &[
-    "rs", "js", "mjs", "ts", "tsx", "jsx", "py", "c", "h", "cpp", "hpp", "cs", "java", "go", "rb", "php", "html", "css",
-    "json", "toml", "yaml", "yml", "xml", "sh", "ps1", "bat", "lua", "sql", "kt", "swift",
+    "rs", "js", "mjs", "ts", "tsx", "jsx", "py", "c", "h", "cpp", "hpp", "cs", "java", "go", "rb",
+    "php", "html", "css", "json", "toml", "yaml", "yml", "xml", "sh", "ps1", "bat", "lua", "sql",
+    "kt", "swift",
 ];
 const PROGRAMS: &[&str] = &["exe", "msi", "bat", "cmd", "lnk", "appx", "msix"];
 // The projects of the programs this app's people edit with.
-const PROJECTS: &[&str] =
-    &["prproj", "aep", "aepx", "mogrt", "psd", "ai", "blend", "fbx", "c4d", "drp", "veg", "kdenlive", "fla", "indd"];
+const PROJECTS: &[&str] = &[
+    "prproj", "aep", "aepx", "mogrt", "psd", "ai", "blend", "fbx", "c4d", "drp", "veg", "kdenlive",
+    "fla", "indd",
+];
 
 fn category(value: &str) -> Parsed {
     let exts = match value {
-        "imagem" | "imagens" | "image" | "images" | "img" | "foto" | "fotos" | "photo" | "picture" => IMAGES,
+        "imagem" | "imagens" | "image" | "images" | "img" | "foto" | "fotos" | "photo"
+        | "picture" => IMAGES,
         "video" | "vídeo" | "videos" | "vídeos" => VIDEOS,
-        "audio" | "áudio" | "audios" | "áudios" | "som" | "sons" | "sound" | "music" | "musica" | "música" => SOUNDS,
+        "audio" | "áudio" | "audios" | "áudios" | "som" | "sons" | "sound" | "music" | "musica"
+        | "música" => SOUNDS,
         "doc" | "docs" | "documento" | "documentos" | "document" | "documents" => DOCUMENTS,
         "compactado" | "compactados" | "zip" | "archive" | "archives" => ARCHIVES,
         "codigo" | "código" | "code" => CODE,
         "programa" | "programas" | "app" | "apps" | "exe" | "program" => PROGRAMS,
         "projeto" | "projetos" | "project" | "projects" => PROJECTS,
-        "pasta" | "pastas" | "folder" | "folders" | "dir" => return Parsed::Filter(Filter::Kind(true)),
+        "pasta" | "pastas" | "folder" | "folders" | "dir" => {
+            return Parsed::Filter(Filter::Kind(true));
+        }
         "arquivo" | "arquivos" | "file" | "files" => return Parsed::Filter(Filter::Kind(false)),
         _ => return Parsed::Incomplete,
     };
-    Parsed::Filter(Filter::Exts(exts.iter().map(|ext| (*ext).to_string()).collect()))
+    Parsed::Filter(Filter::Exts(
+        exts.iter().map(|ext| (*ext).to_string()).collect(),
+    ))
 }
 
 fn parse_filter(key: &str, value: &str, cwd: &str, now: time::OffsetDateTime) -> Parsed {
@@ -447,7 +487,9 @@ fn parse_filter(key: &str, value: &str, cwd: &str, now: time::OffsetDateTime) ->
 // `10mb`, `1,5gb`, `300k`: a number and a unit, 1024 a step.
 fn bytes(text: &str) -> Option<u64> {
     let text = text.trim();
-    let split = text.find(|character: char| !(character.is_ascii_digit() || character == '.' || character == ','))?;
+    let split = text.find(|character: char| {
+        !(character.is_ascii_digit() || character == '.' || character == ',')
+    })?;
     if split == 0 {
         return None;
     }
@@ -580,19 +622,31 @@ fn period(text: &str, offset: time::UtcOffset) -> Option<(i64, i64)> {
         [year] if year.len() == 4 => (parse(year)?, None, None),
         [year, month] if year.len() == 4 => (parse(year)?, Some(parse(month)?), None),
         [month, year] if year.len() == 4 => (parse(year)?, Some(parse(month)?), None),
-        [year, month, day] if year.len() == 4 => (parse(year)?, Some(parse(month)?), Some(parse(day)?)),
-        [day, month, year] if year.len() == 4 => (parse(year)?, Some(parse(month)?), Some(parse(day)?)),
+        [year, month, day] if year.len() == 4 => {
+            (parse(year)?, Some(parse(month)?), Some(parse(day)?))
+        }
+        [day, month, year] if year.len() == 4 => {
+            (parse(year)?, Some(parse(month)?), Some(parse(day)?))
+        }
         _ => return None,
     };
     let start_of = |year: i32, month: i32, day: i32| -> Option<i64> {
         let month = time::Month::try_from(u8::try_from(month).ok()?).ok()?;
         let date = time::Date::from_calendar_date(year, month, u8::try_from(day).ok()?).ok()?;
-        Some(date.with_time(time::Time::MIDNIGHT).assume_offset(offset).unix_timestamp())
+        Some(
+            date.with_time(time::Time::MIDNIGHT)
+                .assume_offset(offset)
+                .unix_timestamp(),
+        )
     };
     let (start, next) = match (month, day) {
         (None, _) => (start_of(year, 1, 1)?, start_of(year + 1, 1, 1)?),
         (Some(month), None) => {
-            let next = if month == 12 { start_of(year + 1, 1, 1)? } else { start_of(year, month + 1, 1)? };
+            let next = if month == 12 {
+                start_of(year + 1, 1, 1)?
+            } else {
+                start_of(year, month + 1, 1)?
+            };
             (start_of(year, month, 1)?, next)
         }
         (Some(month), Some(day)) => {
@@ -677,7 +731,11 @@ fn subsequence(term: &str, name: &str) -> bool {
 // `term` begins a word of `name`: at its start or after a separator.
 fn starts_a_word(name: &str, term: &str) -> bool {
     name.match_indices(term).any(|(at, _)| {
-        at == 0 || name.get(..at).and_then(|before| before.chars().next_back()).is_some_and(|before| !before.is_alphanumeric())
+        at == 0
+            || name
+                .get(..at)
+                .and_then(|before| before.chars().next_back())
+                .is_some_and(|before| !before.is_alphanumeric())
     })
 }
 
@@ -734,7 +792,11 @@ impl Query {
                 match parse_filter(key, value, cwd, now) {
                     Parsed::Filter(filter) => {
                         any = true;
-                        query.filters.push(format!("{}{}", if token.negated { "-" } else { "" }, token.text));
+                        query.filters.push(format!(
+                            "{}{}",
+                            if token.negated { "-" } else { "" },
+                            token.text
+                        ));
                         match (filter, token.negated) {
                             (Filter::Exts(exts), false) => query.exts.extend(exts),
                             (Filter::Exts(exts), true) => query.excluded_exts.extend(exts),
@@ -782,18 +844,31 @@ impl Query {
         query.first = names.first().map(|first| (*first).to_string());
         query.mask = names.iter().fold(0, |mask, name| mask | letter_mask(name));
         query.fuzzy = match query.terms.as_slice() {
-            [Term::Name(only)] if only.chars().count() >= 3 && !only.contains(' ') => Some(only.clone()),
+            [Term::Name(only)] if only.chars().count() >= 3 && !only.contains(' ') => {
+                Some(only.clone())
+            }
             _ => None,
         };
         query.needs_path = !query.scopes.is_empty()
-            || query.terms.iter().chain(&query.excluded).any(|term| matches!(term, Term::Path(_)));
+            || query
+                .terms
+                .iter()
+                .chain(&query.excluded)
+                .any(|term| matches!(term, Term::Path(_)));
         Some(query)
     }
 
     /// The sort key of `entry` if it matches: match class, then system
     /// folders after the person's own, then recency (see `recency`).
     /// `fuzzy` is the second pass, which takes only what the first refused.
-    fn rank(&self, segment: &Segment, position: u32, entry: &Entry, fuzzy: bool, paths: &mut LowerPaths) -> Option<u32> {
+    fn rank(
+        &self,
+        segment: &Segment,
+        position: u32,
+        entry: &Entry,
+        fuzzy: bool,
+        paths: &mut LowerPaths,
+    ) -> Option<u32> {
         if entry.mask & self.mask != self.mask {
             return None;
         }
@@ -813,8 +888,14 @@ impl Query {
         }
         let name = segment.lower(entry);
         if !self.exts.is_empty() || !self.excluded_exts.is_empty() {
-            let ext = if dir { None } else { name.rsplit_once('.').map(|(_, ext)| ext) };
-            if !self.exts.is_empty() && !ext.is_some_and(|ext| self.exts.iter().any(|want| want == ext)) {
+            let ext = if dir {
+                None
+            } else {
+                name.rsplit_once('.').map(|(_, ext)| ext)
+            };
+            if !self.exts.is_empty()
+                && !ext.is_some_and(|ext| self.exts.iter().any(|want| want == ext))
+            {
                 return None;
             }
             if ext.is_some_and(|ext| self.excluded_exts.iter().any(|unwanted| unwanted == ext)) {
@@ -842,7 +923,12 @@ impl Query {
         }
         if self.needs_path {
             let path = paths.of(segment, position);
-            if !self.scopes.is_empty() && !self.scopes.iter().any(|scope| path.starts_with(scope.as_str())) {
+            if !self.scopes.is_empty()
+                && !self
+                    .scopes
+                    .iter()
+                    .any(|scope| path.starts_with(scope.as_str()))
+            {
                 return None;
             }
             let paths_match = self.terms.iter().all(|term| match term {
@@ -863,7 +949,11 @@ impl Query {
             0
         } else if name.starts_with(&self.whole) {
             1
-        } else if self.first.as_deref().is_some_and(|first| starts_a_word(name, first)) {
+        } else if self
+            .first
+            .as_deref()
+            .is_some_and(|first| starts_a_word(name, first))
+        {
             2
         } else {
             3
@@ -879,7 +969,13 @@ pub(crate) fn highlight_term(query: &str) -> String {
     tokenize(query)
         .into_iter()
         .filter(|token| !token.negated && (token.literal || !token.text.contains(':')))
-        .flat_map(|token| token.text.split(['*', '?', '\\', '/']).map(str::to_string).collect::<Vec<_>>())
+        .flat_map(|token| {
+            token
+                .text
+                .split(['*', '?', '\\', '/'])
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
         .max_by_key(String::len)
         .unwrap_or_default()
 }
@@ -909,7 +1005,9 @@ fn wildcard(pattern: &[char], name: &str) -> bool {
             },
         }
     }
-    pattern.get(p..).is_some_and(|rest| rest.iter().all(|&c| c == '*'))
+    pattern
+        .get(p..)
+        .is_some_and(|rest| rest.iter().all(|&c| c == '*'))
 }
 
 // ---------------------------------------------------------------------------
@@ -917,12 +1015,26 @@ fn wildcard(pattern: &[char], name: &str) -> bool {
 
 impl Segment {
     fn empty() -> Self {
-        Self { names: String::new(), lower: String::new(), entries: Vec::new(), paths: Vec::new(), complete: false }
+        Self {
+            names: String::new(),
+            lower: String::new(),
+            entries: Vec::new(),
+            paths: Vec::new(),
+            complete: false,
+        }
     }
 
     #[cfg(test)]
     fn push(&mut self, parent: u32, name: &str, dir: bool) -> u32 {
-        self.add(parent, name, Found { dir, size: 0, modified: 0 })
+        self.add(
+            parent,
+            name,
+            Found {
+                dir,
+                size: 0,
+                modified: 0,
+            },
+        )
     }
 
     fn add(&mut self, parent: u32, name: &str, found: Found) -> u32 {
@@ -933,14 +1045,22 @@ impl Segment {
 
     // `add` with the lowering and the mask done beforehand: the walk does
     // them outside the lock its 32 readers share.
-    fn add_lowered(&mut self, parent: u32, name: &str, lowered: &str, mask: u64, found: Found) -> u32 {
+    fn add_lowered(
+        &mut self,
+        parent: u32,
+        name: &str,
+        lowered: &str,
+        mask: u64,
+        found: Found,
+    ) -> u32 {
         // A name longer than this is not a real Windows name (255 UTF-16
         // units at most); clipping keeps the table's lengths in 16 bits.
         let name = clip(name, u16::MAX as usize);
         let lowered = clip(lowered, u16::MAX as usize);
         let parent_entry = self.entries.get(parent as usize).copied();
         let at_root = parent_entry.is_some_and(|entry| entry.parent == NO_PARENT);
-        let noise = parent_entry.is_some_and(|entry| entry.flags & NOISE != 0) || noisy(lowered, at_root);
+        let noise =
+            parent_entry.is_some_and(|entry| entry.flags & NOISE != 0) || noisy(lowered, at_root);
         let entry = Entry {
             size: if found.dir { 0 } else { found.size },
             mask,
@@ -994,14 +1114,19 @@ impl Found {
 }
 
 fn noisy(lowered: &str, at_root: bool) -> bool {
-    matches!(lowered, "appdata" | "node_modules" | ".git" | "$recycle.bin")
-        || (at_root && (matches!(lowered, "windows" | "programdata") || lowered.starts_with("program files")))
+    matches!(
+        lowered,
+        "appdata" | "node_modules" | ".git" | "$recycle.bin"
+    ) || (at_root
+        && (matches!(lowered, "windows" | "programdata") || lowered.starts_with("program files")))
 }
 
 fn path_is_noise(lowered: &str) -> bool {
     let mut parts = lowered.split('\\');
     parts.next();
-    parts.enumerate().any(|(depth, part)| noisy(part, depth == 0))
+    parts
+        .enumerate()
+        .any(|(depth, part)| noisy(part, depth == 0))
 }
 
 fn clip(text: &str, max: usize) -> &str {
@@ -1039,7 +1164,10 @@ fn build(
     let from_mft = mft::snapshot(&progress);
     for drive in platform::fixed_drives() {
         let root = drive.trim_end_matches('\\').to_string();
-        if let Some(segment) = from_mft.iter().find(|segment| segment.root().eq_ignore_ascii_case(&root)) {
+        if let Some(segment) = from_mft
+            .iter()
+            .find(|segment| segment.root().eq_ignore_ascii_case(&root))
+        {
             segments.push(segment.clone());
             let mut kept = segments.clone();
             if let Some(previous) = &previous {
@@ -1052,7 +1180,9 @@ fn build(
                 );
             }
             let all: Vec<&Segment> = kept.iter().map(|segment| &**segment).collect();
-            let built = previous.as_ref().map_or(SystemTime::UNIX_EPOCH, |previous| previous.built);
+            let built = previous
+                .as_ref()
+                .map_or(SystemTime::UNIX_EPOCH, |previous| previous.built);
             if let Err(error) = save_segments(built, &all, &path) {
                 tracing::warn!("could not save the everything index so far: {error}");
             }
@@ -1070,7 +1200,10 @@ fn build(
                     previous
                         .segments
                         .iter()
-                        .filter(|old| old.root() != root && !segments.iter().any(|new| new.root() == old.root()))
+                        .filter(|old| {
+                            old.root() != root
+                                && !segments.iter().any(|new| new.root() == old.root())
+                        })
                         .cloned(),
                 );
             }
@@ -1080,7 +1213,10 @@ fn build(
         // the first walk of a system drive takes minutes, and an app closed
         // in the middle (an update, a restart) started it over from nothing.
         let first_walk = !previous.as_ref().is_some_and(|previous| {
-            previous.segments.iter().any(|old| old.root() == root && old.complete)
+            previous
+                .segments
+                .iter()
+                .any(|old| old.root() == root && old.complete)
         });
         let kept = others(&segments);
         let mut checkpoint = |table: &Segment| {
@@ -1093,7 +1229,14 @@ fn build(
                 tracing::warn!("could not save the everything index so far: {error}");
             }
         };
-        let segment = Arc::new(walk_drive(&drive, table, progress.clone(), WALKERS, platform::list, &mut checkpoint));
+        let segment = Arc::new(walk_drive(
+            &drive,
+            table,
+            progress.clone(),
+            WALKERS,
+            platform::list,
+            &mut checkpoint,
+        ));
         tracing::info!(
             drive = %drive,
             entries = segment.entries.len(),
@@ -1105,26 +1248,31 @@ fn build(
         // drive done is never walked from nothing again.
         let kept = others(&segments);
         let all: Vec<&Segment> = kept.iter().map(|segment| &**segment).collect();
-        let built = previous.as_ref().map_or(SystemTime::UNIX_EPOCH, |previous| previous.built);
+        let built = previous
+            .as_ref()
+            .map_or(SystemTime::UNIX_EPOCH, |previous| previous.built);
         if let Err(error) = save_segments(built, &all, &path) {
             tracing::warn!("could not save the everything index so far: {error}");
         }
         finished(segments.clone());
     }
-    Index { segments, built: SystemTime::now() }
+    Index {
+        segments,
+        built: SystemTime::now(),
+    }
 }
 
 /// The indexer service (`nohrs_indexer`): asking it for the names, and
 /// installing or removing it from the settings page.
 pub(crate) mod mft {
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::AtomicUsize;
     use std::time::Instant;
 
     use gpui::{App, AppContext as _};
     use nohrs_core::telemetry::LogErr as _;
 
-    use super::{Everything, Found, Segment};
+    use super::{Everything, Segment};
 
     /// What the settings page shows.
     #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1181,7 +1329,15 @@ pub(crate) mod mft {
 
         fn entry(&mut self, parent: u32, name: &str, dir: bool, size: u64, modified: u32) {
             if let Some(segment) = self.current.as_mut() {
-                segment.add(parent, name, Found { dir, size, modified });
+                segment.add(
+                    parent,
+                    name,
+                    Found {
+                        dir,
+                        size,
+                        modified,
+                    },
+                );
             }
             self.count += 1;
             if self.count % 4096 == 0 {
@@ -1199,7 +1355,12 @@ pub(crate) mod mft {
                 return Vec::new();
             }
             let started = Instant::now();
-            let mut builder = Builder { done: Vec::new(), current: None, progress, count: 0 };
+            let mut builder = Builder {
+                done: Vec::new(),
+                current: None,
+                progress,
+                count: 0,
+            };
             match nohrs_indexer::client::snapshot(&mut builder) {
                 Ok(()) => {
                     builder.close();
@@ -1212,7 +1373,9 @@ pub(crate) mod mft {
                     builder.done
                 }
                 Err(error) => {
-                    tracing::warn!("the indexer service did not answer; walking the drives: {error}");
+                    tracing::warn!(
+                        "the indexer service did not answer; walking the drives: {error}"
+                    );
                     Vec::new()
                 }
             }
@@ -1257,18 +1420,23 @@ pub(crate) mod mft {
     #[cfg(windows)]
     fn change(enable: bool) -> Result<(), String> {
         use nohrs_indexer::client;
-        let report = std::env::temp_dir().join(format!("prime-files-indexer-{}.txt", std::process::id()));
+        let report =
+            std::env::temp_dir().join(format!("prime-files-indexer-{}.txt", std::process::id()));
         if let Err(error) = std::fs::remove_file(&report)
             && error.kind() != std::io::ErrorKind::NotFound
         {
             return Err(error.to_string());
         }
         let arguments = if enable {
-            format!("--install --allow {}", client::current_user_sid().map_err(|error| error.to_string())?)
+            format!(
+                "--install --allow {}",
+                client::current_user_sid().map_err(|error| error.to_string())?
+            )
         } else {
             "--uninstall".to_string()
         };
-        let outcome = client::run_elevated(&arguments, &report).map_err(|error| error.to_string())?;
+        let outcome =
+            client::run_elevated(&arguments, &report).map_err(|error| error.to_string())?;
         match outcome {
             // Declined at the prompt: nothing changed, nothing to report.
             None => Ok(()),
@@ -1309,7 +1477,15 @@ fn walk_drive(
     list: fn(&Path, &mut Vec<Listed>),
     checkpoint: &mut dyn FnMut(&Segment),
 ) -> Segment {
-    let root = lock(&table).add(NO_PARENT, drive.trim_end_matches('\\'), Found { dir: true, size: 0, modified: 0 });
+    let root = lock(&table).add(
+        NO_PARENT,
+        drive.trim_end_matches('\\'),
+        Found {
+            dir: true,
+            size: 0,
+            modified: 0,
+        },
+    );
     let walk = Arc::new(Walk {
         queue: Mutex::new((vec![(PathBuf::from(drive), root)], 0)),
         wake: Condvar::new(),
@@ -1350,7 +1526,9 @@ fn walk_drive(
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 fn worker(walk: &Walk) {
@@ -1365,7 +1543,10 @@ fn worker(walk: &Walk) {
                 if queue.1 == 0 {
                     break None;
                 }
-                queue = walk.wake.wait(queue).unwrap_or_else(std::sync::PoisonError::into_inner);
+                queue = walk
+                    .wake
+                    .wait(queue)
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
             }
         };
         let Some((folder, id)) = job else {
@@ -1418,8 +1599,12 @@ fn worker(walk: &Walk) {
 
 // Higher is walked sooner: people look for their own files first, and the
 // system's folders are the largest and least searched.
+#[cfg(windows)]
 fn walk_priority(path: &Path) -> u8 {
-    let name = path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
     match name.as_str() {
         "users" => 3,
         "windows" | "programdata" | "$recycle.bin" | "system volume information" => 0,
@@ -1428,11 +1613,31 @@ fn walk_priority(path: &Path) -> u8 {
     }
 }
 
+// Higher is walked sooner: the person's own folder first, and the folders
+// of the system last, for they are the largest and the least searched.
+#[cfg(not(windows))]
+fn walk_priority(path: &Path) -> u8 {
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    match name.as_str() {
+        "home" => 3,
+        "usr" | "var" | "lib" | "lib64" | "bin" | "sbin" | "opt" | "etc" | "boot" => 0,
+        "srv" | "mnt" => 1,
+        _ => 2,
+    }
+}
+
 fn in_the_cloud(attributes: u32) -> bool {
     const FILE_ATTRIBUTE_OFFLINE: u32 = 0x1000;
     const FILE_ATTRIBUTE_RECALL_ON_OPEN: u32 = 0x40000;
     const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x400000;
-    attributes & (FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_OPEN | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS) != 0
+    attributes
+        & (FILE_ATTRIBUTE_OFFLINE
+            | FILE_ATTRIBUTE_RECALL_ON_OPEN
+            | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
+        != 0
 }
 
 /// A folder listed by the standard library: what the walk did before
@@ -1448,14 +1653,32 @@ fn list_std(folder: &Path, out: &mut Vec<Listed>) {
         };
         let metadata = entry.metadata().ok();
         #[cfg(windows)]
-        let attributes = metadata.as_ref().map_or(0, std::os::windows::fs::MetadataExt::file_attributes);
+        let attributes = metadata
+            .as_ref()
+            .map_or(0, std::os::windows::fs::MetadataExt::file_attributes);
         #[cfg(not(windows))]
         let attributes = 0;
+        // The size of a folder is what the filesystem spends on its own
+        // entry, not what is in it: on Linux it is a number nobody wants to
+        // read, and on Windows it is zero.
+        let size = match &metadata {
+            Some(metadata) if kind.is_dir() => 0,
+            Some(metadata) => metadata.len(),
+            None => 0,
+        };
         out.push(Listed {
             name: entry.file_name().to_string_lossy().into_owned(),
             found: Found {
                 dir: kind.is_dir(),
-                ..metadata.as_ref().map_or(Found { dir: false, size: UNKNOWN_SIZE, modified: 0 }, Found::of)
+                size,
+                ..metadata.as_ref().map_or(
+                    Found {
+                        dir: false,
+                        size: UNKNOWN_SIZE,
+                        modified: 0,
+                    },
+                    Found::of,
+                )
             },
             link: kind.is_symlink(),
             cloud: in_the_cloud(attributes),
@@ -1469,6 +1692,16 @@ fn skipped(name: &str) -> bool {
     name.eq_ignore_ascii_case("$Recycle.Bin")
         || name.eq_ignore_ascii_case("System Volume Information")
         || name.eq_ignore_ascii_case("$WinREAgent")
+        // The pseudo-filesystems of a Linux machine: they are folders the
+        // walk would descend into, and they hold the kernel's own view of
+        // the machine — millions of files that are never what a person
+        // searches for, and whose reading costs the disk.
+        || matches!(
+            name.to_ascii_lowercase().as_str(),
+            "proc" | "sys" | "dev" | "run" | "snap" | "lost+found" | "mnt" | "media"
+        )
+        // The folder an AppImage is mounted in while it runs.
+        || name.starts_with(".mount_")
 }
 
 // ---------------------------------------------------------------------------
@@ -1490,7 +1723,9 @@ fn save_segments(built: SystemTime, segments: &[&Segment], path: &Path) -> std::
     }
     let temporary = path.with_extension("tmp");
     let mut file = std::io::BufWriter::new(std::fs::File::create(&temporary)?);
-    let built = built.duration_since(SystemTime::UNIX_EPOCH).map_or(0, |since| since.as_secs());
+    let built = built
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
     file.write_all(FILE_MAGIC)?;
     file.write_all(&built.to_le_bytes())?;
     file.write_all(&(segments.len() as u64).to_le_bytes())?;
@@ -1514,7 +1749,9 @@ fn save_segments(built: SystemTime, segments: &[&Segment], path: &Path) -> std::
         file.write_all(segment.names.as_bytes())?;
         file.write_all(segment.lower.as_bytes())?;
     }
-    file.into_inner().map_err(|error| error.into_error())?.sync_all()?;
+    file.into_inner()
+        .map_err(|error| error.into_error())?
+        .sync_all()?;
     std::fs::rename(&temporary, path)
 }
 
@@ -1522,7 +1759,9 @@ const ENTRY_BYTES_V2: usize = 17;
 const ENTRY_BYTES: usize = 29;
 
 fn number(bytes: &[u8], at: usize) -> Option<u64> {
-    Some(u64::from_le_bytes(bytes.get(at..at.checked_add(8)?)?.try_into().ok()?))
+    Some(u64::from_le_bytes(
+        bytes.get(at..at.checked_add(8)?)?.try_into().ok()?,
+    ))
 }
 
 fn load(path: &Path) -> Option<Index> {
@@ -1551,17 +1790,29 @@ fn load_segment(bytes: &[u8], at: usize, current: bool) -> Option<(Segment, usiz
     let names_len = usize::try_from(number(bytes, at + 8)?).ok()?;
     let lower_len = usize::try_from(number(bytes, at + 16)?).ok()?;
     // A table from before 0.3.2 was only ever saved whole.
-    let (complete, header) = if current { (number(bytes, at + 24)? != 0, 32) } else { (true, 24) };
+    let (complete, header) = if current {
+        (number(bytes, at + 24)? != 0, 32)
+    } else {
+        (true, 24)
+    };
     let entries_start = at.checked_add(header)?;
     let entries_end = entries_start.checked_add(count.checked_mul(entry_bytes)?)?;
     let names_end = entries_end.checked_add(names_len)?;
     let lower_end = names_end.checked_add(lower_len)?;
     let mut entries = Vec::with_capacity(count);
-    for (position, raw) in bytes.get(entries_start..entries_end)?.chunks_exact(entry_bytes).enumerate() {
+    for (position, raw) in bytes
+        .get(entries_start..entries_end)?
+        .chunks_exact(entry_bytes)
+        .enumerate()
+    {
         let word = |at: usize| u32::from_le_bytes([raw[at], raw[at + 1], raw[at + 2], raw[at + 3]]);
         let half = |at: usize| u16::from_le_bytes([raw[at], raw[at + 1]]);
         let (size, modified, flags) = if entry_bytes == ENTRY_BYTES {
-            (u64::from_le_bytes(raw[16..24].try_into().ok()?), word(24), raw[28] & DIR)
+            (
+                u64::from_le_bytes(raw[16..24].try_into().ok()?),
+                word(24),
+                raw[28] & DIR,
+            )
         } else {
             (UNKNOWN_SIZE, 0, if raw[16] != 0 { DIR } else { 0 })
         };
@@ -1589,11 +1840,18 @@ fn load_segment(bytes: &[u8], at: usize, current: bool) -> Option<(Segment, usiz
     }
     let names = String::from_utf8(bytes.get(entries_end..names_end)?.to_vec()).ok()?;
     let lower = String::from_utf8(bytes.get(names_end..lower_end)?.to_vec()).ok()?;
-    let mut segment = Segment { names, lower, entries, paths: Vec::new(), complete };
+    let mut segment = Segment {
+        names,
+        lower,
+        entries,
+        paths: Vec::new(),
+        complete,
+    };
     // A slice cut inside a character would come back empty; one such entry
     // means the file is not what this version wrote.
     let consistent = segment.entries.iter().all(|entry| {
-        segment.names.is_char_boundary(entry.name as usize) && segment.lower.is_char_boundary(entry.lower as usize)
+        segment.names.is_char_boundary(entry.name as usize)
+            && segment.lower.is_char_boundary(entry.lower as usize)
     });
     if !consistent {
         return None;
@@ -1604,7 +1862,8 @@ fn load_segment(bytes: &[u8], at: usize, current: bool) -> Option<(Segment, usiz
         let lowered = segment.lower(&entry);
         let mask = letter_mask(lowered);
         let at_root = parent.is_some_and(|parent| parent.parent == NO_PARENT);
-        let noise = parent.is_some_and(|parent| parent.flags & NOISE != 0) || noisy(lowered, at_root);
+        let noise =
+            parent.is_some_and(|parent| parent.flags & NOISE != 0) || noisy(lowered, at_root);
         if let Some(entry) = segment.entries.get_mut(position) {
             entry.mask = mask;
             if noise {
@@ -1650,14 +1909,21 @@ struct Fresh {
 
 impl Default for Fresh {
     fn default() -> Self {
-        Self { table: Segment::empty(), seen: Vec::new() }
+        Self {
+            table: Segment::empty(),
+            seen: Vec::new(),
+        }
     }
 }
 
 impl Fresh {
     fn record(&mut self, path: String, found: Found) {
         if self.table.entries.len() >= FRESH_LIMIT {
-            let half = self.seen.get(FRESH_LIMIT / 2).copied().unwrap_or(SystemTime::UNIX_EPOCH);
+            let half = self
+                .seen
+                .get(FRESH_LIMIT / 2)
+                .copied()
+                .unwrap_or(SystemTime::UNIX_EPOCH);
             self.retain(|_, seen| seen > half);
         }
         self.table.add_loose(path, found);
@@ -1671,7 +1937,11 @@ impl Fresh {
                 continue;
             };
             if keep(path, *seen) {
-                let found = Found { dir: entry.flags & DIR != 0, size: entry.size, modified: entry.modified };
+                let found = Found {
+                    dir: entry.flags & DIR != 0,
+                    size: entry.size,
+                    modified: entry.modified,
+                };
                 self.table.add_loose(path.clone(), found);
                 self.seen.push(*seen);
             }
@@ -1687,7 +1957,9 @@ fn churn(lowered: &str) -> bool {
         || lowered.contains("\\$recycle.bin\\")
         || lowered.contains("\\system volume information\\")
         || lowered.contains("\\.git\\")
-        || lowered.get(1..).is_some_and(|rest| rest.starts_with(":\\windows\\"))
+        || lowered
+            .get(1..)
+            .is_some_and(|rest| rest.starts_with(":\\windows\\"))
         || name.ends_with(".tmp")
         || name.starts_with("~$")
 }
@@ -1702,9 +1974,12 @@ fn watch_drives(fresh: Arc<Mutex<Fresh>>) -> Option<notify::RecommendedWatcher> 
             return;
         };
         let paths: Vec<PathBuf> = match event.kind {
-            EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(RenameMode::To | RenameMode::Any)) => event.paths,
+            EventKind::Create(_)
+            | EventKind::Modify(ModifyKind::Name(RenameMode::To | RenameMode::Any)) => event.paths,
             // From and to: only the new name is new.
-            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => event.paths.into_iter().last().into_iter().collect(),
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => {
+                event.paths.into_iter().last().into_iter().collect()
+            }
             _ => return,
         };
         for path in paths {
@@ -1737,10 +2012,12 @@ impl Everything {
         // A drive only half walked before is searched in both tables, the
         // old half and the walk's: the walk shows what it found since.
         let root = lock(table).root().to_string();
-        !self
-            .index
-            .as_ref()
-            .is_some_and(|index| index.segments.iter().any(|segment| segment.root() == root && segment.complete))
+        !self.index.as_ref().is_some_and(|index| {
+            index
+                .segments
+                .iter()
+                .any(|segment| segment.root() == root && segment.complete)
+        })
     }
 }
 
@@ -1755,8 +2032,12 @@ pub(crate) struct Status {
 pub(crate) fn status(cx: &App) -> Status {
     let everything = cx.try_global::<Everything>();
     Status {
-        entries: everything.and_then(|state| state.index.as_ref()).map(|index| index.len()),
-        built: everything.and_then(|state| state.index.as_ref()).map(|index| index.built),
+        entries: everything
+            .and_then(|state| state.index.as_ref())
+            .map(|index| index.len()),
+        built: everything
+            .and_then(|state| state.index.as_ref())
+            .map(|index| index.built),
         building: everything
             .and_then(|state| state.building.as_ref())
             .map(|progress| progress.load(Ordering::Relaxed)),
@@ -1771,12 +2052,20 @@ pub(crate) fn status(cx: &App) -> Status {
 pub(crate) fn finder(cx: &App, query: &str, cwd: &str) -> Option<Finder> {
     let state = cx.try_global::<Everything>()?;
     let index = state.index.clone();
-    let walking = state.walking_is_new().then(|| state.walking.clone()).flatten();
+    let walking = state
+        .walking_is_new()
+        .then(|| state.walking.clone())
+        .flatten();
     if index.is_none() && walking.is_none() {
         return None;
     }
     let parsed = Query::parse(query, cwd)?;
-    Some(Finder { index, walking, fresh: state.fresh.clone(), parsed })
+    Some(Finder {
+        index,
+        walking,
+        fresh: state.fresh.clone(),
+        parsed,
+    })
 }
 
 /// A search taken from [`finder`], to [`run`](Finder::run) on another thread.
@@ -1790,7 +2079,13 @@ pub(crate) struct Finder {
 impl Finder {
     /// The hits as (name, path, is a folder), best first.
     pub(crate) fn run(&self, cancel: &AtomicBool) -> Vec<(String, String, bool)> {
-        gather(self.index.as_deref(), self.walking.as_deref(), Some(&*self.fresh), &self.parsed, cancel)
+        gather(
+            self.index.as_deref(),
+            self.walking.as_deref(),
+            Some(&*self.fresh),
+            &self.parsed,
+            cancel,
+        )
     }
 }
 
@@ -1852,25 +2147,27 @@ pub(crate) fn rebuild(cx: &mut App) {
     let walk_started = SystemTime::now();
     let fresh = state.fresh.clone();
     let (sender, receiver) = async_channel::unbounded::<Walked>();
-    let spawned = std::thread::Builder::new().name("nohrs-everything".into()).spawn({
-        let progress = progress.clone();
-        move || {
-            let index = build(
-                previous,
-                progress,
-                |table| {
-                    sender.send_blocking(Walked::Walking(table)).log_err();
-                },
-                |segments| {
-                    sender.send_blocking(Walked::Drives(segments)).log_err();
-                },
-            );
-            if let Err(error) = save(&index, &index_file()) {
-                tracing::warn!("could not save the everything index: {error}");
+    let spawned = std::thread::Builder::new()
+        .name("nohrs-everything".into())
+        .spawn({
+            let progress = progress.clone();
+            move || {
+                let index = build(
+                    previous,
+                    progress,
+                    |table| {
+                        sender.send_blocking(Walked::Walking(table)).log_err();
+                    },
+                    |segments| {
+                        sender.send_blocking(Walked::Drives(segments)).log_err();
+                    },
+                );
+                if let Err(error) = save(&index, &index_file()) {
+                    tracing::warn!("could not save the everything index: {error}");
+                }
+                sender.send_blocking(Walked::All(index)).log_err();
             }
-            sender.send_blocking(Walked::All(index)).log_err();
-        }
-    });
+        });
     if let Err(error) = spawned {
         tracing::error!("could not start the everything walk: {error}");
         cx.global_mut::<Everything>().building = None;
@@ -1881,20 +2178,31 @@ pub(crate) fn rebuild(cx: &mut App) {
         // walk runs; the walk itself never waits on the UI.
         let mut ticks = 0u32;
         loop {
-            cx.background_executor().timer(Duration::from_millis(400)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(400))
+                .await;
             ticks += 1;
             match receiver.try_recv() {
                 Ok(Walked::Walking(table)) => {
-                    if cx.update(|cx| cx.global_mut::<Everything>().walking = Some(table)).is_err() {
+                    if cx
+                        .update(|cx| cx.global_mut::<Everything>().walking = Some(table))
+                        .is_err()
+                    {
                         return;
                     }
                 }
                 // A drive is done: searchable now, beside what the previous
                 // index knew of the drives still being walked.
                 Ok(Walked::Drives(done)) => {
-                    let roots: Vec<String> = done.iter().map(|segment| segment.root().to_lowercase()).collect();
+                    let roots: Vec<String> = done
+                        .iter()
+                        .map(|segment| segment.root().to_lowercase())
+                        .collect();
                     lock(&fresh).retain(|path, seen| {
-                        seen >= walk_started || !roots.iter().any(|root| path.to_lowercase().starts_with(root.as_str()))
+                        seen >= walk_started
+                            || !roots
+                                .iter()
+                                .any(|root| path.to_lowercase().starts_with(root.as_str()))
                     });
                     let updated = cx.update(|cx| {
                         let state = cx.global_mut::<Everything>();
@@ -1903,11 +2211,16 @@ pub(crate) fn rebuild(cx: &mut App) {
                             segments.extend(
                                 old.segments
                                     .iter()
-                                    .filter(|segment| !done.iter().any(|new| new.root() == segment.root()))
+                                    .filter(|segment| {
+                                        !done.iter().any(|new| new.root() == segment.root())
+                                    })
                                     .cloned(),
                             );
                         }
-                        let built = state.index.as_ref().map_or_else(SystemTime::now, |old| old.built);
+                        let built = state
+                            .index
+                            .as_ref()
+                            .map_or_else(SystemTime::now, |old| old.built);
                         state.index = Some(Arc::new(Index { segments, built }));
                         state.walking = None;
                         state.generation += 1;
@@ -2012,10 +2325,14 @@ impl ExplorerPane {
         let state = cx.try_global::<Everything>();
         let generation = state.map_or(0, |state| state.generation);
         let index = state.and_then(|state| state.index.clone());
-        let walking = state.filter(|state| state.walking_is_new()).and_then(|state| state.walking.clone());
+        let walking = state
+            .filter(|state| state.walking_is_new())
+            .and_then(|state| state.walking.clone());
         let fresh = state.map(|state| state.fresh.clone());
         let built = index.as_ref().map(|index| index.built);
-        let partial = index.as_ref().is_none_or(|index| index.segments.iter().any(|segment| !segment.complete));
+        let partial = index
+            .as_ref()
+            .is_none_or(|index| index.segments.iter().any(|segment| !segment.complete));
         let key = (query.clone(), generation);
         if mode.last.as_ref() == Some(&key) {
             return;
@@ -2041,47 +2358,60 @@ impl ExplorerPane {
 
         let (sender, receiver) = async_channel::unbounded::<Vec<FileEntryDto>>();
         let took = Arc::new(std::sync::atomic::AtomicU64::new(0));
-        let spawned = std::thread::Builder::new().name("nohrs-everything-search".into()).spawn({
-            let took = took.clone();
-            move || {
-            let started = Instant::now();
-            let targets = gather(index.as_deref(), walking.as_deref(), fresh.as_deref(), &parsed, &cancel);
-            let elapsed = started.elapsed().as_millis() as u64;
-            took.store(elapsed.max(1), Ordering::Relaxed);
-            tracing::debug!(hits = targets.len(), elapsed_ms = elapsed, "everything search");
-            let mut batch = Vec::new();
-            let mut limit = FIRST_BATCH;
-            for (name, path, dir) in targets {
-                if cancel.load(Ordering::Relaxed) {
-                    return;
-                }
-                // Gone since the walk: not shown.
-                let Ok(metadata) = std::fs::symlink_metadata(&path) else {
-                    continue;
-                };
-                batch.push(FileEntryDto {
-                    name,
-                    path,
-                    kind: if dir { "dir" } else { "file" }.to_string(),
-                    size: if dir { 0 } else { metadata.len() },
-                    modified: metadata
-                        .modified()
-                        .ok()
-                        .and_then(|time| time.duration_since(SystemTime::UNIX_EPOCH).ok())
-                        .map_or(0, |since| since.as_secs()),
-                    attributes: 0,
-                });
-                if batch.len() >= limit {
-                    if sender.send_blocking(std::mem::take(&mut batch)).is_err() {
-                        return;
+        let spawned = std::thread::Builder::new()
+            .name("nohrs-everything-search".into())
+            .spawn({
+                let took = took.clone();
+                move || {
+                    let started = Instant::now();
+                    let targets = gather(
+                        index.as_deref(),
+                        walking.as_deref(),
+                        fresh.as_deref(),
+                        &parsed,
+                        &cancel,
+                    );
+                    let elapsed = started.elapsed().as_millis() as u64;
+                    took.store(elapsed.max(1), Ordering::Relaxed);
+                    tracing::debug!(
+                        hits = targets.len(),
+                        elapsed_ms = elapsed,
+                        "everything search"
+                    );
+                    let mut batch = Vec::new();
+                    let mut limit = FIRST_BATCH;
+                    for (name, path, dir) in targets {
+                        if cancel.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        // Gone since the walk: not shown.
+                        let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+                            continue;
+                        };
+                        batch.push(FileEntryDto {
+                            name,
+                            path,
+                            kind: if dir { "dir" } else { "file" }.to_string(),
+                            size: if dir { 0 } else { metadata.len() },
+                            modified: metadata
+                                .modified()
+                                .ok()
+                                .and_then(|time| time.duration_since(SystemTime::UNIX_EPOCH).ok())
+                                .map_or(0, |since| since.as_secs()),
+                            attributes: 0,
+                        });
+                        if batch.len() >= limit {
+                            if sender.send_blocking(std::mem::take(&mut batch)).is_err() {
+                                return;
+                            }
+                            limit = BATCH;
+                        }
                     }
-                    limit = BATCH;
+                    if !batch.is_empty() {
+                        sender.send_blocking(batch).log_err();
+                    }
                 }
-            }
-            if !batch.is_empty() {
-                sender.send_blocking(batch).log_err();
-            }
-        }});
+            });
         if let Err(error) = spawned {
             tracing::error!("could not start the everything search: {error}");
             return;
@@ -2091,14 +2421,15 @@ impl ExplorerPane {
         let task = cx.spawn(async move |this: WeakEntity<Self>, cx| {
             let mut first = true;
             while let Ok(batch) = receiver.recv().await {
-                if this.update(cx, |pane, cx| {
-                    if std::mem::take(&mut first) {
-                        pane.begin_search_hits();
-                    }
-                    pane.add_search_hits(batch);
-                    cx.notify();
-                })
-                .is_err()
+                if this
+                    .update(cx, |pane, cx| {
+                        if std::mem::take(&mut first) {
+                            pane.begin_search_hits();
+                        }
+                        pane.add_search_hits(batch);
+                        cx.notify();
+                    })
+                    .is_err()
                 {
                     return;
                 }
@@ -2125,10 +2456,16 @@ impl ExplorerPane {
                     match (building, built.and_then(|built| built.elapsed().ok())) {
                         // A first walk still under way: say so, not an age.
                         (Some(found), _) if partial => {
-                            detail.push(nohrs_core::tf!("Indexando o computador… {n} itens", n = found));
+                            detail.push(nohrs_core::tf!(
+                                "Indexando o computador… {n} itens",
+                                n = found
+                            ));
                         }
                         (_, Some(age)) if !partial => {
-                            detail.push(nohrs_core::tf!("índice de {age} atrás", age = short_age(age)));
+                            detail.push(nohrs_core::tf!(
+                                "índice de {age} atrás",
+                                age = short_age(age)
+                            ));
                         }
                         _ => {}
                     }
@@ -2190,7 +2527,13 @@ fn gather(
     let fresh = fresh.map(lock);
     let mut sources: Vec<(usize, &Segment)> = Vec::new();
     if let Some(index) = index {
-        sources.extend(index.segments.iter().enumerate().map(|(at, segment)| (at, &**segment)));
+        sources.extend(
+            index
+                .segments
+                .iter()
+                .enumerate()
+                .map(|(at, segment)| (at, &**segment)),
+        );
     }
     if let Some(table) = &table {
         sources.push((WALKING, &**table));
@@ -2226,7 +2569,11 @@ fn gather(
     let mut shown = std::collections::HashSet::new();
     let mut out = Vec::new();
     in_order_while(&mut hits, MAX_RESULTS, |(_, _, source, position)| {
-        let Some(segment) = sources.iter().find(|(id, _)| *id == source).map(|(_, segment)| *segment) else {
+        let Some(segment) = sources
+            .iter()
+            .find(|(id, _)| *id == source)
+            .map(|(_, segment)| *segment)
+        else {
             return true;
         };
         let Some(entry) = segment.entries.get(position as usize) else {
@@ -2234,7 +2581,11 @@ fn gather(
         };
         let path = segment.path(position);
         if shown.insert(path.to_lowercase()) {
-            out.push((segment.name(entry).to_string(), path, entry.flags & DIR != 0));
+            out.push((
+                segment.name(entry).to_string(),
+                path,
+                entry.flags & DIR != 0,
+            ));
         }
         out.len() < MAX_RESULTS
     });
@@ -2278,8 +2629,9 @@ mod platform {
     use std::path::Path;
 
     use windows::Win32::Storage::FileSystem::{
-        FIND_FIRST_EX_LARGE_FETCH, FindClose, FindExInfoBasic, FindExSearchNameMatch, FindFirstFileExW, FindNextFileW,
-        GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW, WIN32_FIND_DATAW,
+        FIND_FIRST_EX_LARGE_FETCH, FindClose, FindExInfoBasic, FindExSearchNameMatch,
+        FindFirstFileExW, FindNextFileW, GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW,
+        WIN32_FIND_DATAW,
     };
     use windows::core::{HSTRING, PCWSTR};
 
@@ -2325,7 +2677,11 @@ mod platform {
             return;
         };
         loop {
-            let length = data.cFileName.iter().position(|&unit| unit == 0).unwrap_or(data.cFileName.len());
+            let length = data
+                .cFileName
+                .iter()
+                .position(|&unit| unit == 0)
+                .unwrap_or(data.cFileName.len());
             let name = &data.cFileName[..length];
             let dot = name == [u16::from(b'.')] || name == [u16::from(b'.'), u16::from(b'.')];
             if !dot {
@@ -2339,8 +2695,16 @@ mod platform {
                     name: String::from_utf16_lossy(name),
                     found: super::Found {
                         dir,
-                        size: if dir { 0 } else { (u64::from(data.nFileSizeHigh) << 32) | u64::from(data.nFileSizeLow) },
-                        modified: if ticks == 0 { 0 } else { super::clamp_seconds(seconds as i64) },
+                        size: if dir {
+                            0
+                        } else {
+                            (u64::from(data.nFileSizeHigh) << 32) | u64::from(data.nFileSizeLow)
+                        },
+                        modified: if ticks == 0 {
+                            0
+                        } else {
+                            super::clamp_seconds(seconds as i64)
+                        },
                     },
                     link: attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
                         && (tag == IO_REPARSE_TAG_SYMLINK || tag == IO_REPARSE_TAG_MOUNT_POINT),
@@ -2369,20 +2733,33 @@ mod platform {
                     return false;
                 }
                 let mut label = [0u16; 261];
-                let named = unsafe { GetVolumeInformationW(&wide, Some(&mut label), None, None, None, None) }.is_ok();
+                let named = unsafe {
+                    GetVolumeInformationW(&wide, Some(&mut label), None, None, None, None)
+                }
+                .is_ok();
                 let label = String::from_utf16_lossy(&label);
-                !(named && label.trim_end_matches('\0').to_lowercase().contains("google drive"))
+                !(named
+                    && label
+                        .trim_end_matches('\0')
+                        .to_lowercase()
+                        .contains("google drive"))
             })
             .collect()
     }
 }
 
+/// On Linux the index covers the filesystems that are really there: the
+/// disks and the network shares, not the pseudo-filesystems the kernel
+/// offers, whose folders are never what a person looks for.
 #[cfg(not(target_os = "windows"))]
 mod platform {
     pub(super) use super::list_std as list;
 
     pub fn fixed_drives() -> Vec<String> {
-        vec!["/".to_string()]
+        super::super::drives::mount_points()
+            .into_iter()
+            .map(|mount| mount.to_string_lossy().into_owned())
+            .collect()
     }
 }
 
@@ -2408,7 +2785,10 @@ mod tests {
         builder.push(projects, "kick_final.mp3", false);
         builder.complete = true;
         other.complete = true;
-        Index { segments: vec![Arc::new(builder), Arc::new(other)], built: SystemTime::now() }
+        Index {
+            segments: vec![Arc::new(builder), Arc::new(other)],
+            built: SystemTime::now(),
+        }
     }
 
     fn names(index: &Index, query: &str) -> Vec<String> {
@@ -2424,14 +2804,22 @@ mod tests {
         let index = sample();
         assert_eq!(
             names(&index, "KICK"),
-            ["C:\\Música\\kick", "C:\\Música\\Kick 01.WAV", "C:\\Projetos\\kick_final.mp3", "D:\\kickstarter.txt"]
+            [
+                "C:\\Música\\kick",
+                "C:\\Música\\Kick 01.WAV",
+                "C:\\Projetos\\kick_final.mp3",
+                "D:\\kickstarter.txt"
+            ]
         );
     }
 
     #[test]
     fn every_term_must_match_and_slashes_match_the_path() {
         let index = sample();
-        assert_eq!(names(&index, "kick projetos\\"), ["C:\\Projetos\\kick_final.mp3"]);
+        assert_eq!(
+            names(&index, "kick projetos\\"),
+            ["C:\\Projetos\\kick_final.mp3"]
+        );
         assert_eq!(names(&index, "*.wav"), ["C:\\Música\\Kick 01.WAV"]);
         assert_eq!(names(&index, "música"), ["C:\\Música"]);
     }
@@ -2460,13 +2848,20 @@ mod tests {
         walking.push(e, "Kick.wav", false);
         let walking = Mutex::new(walking);
         let query = Query::parse("kick", "").unwrap();
-        let found = gather(Some(&index), Some(&walking), None, &query, &AtomicBool::new(false));
+        let found = gather(
+            Some(&index),
+            Some(&walking),
+            None,
+            &query,
+            &AtomicBool::new(false),
+        );
         let paths: Vec<&str> = found.iter().map(|(_, path, _)| path.as_str()).collect();
         assert_eq!(paths.first(), Some(&"C:\\Música\\kick"));
         assert!(paths.contains(&"E:\\Kick.wav"));
         assert_eq!(paths.len(), 5);
     }
 
+    #[cfg(windows)]
     #[test]
     fn the_root_walks_users_first_and_windows_last() {
         let mut children = vec![
@@ -2481,6 +2876,22 @@ mod tests {
         assert_eq!(order, [1, 4, 3, 2]);
     }
 
+    // On Linux the person's own folder first, and the folders of the
+    // system last of all.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_root_walks_home_first_and_the_system_last() {
+        let mut children = vec![
+            (PathBuf::from("/home"), 1),
+            (PathBuf::from("/usr"), 2),
+            (PathBuf::from("/srv"), 3),
+            (PathBuf::from("/Projetos"), 4),
+        ];
+        children.sort_by_key(|(path, _)| walk_priority(path));
+        let order: Vec<u32> = children.iter().rev().map(|(_, id)| *id).collect();
+        assert_eq!(order, [1, 4, 3, 2]);
+    }
+
     // 2026-11-05 12:00 UTC, the day these were written.
     const NOW: i64 = 1_793_880_000;
 
@@ -2489,7 +2900,11 @@ mod tests {
     }
 
     fn found(dir: bool, size: u64, days_old: i64) -> Found {
-        Found { dir, size, modified: clamp_seconds(NOW - days_old * DAY) }
+        Found {
+            dir,
+            size,
+            modified: clamp_seconds(NOW - days_old * DAY),
+        }
     }
 
     // A drive with sizes and dates, a system folder among the person's own.
@@ -2505,7 +2920,10 @@ mod tests {
         let media = table.add(windows, "Media", found(true, 0, 400));
         table.add(media, "bonk.wav", found(false, 300 * KB, 2));
         table.complete = true;
-        Index { segments: vec![Arc::new(table)], built: SystemTime::now() }
+        Index {
+            segments: vec![Arc::new(table)],
+            built: SystemTime::now(),
+        }
     }
 
     fn search(index: &Index, query: &str) -> Vec<String> {
@@ -2535,19 +2953,43 @@ mod tests {
     #[test]
     fn filters_narrow_by_extension_kind_size_date_and_folder() {
         let index = detailed();
-        assert_eq!(search(&index, "bonk ext:md"), ["C:\\Users\\SFX\\bonk notes.md"]);
-        assert_eq!(search(&index, "tipo:som tamanho:>10mb"), ["C:\\Users\\SFX\\Big Bonk.wav"]);
-        assert_eq!(search(&index, "bonk data:<7d em:."), ["C:\\Users\\SFX\\Bonk.wav"]);
-        assert_eq!(search(&index, "pasta: s"), ["C:\\Users\\SFX", "C:\\Users", "C:\\Windows"]);
-        assert_eq!(search(&index, "wav -big em:users"), ["C:\\Users\\SFX\\Bonk.wav"]);
-        assert_eq!(search(&index, "\"big bonk\""), ["C:\\Users\\SFX\\Big Bonk.wav"]);
-        assert_eq!(search(&index, "bonk -ext:wav"), ["C:\\Users\\SFX\\bonk notes.md"]);
+        assert_eq!(
+            search(&index, "bonk ext:md"),
+            ["C:\\Users\\SFX\\bonk notes.md"]
+        );
+        assert_eq!(
+            search(&index, "tipo:som tamanho:>10mb"),
+            ["C:\\Users\\SFX\\Big Bonk.wav"]
+        );
+        assert_eq!(
+            search(&index, "bonk data:<7d em:."),
+            ["C:\\Users\\SFX\\Bonk.wav"]
+        );
+        assert_eq!(
+            search(&index, "pasta: s"),
+            ["C:\\Users\\SFX", "C:\\Users", "C:\\Windows"]
+        );
+        assert_eq!(
+            search(&index, "wav -big em:users"),
+            ["C:\\Users\\SFX\\Bonk.wav"]
+        );
+        assert_eq!(
+            search(&index, "\"big bonk\""),
+            ["C:\\Users\\SFX\\Big Bonk.wav"]
+        );
+        assert_eq!(
+            search(&index, "bonk -ext:wav"),
+            ["C:\\Users\\SFX\\bonk notes.md"]
+        );
     }
 
     #[test]
     fn a_filter_still_being_typed_is_left_out_and_an_unknown_key_is_text() {
         let index = detailed();
-        assert_eq!(search(&index, "notes tamanho:"), ["C:\\Users\\SFX\\bonk notes.md"]);
+        assert_eq!(
+            search(&index, "notes tamanho:"),
+            ["C:\\Users\\SFX\\bonk notes.md"]
+        );
         assert!(Query::parse_at("tamanho:", "", now()).is_none());
         assert!(search(&index, "foo:bonk").is_empty());
     }
@@ -2555,7 +2997,10 @@ mod tests {
     #[test]
     fn too_few_hits_bring_in_the_letters_in_order() {
         let index = detailed();
-        assert_eq!(search(&index, "bnknotes"), ["C:\\Users\\SFX\\bonk notes.md"]);
+        assert_eq!(
+            search(&index, "bnknotes"),
+            ["C:\\Users\\SFX\\bonk notes.md"]
+        );
         assert!(subsequence("bonk", "bomnk.wav"));
         assert!(!subsequence("bonk", "boom - robo night k.mp3"));
     }
@@ -2563,7 +3008,10 @@ mod tests {
     #[test]
     fn sizes_and_dates_are_read_the_way_people_write_them() {
         assert_eq!(size_range(">10mb"), Some((10 * MB + 1, u64::MAX)));
-        assert_eq!(size_range("1,5gb..2gb"), Some(((1.5 * GB as f64) as u64, 2 * GB)));
+        assert_eq!(
+            size_range("1,5gb..2gb"),
+            Some(((1.5 * GB as f64) as u64, 2 * GB))
+        );
         assert_eq!(size_range("vazio"), Some((0, 0)));
         assert_eq!(size_range("10"), Some((10, u64::MAX)));
         let utc = time::UtcOffset::UTC;
@@ -2572,7 +3020,10 @@ mod tests {
         assert_eq!(period("2026-11-05", utc), Some((start, end)));
         let (from, to) = date_range("2026", now()).unwrap();
         assert!(from < clamp_seconds(NOW) && clamp_seconds(NOW) < to);
-        assert_eq!(date_range(">2a", now()), Some((0, clamp_seconds(NOW - 2 * 365 * DAY))));
+        assert_eq!(
+            date_range(">2a", now()),
+            Some((0, clamp_seconds(NOW - 2 * 365 * DAY)))
+        );
         assert!(date_range("hoje", now()).is_some_and(|(from, _)| from <= clamp_seconds(NOW)));
     }
 
@@ -2583,7 +3034,10 @@ mod tests {
         let path = dir.path().join("everything.idx");
         save(&index, &path).unwrap();
         let loaded = load(&path).unwrap();
-        assert_eq!(search(&loaded, "tipo:som tamanho:>10mb"), ["C:\\Users\\SFX\\Big Bonk.wav"]);
+        assert_eq!(
+            search(&loaded, "tipo:som tamanho:>10mb"),
+            ["C:\\Users\\SFX\\Big Bonk.wav"]
+        );
         assert_eq!(search(&loaded, "bonk"), search(&index, "bonk"));
 
         // The same table as 0.3.1 wrote it: no size or date per entry.
@@ -2618,12 +3072,29 @@ mod tests {
         lock(&fresh).record("C:\\Users\\SFX\\Bonk Remix.wav".into(), found(false, KB, 0));
         lock(&fresh).record("C:\\Users\\SFX\\Bonk.wav".into(), found(false, KB, 0));
         let query = Query::parse_at("bonk remix", "", now()).unwrap();
-        let hits = gather(Some(&index), None, Some(&fresh), &query, &AtomicBool::new(false));
+        let hits = gather(
+            Some(&index),
+            None,
+            Some(&fresh),
+            &query,
+            &AtomicBool::new(false),
+        );
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].1, "C:\\Users\\SFX\\Bonk Remix.wav");
         let query = Query::parse_at("bonk ext:wav", "", now()).unwrap();
-        let hits = gather(Some(&index), None, Some(&fresh), &query, &AtomicBool::new(false));
-        assert_eq!(hits.iter().filter(|(_, path, _)| path == "C:\\Users\\SFX\\Bonk.wav").count(), 1);
+        let hits = gather(
+            Some(&index),
+            None,
+            Some(&fresh),
+            &query,
+            &AtomicBool::new(false),
+        );
+        assert_eq!(
+            hits.iter()
+                .filter(|(_, path, _)| path == "C:\\Users\\SFX\\Bonk.wav")
+                .count(),
+            1
+        );
         lock(&fresh).retain(|path, _| !path.ends_with("Remix.wav"));
         assert_eq!(lock(&fresh).table.paths, ["C:\\Users\\SFX\\Bonk.wav"]);
         assert!(churn("c:\\users\\a\\appdata\\local\\temp\\x.wav"));
@@ -2634,17 +3105,29 @@ mod tests {
     #[test]
     #[ignore]
     fn letter_mask_speed() {
-        let words = ["render", "final", "bonk", "projeto", "audio", "cena", "take", "export", "img", "backup", "v2"];
+        let words = [
+            "render", "final", "bonk", "projeto", "audio", "cena", "take", "export", "img",
+            "backup", "v2",
+        ];
         let mut table = Segment::empty();
         let drive = table.add(NO_PARENT, "C:", found(true, 0, 1));
         let mut seed = 7u64;
         for index in 0..2_000_000u32 {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let first = words[(seed >> 33) as usize % words.len()];
             let second = words[(seed >> 45) as usize % words.len()];
-            table.add(drive, &format!("{first}_{second}_{index}.dat"), found(false, 1, 1));
+            table.add(
+                drive,
+                &format!("{first}_{second}_{index}.dat"),
+                found(false, 1, 1),
+            );
         }
-        let index = Index { segments: vec![Arc::new(table)], built: SystemTime::now() };
+        let index = Index {
+            segments: vec![Arc::new(table)],
+            built: SystemTime::now(),
+        };
         for text in ["zq", "bonk render", "xyz"] {
             let mut query = Query::parse_at(text, "", now()).unwrap();
             query.fuzzy = None;
@@ -2677,7 +3160,14 @@ mod tests {
         for (label, list, workers) in runs {
             let started = Instant::now();
             let table = Arc::new(Mutex::new(Segment::empty()));
-            let segment = walk_drive(&root, table, Arc::new(AtomicUsize::new(0)), workers, list, &mut |_| {});
+            let segment = walk_drive(
+                &root,
+                table,
+                Arc::new(AtomicUsize::new(0)),
+                workers,
+                list,
+                &mut |_| {},
+            );
             let elapsed = started.elapsed();
             println!(
                 "{label:>16}: {} names in {elapsed:?} ({:.0} k/s)",
@@ -2696,13 +3186,28 @@ mod tests {
         let read = |list: fn(&Path, &mut Vec<Listed>)| {
             let mut out = Vec::new();
             list(dir.path(), &mut out);
-            let mut seen: Vec<(String, bool, u64, bool)> =
-                out.into_iter().map(|entry| (entry.name, entry.found.dir, entry.found.size, entry.found.modified > 0)).collect();
+            let mut seen: Vec<(String, bool, u64, bool)> = out
+                .into_iter()
+                .map(|entry| {
+                    (
+                        entry.name,
+                        entry.found.dir,
+                        entry.found.size,
+                        entry.found.modified > 0,
+                    )
+                })
+                .collect();
             seen.sort();
             seen
         };
         assert_eq!(read(platform::list), read(list_std));
-        assert_eq!(read(platform::list), [("a.wav".to_string(), false, 1234, true), ("pasta com espaço".to_string(), true, 0, true)]);
+        assert_eq!(
+            read(platform::list),
+            [
+                ("a.wav".to_string(), false, 1234, true),
+                ("pasta com espaço".to_string(), true, 0, true)
+            ]
+        );
     }
 
     #[test]
@@ -2713,7 +3218,12 @@ mod tests {
         partial.add(drive, "Bonk Remix.wav", found(false, KB, 1));
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("everything.idx");
-        save_segments(SystemTime::UNIX_EPOCH, &[&*whole.segments[0], &partial], &path).unwrap();
+        save_segments(
+            SystemTime::UNIX_EPOCH,
+            &[&*whole.segments[0], &partial],
+            &path,
+        )
+        .unwrap();
         let loaded = load(&path).unwrap();
         assert!(loaded.segments[0].complete);
         assert!(!loaded.segments[1].complete);

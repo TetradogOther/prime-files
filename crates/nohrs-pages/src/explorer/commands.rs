@@ -29,16 +29,31 @@ impl ExplorerPane {
     /// Runs the command a shortcut stands for. Returns false for the ones
     /// the page answers through gpui's actions (tabs, panes), so the key
     /// goes on to them.
-    pub(crate) fn run_shortcut(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn run_shortcut(
+        &mut self,
+        action: Action,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         // In the Recycle Bin, Delete would send the items' own files to the
         // Bin again, and Shift+Delete leave the Bin's records behind; both go
         // through its menu, as Restore does.
         if super::recycle_bin::is_recycle_bin(&self.cwd)
-            && matches!(action, Action::Trash | Action::DeletePermanently | Action::Rename | Action::Cut | Action::Paste)
+            && matches!(
+                action,
+                Action::Trash
+                    | Action::DeletePermanently
+                    | Action::Rename
+                    | Action::Cut
+                    | Action::Paste
+            )
         {
             self.set_status(
                 super::types::StatusLevel::Info,
-                nohrs_core::t!("Na Lixeira, use o botão direito: Restaurar ou Excluir para sempre.").to_string(),
+                nohrs_core::t!(
+                    "Na Lixeira, use o botão direito: Restaurar ou Excluir para sempre."
+                )
+                .to_string(),
             );
             cx.notify();
             return true;
@@ -96,7 +111,9 @@ impl ExplorerPane {
             | Action::Tag6
             | Action::Tag7 => {
                 let paths = self.selected_paths();
-                let tag = action.tag_index().and_then(|index| super::tags::Tags::nth(index, cx));
+                let tag = action
+                    .tag_index()
+                    .and_then(|index| super::tags::Tags::nth(index, cx));
                 match tag {
                     Some(tag) if !paths.is_empty() => {
                         let on = !super::tags::Tags::all_have(&paths, tag.id, cx);
@@ -120,7 +137,10 @@ impl ExplorerPane {
                 let paths = self.selected_paths();
                 if !paths.is_empty() {
                     super::tags::Tags::clear(&paths, cx);
-                    self.set_status(super::types::StatusLevel::Info, nohrs_core::t!("Tags tiradas").to_string());
+                    self.set_status(
+                        super::types::StatusLevel::Info,
+                        nohrs_core::t!("Tags tiradas").to_string(),
+                    );
                     cx.notify();
                 }
             }
@@ -150,7 +170,9 @@ impl ExplorerPane {
         // Replacing the task drops the previous timer: the menu stays while
         // the wheel keeps turning.
         self.zoom_menu_flash = Some(cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
-            cx.background_executor().timer(Duration::from_millis(1300)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(1300))
+                .await;
             this.update(cx, |pane, cx| {
                 if pane.zoom_menu_hovered || pane.zoom_dragging {
                     // Taken over by the mouse: it closes like a clicked menu.
@@ -190,18 +212,30 @@ impl ExplorerPane {
                     folder.as_os_str().to_owned()
                 };
                 crate::reveal::leave_next_explorer_window();
-                std::process::Command::new("explorer.exe").arg(target).spawn().map(drop)
+                std::process::Command::new("explorer.exe")
+                    .arg(target)
+                    .spawn()
+                    .map(drop)
             }
-            OpenIn::CommandPrompt => console(std::process::Command::new("cmd.exe").arg("/K"), &folder),
+            OpenIn::CommandPrompt => {
+                console(std::process::Command::new("cmd.exe").arg("/K"), &folder)
+            }
             OpenIn::PowerShell => {
                 let mut command = std::process::Command::new(powershell());
                 command.args(["-NoExit", "-NoLogo"]);
                 console(&mut command, &folder)
             }
-            OpenIn::WindowsTerminal => std::process::Command::new("wt.exe").arg("-d").arg(&folder).spawn().map(drop),
+            OpenIn::WindowsTerminal => std::process::Command::new("wt.exe")
+                .arg("-d")
+                .arg(&folder)
+                .spawn()
+                .map(drop),
         };
         if let Err(error) = outcome {
-            self.set_status(StatusLevel::Error, tf!("Não foi possível abrir o programa: {error}", error = error));
+            self.set_status(
+                StatusLevel::Error,
+                tf!("Não foi possível abrir o programa: {error}", error = error),
+            );
         }
         cx.notify();
     }
@@ -224,7 +258,12 @@ fn console(command: &mut std::process::Command, folder: &std::path::Path) -> std
 /// terminal panel picks.
 fn powershell() -> PathBuf {
     let installed = std::env::var_os("ProgramFiles")
-        .map(|folder| PathBuf::from(folder).join("PowerShell").join("7").join("pwsh.exe"))
+        .map(|folder| {
+            PathBuf::from(folder)
+                .join("PowerShell")
+                .join("7")
+                .join("pwsh.exe")
+        })
         .filter(|path| path.is_file());
     installed.unwrap_or_else(|| PathBuf::from("powershell.exe"))
 }
@@ -234,7 +273,9 @@ fn powershell() -> PathBuf {
 /// labels and key names, however often the menus open.
 pub(crate) fn interned(text: String) -> &'static str {
     static SEEN: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
-    let mut seen = SEEN.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut seen = SEEN
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(kept) = seen.iter().find(|kept| **kept == text) {
         return kept;
     }
@@ -253,7 +294,12 @@ pub(crate) fn has_windows_terminal() -> bool {
     static FOUND: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *FOUND.get_or_init(|| {
         std::env::var_os("LOCALAPPDATA")
-            .map(|folder| PathBuf::from(folder).join("Microsoft").join("WindowsApps").join("wt.exe"))
+            .map(|folder| {
+                PathBuf::from(folder)
+                    .join("Microsoft")
+                    .join("WindowsApps")
+                    .join("wt.exe")
+            })
             .is_some_and(|path| path.exists())
     })
 }

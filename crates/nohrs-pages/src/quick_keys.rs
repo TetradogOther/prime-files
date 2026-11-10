@@ -104,7 +104,11 @@ fn name_of(vk: u16) -> String {
 /// The setting as the hook takes it: lower case, `cmd` read as Ctrl, and
 /// `auto` decided.
 pub fn resolve(text: &str) -> String {
-    let text = text.trim().to_lowercase().replace("cmd", "ctrl").replace(' ', "");
+    let text = text
+        .trim()
+        .to_lowercase()
+        .replace("cmd", "ctrl")
+        .replace(' ', "");
     // `Cmd+Shift+Space` was the default written to every config file before
     // the quick search, when nothing let anyone choose it: it counts as the
     // default it was, not as a choice.
@@ -113,7 +117,12 @@ pub fn resolve(text: &str) -> String {
         // looked for once.
         static LISTARY: OnceLock<bool> = OnceLock::new();
         let listary = *LISTARY.get_or_init(|| crate::listary::preferences_file().is_some());
-        return if listary { "double-shift" } else { "double-ctrl" }.to_string();
+        return if listary {
+            "double-shift"
+        } else {
+            "double-ctrl"
+        }
+        .to_string();
     }
     text
 }
@@ -127,7 +136,13 @@ pub fn parse(text: &str) -> Option<Trigger> {
         "double-alt" => return Some(Trigger::Double(Tap::Alt)),
         _ => {}
     }
-    let mut chord = Chord { ctrl: false, shift: false, alt: false, win: false, vk: 0 };
+    let mut chord = Chord {
+        ctrl: false,
+        shift: false,
+        alt: false,
+        win: false,
+        vk: 0,
+    };
     let parts: Vec<&str> = text.split('+').filter(|part| !part.is_empty()).collect();
     let (key, modifiers) = parts.split_last()?;
     for modifier in modifiers {
@@ -186,7 +201,12 @@ pub fn describe(text: &str) -> String {
         Some(Trigger::Double(Tap::Alt)) => "Alt 2x".into(),
         Some(Trigger::Chord(chord)) => {
             let mut parts: Vec<String> = Vec::new();
-            for (on, name) in [(chord.ctrl, "Ctrl"), (chord.shift, "Shift"), (chord.alt, "Alt"), (chord.win, "Win")] {
+            for (on, name) in [
+                (chord.ctrl, "Ctrl"),
+                (chord.shift, "Shift"),
+                (chord.alt, "Alt"),
+                (chord.win, "Win"),
+            ] {
                 if on {
                     parts.push(name.into());
                 }
@@ -196,7 +216,10 @@ pub fn describe(text: &str) -> String {
                 "space" => nohrs_core::t!("Espaço").to_string(),
                 _ => {
                     let mut chars = key.chars();
-                    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
+                    chars
+                        .next()
+                        .map(|first| first.to_uppercase().chain(chars).collect())
+                        .unwrap_or_default()
                 }
             });
             parts.join("+")
@@ -210,7 +233,13 @@ pub fn describe(text: &str) -> String {
 pub fn from_keystroke(ctrl: bool, shift: bool, alt: bool, win: bool, key: &str) -> Option<String> {
     let key = key.to_lowercase();
     let vk = vk_of(&key)?;
-    let chord = Chord { ctrl, shift, alt, win, vk };
+    let chord = Chord {
+        ctrl,
+        shift,
+        alt,
+        win,
+        vk,
+    };
     let text = to_setting(Trigger::Chord(chord));
     // Shift alone with a letter or digit is typing a capital or a symbol.
     let typing = !(ctrl || alt || win) && (0x30..=0x5A).contains(&vk);
@@ -235,7 +264,10 @@ pub fn set_open(open: bool) {
 }
 
 fn trigger() -> Trigger {
-    TRIGGER.lock().map(|trigger| *trigger).unwrap_or(Trigger::Off)
+    TRIGGER
+        .lock()
+        .map(|trigger| *trigger)
+        .unwrap_or(Trigger::Off)
 }
 
 /// Uses the setting `text` from now on.
@@ -252,7 +284,11 @@ pub fn set(text: &str) {
 /// Starts listening to the keyboard, once per run; `on_fire` runs on the UI
 /// thread each time the shortcut is pressed, `on_escape` each time Esc is
 /// pressed while the quick search is open (`set_open`).
-pub fn install(cx: &mut App, on_fire: impl Fn(&mut App) + 'static, on_escape: impl Fn(&mut App) + 'static) {
+pub fn install(
+    cx: &mut App,
+    on_fire: impl Fn(&mut App) + 'static,
+    on_escape: impl Fn(&mut App) + 'static,
+) {
     let (sender, receiver) = async_channel::unbounded::<Signal>();
     if SENDER.set(sender).is_err() {
         return;
@@ -341,7 +377,10 @@ impl Keys {
                     self.last_tap = None;
                     if let Trigger::Chord(chord) = trigger {
                         let (ctrl, shift, alt, win) = held();
-                        if chord.vk == vk && (ctrl, shift, alt, win) == (chord.ctrl, chord.shift, chord.alt, chord.win) {
+                        if chord.vk == vk
+                            && (ctrl, shift, alt, win)
+                                == (chord.ctrl, chord.shift, chord.alt, chord.win)
+                        {
                             self.swallow_up = Some(vk);
                             fire();
                             return true;
@@ -376,10 +415,12 @@ mod platform {
     use std::cell::RefCell;
 
     use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG,
-        SetWindowsHookExW, TranslateMessage, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+        CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED,
+        MSG, SetWindowsHookExW, TranslateMessage, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
     };
 
     use super::Keys;
@@ -447,23 +488,42 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
-    use super::{Chord, Keys, Tap, Trigger, TRIGGER, from_keystroke, parse, to_setting};
+    use super::{Chord, Keys, TRIGGER, Tap, Trigger, from_keystroke, parse, to_setting};
 
     #[test]
     fn settings_read_and_write_back() {
         assert_eq!(parse("double-ctrl"), Some(Trigger::Double(Tap::Ctrl)));
         assert_eq!(parse("off"), Some(Trigger::Off));
-        let chord = Chord { ctrl: true, shift: false, alt: false, win: false, vk: 0x20 };
+        let chord = Chord {
+            ctrl: true,
+            shift: false,
+            alt: false,
+            win: false,
+            vk: 0x20,
+        };
         assert_eq!(parse("ctrl+space"), Some(Trigger::Chord(chord)));
         assert_eq!(to_setting(Trigger::Chord(chord)), "ctrl+space");
-        assert_eq!(parse("ctrl+shift+f"), Some(Trigger::Chord(Chord { shift: true, vk: 0x46, ..chord })));
+        assert_eq!(
+            parse("ctrl+shift+f"),
+            Some(Trigger::Chord(Chord {
+                shift: true,
+                vk: 0x46,
+                ..chord
+            }))
+        );
         assert_eq!(parse("f9").map(to_setting), Some("f9".to_string()));
         // A letter alone would be taken from every program.
         assert_eq!(parse("a"), None);
         assert_eq!(parse("hyper+space"), None);
-        assert_eq!(from_keystroke(false, true, false, false, "space"), Some("shift+space".into()));
+        assert_eq!(
+            from_keystroke(false, true, false, false, "space"),
+            Some("shift+space".into())
+        );
         assert_eq!(from_keystroke(false, true, false, false, "a"), None);
-        assert_eq!(from_keystroke(true, false, true, false, "k"), Some("ctrl+alt+k".into()));
+        assert_eq!(
+            from_keystroke(true, false, true, false, "k"),
+            Some("ctrl+alt+k".into())
+        );
     }
 
     // Serial: they share the process-wide trigger.
@@ -490,8 +550,13 @@ mod tests {
         keys.key(0xA2, false, none);
         assert!(keys.last_tap.is_none());
         // A combination is taken, press and release.
-        *TRIGGER.lock().unwrap() =
-            Trigger::Chord(super::Chord { ctrl: true, shift: false, alt: false, win: false, vk: 0x20 });
+        *TRIGGER.lock().unwrap() = Trigger::Chord(super::Chord {
+            ctrl: true,
+            shift: false,
+            alt: false,
+            win: false,
+            vk: 0x20,
+        });
         let mut keys = Keys::default();
         keys.key(0xA2, true, none);
         assert!(keys.key(0x20, true, ctrl_down));

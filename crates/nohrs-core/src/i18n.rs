@@ -138,7 +138,9 @@ impl Lang {
             "ES", "MX", "AR", "CO", "CL", "PE", "VE", "EC", "GT", "CU", "BO", "DO", "HN", "PY",
             "SV", "NI", "CR", "PA", "UY", "PR", "GQ",
         ];
-        const FRENCH: &[&str] = &["FR", "BE", "LU", "MC", "SN", "CI", "CM", "ML", "BF", "NE", "MG", "HT"];
+        const FRENCH: &[&str] = &[
+            "FR", "BE", "LU", "MC", "SN", "CI", "CM", "ML", "BF", "NE", "MG", "HT",
+        ];
         const GERMAN: &[&str] = &["DE", "AT", "CH", "LI"];
         const ITALIAN: &[&str] = &["IT", "SM", "VA"];
         const RUSSIAN: &[&str] = &["RU", "BY", "KZ", "KG"];
@@ -150,8 +152,8 @@ impl Lang {
         // of the person's own choice is read from the session.
         const CATALAN: &[&str] = &["AD"];
         const ARABIC: &[&str] = &[
-            "SA", "AE", "EG", "MA", "DZ", "TN", "LY", "IQ", "JO", "LB", "SY", "KW", "QA", "BH", "OM", "YE",
-            "SD", "PS", "MR",
+            "SA", "AE", "EG", "MA", "DZ", "TN", "LY", "IQ", "JO", "LB", "SY", "KW", "QA", "BH",
+            "OM", "YE", "SD", "PS", "MR",
         ];
         let country = country.trim().to_ascii_uppercase();
         let country = country.as_str();
@@ -174,7 +176,10 @@ impl Lang {
     }
 
     fn from_u8(value: u8) -> Lang {
-        Lang::ALL.get(usize::from(value)).copied().unwrap_or(Lang::Pt)
+        Lang::ALL
+            .get(usize::from(value))
+            .copied()
+            .unwrap_or(Lang::Pt)
     }
 
     fn as_u8(self) -> u8 {
@@ -236,7 +241,12 @@ pub fn current() -> Lang {
 
 fn table() -> &'static HashMap<&'static str, (&'static str, &'static str)> {
     static TABLE: OnceLock<HashMap<&'static str, (&'static str, &'static str)>> = OnceLock::new();
-    TABLE.get_or_init(|| strings::STRINGS.iter().map(|&(pt, en, es)| (pt, (en, es))).collect())
+    TABLE.get_or_init(|| {
+        strings::STRINGS
+            .iter()
+            .map(|&(pt, en, es)| (pt, (en, es)))
+            .collect()
+    })
 }
 
 /// `key` in the current language. A key without a row comes back as it is
@@ -269,8 +279,14 @@ fn catalan_table() -> &'static HashMap<&'static str, &'static str> {
 /// the Catalan.
 #[cfg(not(target_os = "windows"))]
 fn linux_table() -> &'static HashMap<&'static str, (&'static str, &'static str, &'static str)> {
-    static TABLE: OnceLock<HashMap<&'static str, (&'static str, &'static str, &'static str)>> = OnceLock::new();
-    TABLE.get_or_init(|| linux::LINUX.iter().map(|&(key, en, es, ca)| (key, (en, es, ca))).collect())
+    static TABLE: OnceLock<HashMap<&'static str, (&'static str, &'static str, &'static str)>> =
+        OnceLock::new();
+    TABLE.get_or_init(|| {
+        linux::LINUX
+            .iter()
+            .map(|&(key, en, es, ca)| (key, (en, es, ca)))
+            .collect()
+    })
 }
 
 /// `key` in a given language. A language missing the row falls back to
@@ -309,7 +325,10 @@ fn base_text(lang: Lang, key: &'static str) -> &'static str {
             Some(text) => text,
             None => tr_in(Lang::En, key),
         },
-        other => match other.extra_column().and_then(|column| extra_table().get(key)?.get(column)) {
+        other => match other
+            .extra_column()
+            .and_then(|column| extra_table().get(key)?.get(column))
+        {
             Some(text) => text,
             None => tr_in(Lang::En, key),
         },
@@ -381,7 +400,10 @@ macro_rules! k {
 
 /// Picks the singular or plural key by `count` and fills `{n}`.
 pub fn plural(count: usize, one: &'static str, many: &'static str) -> String {
-    fill(tr(if count == 1 { one } else { many }), &[("n", count.to_string())])
+    fill(
+        tr(if count == 1 { one } else { many }),
+        &[("n", count.to_string())],
+    )
 }
 
 #[cfg(test)]
@@ -407,9 +429,20 @@ mod tests {
         let mut seen = HashSet::new();
         for &(pt, en, es) in strings::STRINGS {
             assert!(seen.insert(pt), "duplicated row: {pt:?}");
-            assert!(!en.trim().is_empty() && !es.trim().is_empty(), "empty translation for {pt:?}");
-            assert_eq!(placeholders(pt), placeholders(en), "placeholders differ in English: {pt:?}");
-            assert_eq!(placeholders(pt), placeholders(es), "placeholders differ in Spanish: {pt:?}");
+            assert!(
+                !en.trim().is_empty() && !es.trim().is_empty(),
+                "empty translation for {pt:?}"
+            );
+            assert_eq!(
+                placeholders(pt),
+                placeholders(en),
+                "placeholders differ in English: {pt:?}"
+            );
+            assert_eq!(
+                placeholders(pt),
+                placeholders(es),
+                "placeholders differ in Spanish: {pt:?}"
+            );
         }
     }
 
@@ -459,7 +492,9 @@ mod tests {
     }
 
     fn walk(dir: &Path, found: &mut Vec<String>) {
-        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -477,58 +512,101 @@ mod tests {
     fn every_row_has_every_extra_language_with_its_placeholders() {
         let extra: std::collections::HashMap<&str, &[&str; 6]> =
             extra::EXTRA.iter().map(|(pt, row)| (*pt, row)).collect();
-        assert_eq!(extra.len(), extra::EXTRA.len(), "duplicated row in i18n/extra.rs");
+        assert_eq!(
+            extra.len(),
+            extra::EXTRA.len(),
+            "duplicated row in i18n/extra.rs"
+        );
         for &(pt, _, _) in strings::STRINGS {
-            let row = extra.get(pt).unwrap_or_else(|| panic!("no row in i18n/extra.rs for {pt:?}"));
+            let row = extra
+                .get(pt)
+                .unwrap_or_else(|| panic!("no row in i18n/extra.rs for {pt:?}"));
             for text in row.iter() {
                 assert!(!text.trim().is_empty(), "empty translation for {pt:?}");
-                assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                assert_eq!(
+                    placeholders(pt),
+                    placeholders(text),
+                    "placeholders differ: {pt:?} -> {text:?}"
+                );
             }
         }
         for (pt, _) in extra::EXTRA {
-            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in extra.rs without one in strings.rs: {pt:?}");
+            assert!(
+                strings::STRINGS.iter().any(|row| row.0 == *pt),
+                "row in extra.rs without one in strings.rs: {pt:?}"
+            );
         }
     }
 
     #[test]
     fn every_row_has_arabic_with_its_placeholders() {
-        let arabic: std::collections::HashMap<&str, &str> = arabic::ARABIC.iter().copied().collect();
-        assert_eq!(arabic.len(), arabic::ARABIC.len(), "duplicated row in i18n/arabic.rs");
+        let arabic: std::collections::HashMap<&str, &str> =
+            arabic::ARABIC.iter().copied().collect();
+        assert_eq!(
+            arabic.len(),
+            arabic::ARABIC.len(),
+            "duplicated row in i18n/arabic.rs"
+        );
         let mut missing = Vec::new();
         for &(pt, _, _) in strings::STRINGS {
             match arabic.get(pt) {
                 Some(text) => {
                     assert!(!text.trim().is_empty(), "empty Arabic for {pt:?}");
-                    assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                    assert_eq!(
+                        placeholders(pt),
+                        placeholders(text),
+                        "placeholders differ: {pt:?} -> {text:?}"
+                    );
                 }
                 None => missing.push(pt),
             }
         }
-        assert!(missing.is_empty(), "no row in i18n/arabic.rs for:
-{missing:#?}");
+        assert!(
+            missing.is_empty(),
+            "no row in i18n/arabic.rs for:
+{missing:#?}"
+        );
         for (pt, _) in arabic::ARABIC {
-            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in arabic.rs without one in strings.rs: {pt:?}");
+            assert!(
+                strings::STRINGS.iter().any(|row| row.0 == *pt),
+                "row in arabic.rs without one in strings.rs: {pt:?}"
+            );
         }
     }
 
     #[test]
     fn every_row_has_hungarian_with_its_placeholders() {
-        let hungarian: std::collections::HashMap<&str, &str> = hungarian::HUNGARIAN.iter().copied().collect();
-        assert_eq!(hungarian.len(), hungarian::HUNGARIAN.len(), "duplicated row in i18n/hungarian.rs");
+        let hungarian: std::collections::HashMap<&str, &str> =
+            hungarian::HUNGARIAN.iter().copied().collect();
+        assert_eq!(
+            hungarian.len(),
+            hungarian::HUNGARIAN.len(),
+            "duplicated row in i18n/hungarian.rs"
+        );
         let mut missing = Vec::new();
         for &(pt, _, _) in strings::STRINGS {
             match hungarian.get(pt) {
                 Some(text) => {
                     assert!(!text.trim().is_empty(), "empty Hungarian for {pt:?}");
-                    assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                    assert_eq!(
+                        placeholders(pt),
+                        placeholders(text),
+                        "placeholders differ: {pt:?} -> {text:?}"
+                    );
                 }
                 None => missing.push(pt),
             }
         }
-        assert!(missing.is_empty(), "no row in i18n/hungarian.rs for:
-{missing:#?}");
+        assert!(
+            missing.is_empty(),
+            "no row in i18n/hungarian.rs for:
+{missing:#?}"
+        );
         for (pt, _) in hungarian::HUNGARIAN {
-            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in hungarian.rs without one in strings.rs: {pt:?}");
+            assert!(
+                strings::STRINGS.iter().any(|row| row.0 == *pt),
+                "row in hungarian.rs without one in strings.rs: {pt:?}"
+            );
         }
         assert_eq!(tr_in(Lang::Hu, "Copiar"), "Másolás");
         assert_eq!(Lang::parse("hu-HU"), Some(Lang::Hu));
@@ -537,22 +615,37 @@ mod tests {
 
     #[test]
     fn every_row_has_catalan_with_its_placeholders() {
-        let catalan: std::collections::HashMap<&str, &str> = catalan::CATALAN.iter().copied().collect();
-        assert_eq!(catalan.len(), catalan::CATALAN.len(), "duplicated row in i18n/catalan.rs");
+        let catalan: std::collections::HashMap<&str, &str> =
+            catalan::CATALAN.iter().copied().collect();
+        assert_eq!(
+            catalan.len(),
+            catalan::CATALAN.len(),
+            "duplicated row in i18n/catalan.rs"
+        );
         let mut missing = Vec::new();
         for &(pt, _, _) in strings::STRINGS {
             match catalan.get(pt) {
                 Some(text) => {
                     assert!(!text.trim().is_empty(), "empty Catalan for {pt:?}");
-                    assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                    assert_eq!(
+                        placeholders(pt),
+                        placeholders(text),
+                        "placeholders differ: {pt:?} -> {text:?}"
+                    );
                 }
                 None => missing.push(pt),
             }
         }
-        assert!(missing.is_empty(), "no row in i18n/catalan.rs for:
-{missing:#?}");
+        assert!(
+            missing.is_empty(),
+            "no row in i18n/catalan.rs for:
+{missing:#?}"
+        );
         for (pt, _) in catalan::CATALAN {
-            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in catalan.rs without one in strings.rs: {pt:?}");
+            assert!(
+                strings::STRINGS.iter().any(|row| row.0 == *pt),
+                "row in catalan.rs without one in strings.rs: {pt:?}"
+            );
         }
         assert_eq!(tr_in(Lang::Ca, "Copiar"), "Copia");
         assert_eq!(Lang::parse("ca-ES"), Some(Lang::Ca));
@@ -561,24 +654,43 @@ mod tests {
 
     #[test]
     fn every_linux_text_has_its_key_and_its_placeholders() {
-        let rows: std::collections::HashMap<&str, (&str, &str, &str)> =
-            linux::LINUX.iter().map(|&(key, en, es, ca)| (key, (en, es, ca))).collect();
-        assert_eq!(rows.len(), linux::LINUX.len(), "duplicated row in i18n/linux.rs");
+        let rows: std::collections::HashMap<&str, (&str, &str, &str)> = linux::LINUX
+            .iter()
+            .map(|&(key, en, es, ca)| (key, (en, es, ca)))
+            .collect();
+        assert_eq!(
+            rows.len(),
+            linux::LINUX.len(),
+            "duplicated row in i18n/linux.rs"
+        );
         for &(pt, _, _) in strings::STRINGS {
             if let Some((en, es, ca)) = rows.get(pt) {
                 for text in [en, es, ca] {
                     assert!(!text.trim().is_empty(), "empty Linux text for {pt:?}");
-                    assert_eq!(placeholders(pt), placeholders(text), "placeholders differ: {pt:?} -> {text:?}");
+                    assert_eq!(
+                        placeholders(pt),
+                        placeholders(text),
+                        "placeholders differ: {pt:?} -> {text:?}"
+                    );
                 }
             }
         }
         // Every row of the Linux table must be a key of the main table: a
         // key that is not used anywhere would be a text nobody ever sees.
         for (pt, _) in rows.iter() {
-            assert!(strings::STRINGS.iter().any(|row| row.0 == *pt), "row in linux.rs without one in strings.rs: {pt:?}");
+            assert!(
+                strings::STRINGS.iter().any(|row| row.0 == *pt),
+                "row in linux.rs without one in strings.rs: {pt:?}"
+            );
         }
-        assert_eq!(tr_in(Lang::Ca, "Explorador do Windows"), "Gestor de fitxers");
-        assert_eq!(tr_in(Lang::Es, "Explorador do Windows"), "Explorador de archivos");
+        assert_eq!(
+            tr_in(Lang::Ca, "Explorador do Windows"),
+            "Gestor de fitxers"
+        );
+        assert_eq!(
+            tr_in(Lang::Es, "Explorador do Windows"),
+            "Explorador de archivos"
+        );
     }
 
     #[test]
@@ -588,7 +700,10 @@ mod tests {
             assert_eq!(Lang::parse(lang.code()), Some(lang));
         }
         assert_eq!(tr_in(Lang::De, "Copiar"), "Kopieren");
-        assert_eq!(tr_in(Lang::Ja, "texto que não existe na tabela"), "texto que não existe na tabela");
+        assert_eq!(
+            tr_in(Lang::Ja, "texto que não existe na tabela"),
+            "texto que não existe na tabela"
+        );
     }
 
     #[test]
@@ -596,12 +711,22 @@ mod tests {
         let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let mut found = Vec::new();
         walk(&crates, &mut found);
-        assert!(found.len() > 100, "the scan found only {} keys; is it reading the crates?", found.len());
+        assert!(
+            found.len() > 100,
+            "the scan found only {} keys; is it reading the crates?",
+            found.len()
+        );
         let rows: HashSet<&str> = strings::STRINGS.iter().map(|row| row.0).collect();
-        let mut missing: Vec<&String> = found.iter().filter(|key| !rows.contains(key.as_str())).collect();
+        let mut missing: Vec<&String> = found
+            .iter()
+            .filter(|key| !rows.contains(key.as_str()))
+            .collect();
         missing.sort();
         missing.dedup();
-        assert!(missing.is_empty(), "keys without a row in i18n/strings.rs:\n{missing:#?}");
+        assert!(
+            missing.is_empty(),
+            "keys without a row in i18n/strings.rs:\n{missing:#?}"
+        );
     }
 
     #[test]
@@ -632,7 +757,10 @@ mod tests {
 
     #[test]
     fn missing_rows_fall_back_to_the_key() {
-        assert_eq!(tr_in(Lang::En, "texto que não existe na tabela"), "texto que não existe na tabela");
+        assert_eq!(
+            tr_in(Lang::En, "texto que não existe na tabela"),
+            "texto que não existe na tabela"
+        );
         assert_eq!(tr_in(Lang::En, "Copiar"), "Copy");
         assert_eq!(tr_in(Lang::Es, "Copiar"), "Copiar");
     }

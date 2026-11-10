@@ -14,8 +14,9 @@ use std::time::Instant;
 
 use gpui::prelude::*;
 use gpui::{
-    AnchoredPositionMode, AnyElement, Bounds, Context, Div, ElementId, MouseButton, MouseDownEvent, MouseMoveEvent,
-    Pixels, Point, SharedString, Stateful, Window, anchored, canvas, deferred, div, point, px, rgb,
+    AnchoredPositionMode, AnyElement, Bounds, Context, Div, ElementId, MouseButton, MouseDownEvent,
+    MouseMoveEvent, Pixels, Point, SharedString, Stateful, Window, anchored, canvas, deferred, div,
+    point, px, rgb,
 };
 use gpui_component::Icon;
 use nohrs_core::config::{Compact, DockSide};
@@ -101,7 +102,13 @@ impl SettingsPage {
 
     pub(super) fn compact_preview(&self, cx: &mut Context<Self>) -> AnyElement {
         self.compact_demo
-            .render(&self.config.compact, 280.0, |page: &mut Self| &mut page.compact_demo, |page| &page.config.compact, cx)
+            .render(
+                &self.config.compact,
+                280.0,
+                |page: &mut Self| &mut page.compact_demo,
+                |page| &page.config.compact,
+                cx,
+            )
             .into_any_element()
     }
 
@@ -115,7 +122,12 @@ impl SettingsPage {
         // The row's control spans the card inside its 16 px sides.
         let count = HoverDemo::fitting(self.column_width - 34.0);
         self.hover_demo
-            .render(self.config.ui.hover_audio_delay_ms, count, |page: &mut Self| &mut page.hover_demo, cx)
+            .render(
+                self.config.ui.hover_audio_delay_ms,
+                count,
+                |page: &mut Self| &mut page.hover_demo,
+                cx,
+            )
             .into_any_element()
     }
 }
@@ -128,7 +140,12 @@ pub(crate) fn layout_window(layout: &nohrs_core::config::Layout, height: f32) ->
         (Panel::Preview, layout.preview),
         (Panel::Terminal, layout.terminal),
     ];
-    let at = |side: DockSide| panels.iter().filter(move |(_, s)| *s == side).map(|(panel, _)| *panel);
+    let at = |side: DockSide| {
+        panels
+            .iter()
+            .filter(move |(_, s)| *s == side)
+            .map(|(panel, _)| *panel)
+    };
     let grips = layout.move_grips;
     let tags = layout.sidebar_tags;
     let docked = |panel: Panel, side: DockSide| docked_panel(panel, side, grips, tags);
@@ -171,16 +188,38 @@ fn docked_panel(panel: Panel, side: DockSide, grips: bool, tags: bool) -> Div {
     let grip = grips.then(|| {
         let pill = div().absolute().rounded_full().bg(rgb(theme::accent()));
         match side {
-            DockSide::Left => pill.right(px(-2.0)).top(relative_center()).w(px(3.0)).h(px(18.0)),
-            DockSide::Right => pill.left(px(-2.0)).top(relative_center()).w(px(3.0)).h(px(18.0)),
-            DockSide::Top => pill.bottom(px(-2.0)).left(relative_center()).h(px(3.0)).w(px(18.0)),
-            DockSide::Bottom => pill.top(px(-2.0)).left(relative_center()).h(px(3.0)).w(px(18.0)),
+            DockSide::Left => pill
+                .right(px(-2.0))
+                .top(relative_center())
+                .w(px(3.0))
+                .h(px(18.0)),
+            DockSide::Right => pill
+                .left(px(-2.0))
+                .top(relative_center())
+                .w(px(3.0))
+                .h(px(18.0)),
+            DockSide::Top => pill
+                .bottom(px(-2.0))
+                .left(relative_center())
+                .h(px(3.0))
+                .w(px(18.0)),
+            DockSide::Bottom => pill
+                .top(px(-2.0))
+                .left(relative_center())
+                .h(px(3.0))
+                .w(px(18.0)),
         }
     });
     div()
         .relative()
         .flex_shrink_0()
-        .map(|this| if across { this.w_full().h(px(DOCK_H)) } else { this.h_full().w(px(width)) })
+        .map(|this| {
+            if across {
+                this.w_full().h(px(DOCK_H))
+            } else {
+                this.h_full().w(px(width))
+            }
+        })
         .map(|this| match side {
             DockSide::Left => this.border_r_1(),
             DockSide::Right => this.border_l_1(),
@@ -197,7 +236,9 @@ impl CompactDemo {
     /// of the page that shows the preview.
     pub(crate) fn tick(&mut self, compact: &Compact, window: &mut Window) {
         let now = Instant::now();
-        let dt = self.last_tick.map_or(0.0, |last| (now - last).as_secs_f32().min(0.1));
+        let dt = self
+            .last_tick
+            .map_or(0.0, |last| (now - last).as_secs_f32().min(0.1));
         let mut busy = false;
         for (ix, edge) in EDGES.into_iter().enumerate() {
             let state = &mut self.edges[ix];
@@ -205,7 +246,9 @@ impl CompactDemo {
                 *state = EdgeState::default();
                 continue;
             }
-            let waited = state.since.map_or(u128::MAX, |since| (now - since).as_millis());
+            let waited = state
+                .since
+                .map_or(u128::MAX, |since| (now - since).as_millis());
             if state.hovered && !state.out {
                 if waited >= compact.reveal_delay_ms as u128 {
                     state.out = true;
@@ -250,7 +293,12 @@ impl CompactDemo {
         let (w, h) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
         let zone = (compact.edge_px as f32 * 0.75).max(5.0);
         let top_depth = top_hidden(compact) + top_fixed(compact);
-        let local = position.map(|p| (f32::from(p.x - bounds.origin.x), f32::from(p.y - bounds.origin.y)));
+        let local = position.map(|p| {
+            (
+                f32::from(p.x - bounds.origin.x),
+                f32::from(p.y - bounds.origin.y),
+            )
+        });
         let now = Instant::now();
         let mut changed = false;
         for (ix, edge) in EDGES.into_iter().enumerate() {
@@ -296,7 +344,12 @@ impl CompactDemo {
             }
         };
         let overlay = compact.overlay;
-        let (pt, pl, pr, pb) = (progress(Edge::Top), progress(Edge::Left), progress(Edge::Right), progress(Edge::Bottom));
+        let (pt, pl, pr, pb) = (
+            progress(Edge::Top),
+            progress(Edge::Left),
+            progress(Edge::Right),
+            progress(Edge::Bottom),
+        );
         let top_hidden_h = top_hidden(compact);
         let frame = compact.frame_px as f32 * 0.6;
 
@@ -340,7 +393,17 @@ impl CompactDemo {
             )
         };
         let side = |inner: Div, width: f32, left: bool| {
-            inner.bg(rgb(theme::toolbar_bg())).map(|this| if left { this.border_r_1() } else { this.border_l_1() }).border_color(rgb(theme::border())).w(px(width))
+            inner
+                .bg(rgb(theme::toolbar_bg()))
+                .map(|this| {
+                    if left {
+                        this.border_r_1()
+                    } else {
+                        this.border_l_1()
+                    }
+                })
+                .border_color(rgb(theme::border()))
+                .w(px(width))
         };
 
         let listing_card = div()
@@ -349,52 +412,81 @@ impl CompactDemo {
             .min_h(px(0.0))
             .flex()
             .when(frame > 0.0, |this| this.p(px(frame)))
-            .child(
-                listing()
-                    .size_full()
-                    .when(frame > 0.0, |this| this.rounded(px(7.0)).border_1().border_color(rgb(theme::border()))),
-            );
+            .child(listing().size_full().when(frame > 0.0, |this| {
+                this.rounded(px(7.0))
+                    .border_1()
+                    .border_color(rgb(theme::border()))
+            }));
 
-        let mut body = div().relative().flex_1().min_h(px(0.0)).flex().bg(rgb(theme::toolbar_bg()));
+        let mut body = div()
+            .relative()
+            .flex_1()
+            .min_h(px(0.0))
+            .flex()
+            .bg(rgb(theme::toolbar_bg()));
         if !compact.hide_sidebar {
             body = body.child(side(sidebar(false), SIDEBAR_W, true));
-        } else if let Some(room) = pushed(side(sidebar(false), SIDEBAR_W, true), Edge::Left, SIDEBAR_W, pl) {
+        } else if let Some(room) = pushed(
+            side(sidebar(false), SIDEBAR_W, true),
+            Edge::Left,
+            SIDEBAR_W,
+            pl,
+        ) {
             body = body.child(room);
         }
         body = body.child(listing_card);
         if !compact.hide_preview {
             body = body.child(side(preview_panel(), PREVIEW_W, false));
-        } else if let Some(room) = pushed(side(preview_panel(), PREVIEW_W, false), Edge::Right, PREVIEW_W, pr) {
+        } else if let Some(room) = pushed(
+            side(preview_panel(), PREVIEW_W, false),
+            Edge::Right,
+            PREVIEW_W,
+            pr,
+        ) {
             body = body.child(room);
         }
         // Over the listing: each hidden bar slides from its edge, clipped to
         // the strip it ends up in.
         if overlay {
             if compact.hide_sidebar {
-                body = body.child(slide(side(sidebar(false), SIDEBAR_W, true).shadow_lg(), Edge::Left, SIDEBAR_W, pl));
+                body = body.child(slide(
+                    side(sidebar(false), SIDEBAR_W, true).shadow_lg(),
+                    Edge::Left,
+                    SIDEBAR_W,
+                    pl,
+                ));
             }
             if compact.hide_preview {
-                body = body.child(slide(side(preview_panel(), PREVIEW_W, false).shadow_lg(), Edge::Right, PREVIEW_W, pr));
+                body = body.child(slide(
+                    side(preview_panel(), PREVIEW_W, false).shadow_lg(),
+                    Edge::Right,
+                    PREVIEW_W,
+                    pr,
+                ));
             }
         }
 
         let entity = cx.entity().downgrade();
         let mut window = mini_window(height)
             .id("compact-preview")
-            .on_mouse_move(cx.listener(move |view: &mut V, event: &MouseMoveEvent, _window, cx| {
-                let compact = config(view).clone();
-                if demo(view).pointer(&compact, Some(event.position)) {
-                    cx.notify();
-                }
-            }))
-            .on_hover(cx.listener(move |view: &mut V, hovered: &bool, _window, cx| {
-                if !*hovered {
+            .on_mouse_move(
+                cx.listener(move |view: &mut V, event: &MouseMoveEvent, _window, cx| {
                     let compact = config(view).clone();
-                    if demo(view).pointer(&compact, None) {
+                    if demo(view).pointer(&compact, Some(event.position)) {
                         cx.notify();
                     }
-                }
-            }))
+                }),
+            )
+            .on_hover(
+                cx.listener(move |view: &mut V, hovered: &bool, _window, cx| {
+                    if !*hovered {
+                        let compact = config(view).clone();
+                        if demo(view).pointer(&compact, None) {
+                            cx.notify();
+                        }
+                    }
+                }),
+            )
             .child(fixed_top);
         if top_hidden_h > 0.0 && !overlay {
             window = window.children(pushed(hidden_top(), Edge::Top, top_hidden_h, pt));
@@ -414,7 +506,14 @@ impl CompactDemo {
                     .top(px(top_fixed(compact)))
                     .h(px(top_hidden_h))
                     .overflow_hidden()
-                    .child(hidden_top().absolute().left_0().right_0().top(px(-(1.0 - pt) * top_hidden_h)).shadow_lg()),
+                    .child(
+                        hidden_top()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .top(px(-(1.0 - pt) * top_hidden_h))
+                            .shadow_lg(),
+                    ),
             );
         }
         if overlay && compact.hide_bottom_bar {
@@ -426,14 +525,22 @@ impl CompactDemo {
                     .bottom_0()
                     .h(px(BOTTOM_H))
                     .overflow_hidden()
-                    .child(bottom_bar().absolute().left_0().right_0().top(px((1.0 - pb) * BOTTOM_H))),
+                    .child(
+                        bottom_bar()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .top(px((1.0 - pb) * BOTTOM_H)),
+                    ),
             );
         }
         // Where it was drawn, for `pointer`.
         window.child(
             canvas(
                 move |bounds, _window, cx| {
-                    entity.update(cx, |view, _cx| demo(view).bounds = bounds).ok();
+                    entity
+                        .update(cx, |view, _cx| demo(view).bounds = bounds)
+                        .ok();
                 },
                 |_, _, _, _| {},
             )
@@ -444,7 +551,6 @@ impl CompactDemo {
 }
 
 impl SettingsPage {
-
     // ---------------------------------------------------------------------
     // Right-click menu
 
@@ -462,8 +568,16 @@ impl SettingsPage {
             .gap(px(6.0))
             .rounded(px(10.0))
             .border_1()
-            .border_color(rgb(if self.menu_test.open_at.is_some() { theme::accent() } else { theme::border() }))
-            .bg(rgb(if self.menu_test.open_at.is_some() { theme::accent_subtle() } else { theme::bg() }))
+            .border_color(rgb(if self.menu_test.open_at.is_some() {
+                theme::accent()
+            } else {
+                theme::border()
+            }))
+            .bg(rgb(if self.menu_test.open_at.is_some() {
+                theme::accent_subtle()
+            } else {
+                theme::bg()
+            }))
             .cursor_pointer()
             .on_mouse_down(
                 MouseButton::Right,
@@ -473,14 +587,29 @@ impl SettingsPage {
                     cx.notify();
                 }),
             )
-            .child(Icon::new(Icon::empty()).path("icons/file-text.svg").size_8().text_color(rgb(theme::fg_secondary())))
+            .child(
+                Icon::new(Icon::empty())
+                    .path("icons/file-text.svg")
+                    .size_8()
+                    .text_color(rgb(theme::fg_secondary())),
+            )
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .items_center()
-                    .child(div().text_xs().text_color(rgb(theme::fg())).child("Relatório.pdf"))
-                    .child(div().text_xs().text_color(rgb(theme::muted())).child("2,4 MB")),
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme::fg()))
+                            .child("Relatório.pdf"),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme::muted()))
+                            .child("2,4 MB"),
+                    ),
             );
         // Beside the row's text, on the right; what the last choice did sits
         // to the tile's left.
@@ -489,7 +618,12 @@ impl SettingsPage {
             .items_center()
             .gap(px(14.0))
             .children(self.menu_test.note.clone().map(|note| {
-                div().max_w(px(240.0)).text_xs().text_right().text_color(rgb(theme::fg_secondary())).child(note)
+                div()
+                    .max_w(px(240.0))
+                    .text_xs()
+                    .text_right()
+                    .text_color(rgb(theme::fg_secondary()))
+                    .child(note)
             }))
             .child(file)
             .children(self.menu_test.open_at.map(|at| self.test_menu(at, cx)))
@@ -521,14 +655,26 @@ impl SettingsPage {
                     windows = true;
                     continue;
                 }
-                let Some((label, icon)) = crate::explorer::context_menu::menu_entry_info(id) else { continue };
+                let Some((label, icon)) = crate::explorer::context_menu::menu_entry_info(id) else {
+                    continue;
+                };
                 let shortcut = match id.as_str() {
                     "new_tab" => Some(t!("Botão do meio")),
                     "more_options" => Some("Shift+F10"),
                     _ => None,
                 };
-                let entry = TestEntry::Item { label, icon: Some(icon), submenu: id == "tags", shortcut, windows: false };
-                if windows { after.push(entry) } else { before.push(entry) }
+                let entry = TestEntry::Item {
+                    label,
+                    icon: Some(icon),
+                    submenu: id == "tags",
+                    shortcut,
+                    windows: false,
+                };
+                if windows {
+                    after.push(entry)
+                } else {
+                    before.push(entry)
+                }
             }
             let sample: Vec<TestEntry> = if windows {
                 [
@@ -540,7 +686,13 @@ impl SettingsPage {
                 ]
                 .into_iter()
                 .filter(|(label, _)| !menu.hidden.iter().any(|hidden| hidden == label))
-                .map(|(label, submenu)| TestEntry::Item { label, icon: None, submenu, shortcut: None, windows: true })
+                .map(|(label, submenu)| TestEntry::Item {
+                    label,
+                    icon: None,
+                    submenu,
+                    shortcut: None,
+                    windows: true,
+                })
                 .collect()
             } else {
                 Vec::new()
@@ -557,15 +709,29 @@ impl SettingsPage {
         let width = 270.0;
         let height = 8.0
             + if quick.is_empty() { 0.0 } else { 46.0 }
-            + rows.iter().map(|row| if matches!(row, TestEntry::Separator) { 9.0 } else { 30.0 }).sum::<f32>();
-        let (vw, vh) = (f32::from(self.viewport.width), f32::from(self.viewport.height));
+            + rows
+                .iter()
+                .map(|row| {
+                    if matches!(row, TestEntry::Separator) {
+                        9.0
+                    } else {
+                        30.0
+                    }
+                })
+                .sum::<f32>();
+        let (vw, vh) = (
+            f32::from(self.viewport.width),
+            f32::from(self.viewport.height),
+        );
         let x = f32::from(at.x).min(vw - width - 8.0).max(8.0);
         let mut y = f32::from(at.y);
         if y + height > vh - 8.0 {
             y = (y - height).max(8.0);
         }
 
-        let close = |page: &mut SettingsPage, note: Option<SharedString>, cx: &mut Context<SettingsPage>| {
+        let close = |page: &mut SettingsPage,
+                     note: Option<SharedString>,
+                     cx: &mut Context<SettingsPage>| {
             page.menu_test.open_at = None;
             page.menu_test.note = note;
             cx.notify();
@@ -592,10 +758,18 @@ impl SettingsPage {
                         .cursor_pointer()
                         .text_color(rgb(theme::fg()))
                         .hover(|button| button.bg(rgb(theme::bg_hover())))
-                        .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx))
+                        .tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(label).build(window, cx)
+                        })
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .on_click(cx.listener(move |page, _, _, cx| close(page, Some(chosen(label)), cx)))
-                        .child(Icon::new(Icon::empty()).path(SharedString::from(*icon)).size_4())
+                        .on_click(
+                            cx.listener(move |page, _, _, cx| close(page, Some(chosen(label)), cx)),
+                        )
+                        .child(
+                            Icon::new(Icon::empty())
+                                .path(SharedString::from(*icon))
+                                .size_4(),
+                        )
                 }))
         });
         let entries = rows.into_iter().enumerate().map(|(ix, row)| match row {
@@ -614,7 +788,13 @@ impl SettingsPage {
                 .text_color(rgb(theme::fg_secondary()))
                 .child(text)
                 .into_any_element(),
-            TestEntry::Item { label, icon, submenu, shortcut, windows } => div()
+            TestEntry::Item {
+                label,
+                icon,
+                submenu,
+                shortcut,
+                windows,
+            } => div()
                 .id(ElementId::NamedInteger("menu-test-entry".into(), ix as u64))
                 .h(px(30.0))
                 .flex_shrink_0()
@@ -640,19 +820,50 @@ impl SettingsPage {
                                 hidden.push(label.to_string());
                             }
                             page.write_config("menu", "hidden", &super::toml_list(&hidden), cx);
-                            page.menu_test.note =
-                                Some(t!("Escondido. Ele volta pela lista \"Escondidos\" mais abaixo.").into());
+                            page.menu_test.note = Some(
+                                t!("Escondido. Ele volta pela lista \"Escondidos\" mais abaixo.")
+                                    .into(),
+                            );
                             cx.notify();
                         }),
                     )
                 })
-                .child(div().w(px(16.0)).flex_shrink_0().flex().justify_center().children(icon.map(|icon| {
-                    Icon::new(Icon::empty()).path(SharedString::from(icon)).size_4().text_color(rgb(theme::fg_secondary()))
-                })))
-                .child(div().flex_1().min_w(px(0.0)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(label))
-                .children(shortcut.map(|keys| div().flex_shrink_0().text_xs().text_color(rgb(theme::muted())).child(keys)))
+                .child(
+                    div()
+                        .w(px(16.0))
+                        .flex_shrink_0()
+                        .flex()
+                        .justify_center()
+                        .children(icon.map(|icon| {
+                            Icon::new(Icon::empty())
+                                .path(SharedString::from(icon))
+                                .size_4()
+                                .text_color(rgb(theme::fg_secondary()))
+                        })),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.0))
+                        .whitespace_nowrap()
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .child(label),
+                )
+                .children(shortcut.map(|keys| {
+                    div()
+                        .flex_shrink_0()
+                        .text_xs()
+                        .text_color(rgb(theme::muted()))
+                        .child(keys)
+                }))
                 .when(submenu, |row| {
-                    row.child(Icon::new(Icon::empty()).path("icons/chevron-right.svg").size_3().text_color(rgb(theme::muted())))
+                    row.child(
+                        Icon::new(Icon::empty())
+                            .path("icons/chevron-right.svg")
+                            .size_3()
+                            .text_color(rgb(theme::muted())),
+                    )
                 })
                 .into_any_element(),
         });
@@ -690,8 +901,14 @@ impl SettingsPage {
                                 .left_0()
                                 .size_full()
                                 .occlude()
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |page, _, _, cx| close(page, None, cx)))
-                                .on_mouse_down(MouseButton::Right, cx.listener(move |page, _, _, cx| close(page, None, cx))),
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |page, _, _, cx| close(page, None, cx)),
+                                )
+                                .on_mouse_down(
+                                    MouseButton::Right,
+                                    cx.listener(move |page, _, _, cx| close(page, None, cx)),
+                                ),
                         )
                         .child(panel),
                 ),
@@ -728,7 +945,9 @@ impl HoverDemo {
     /// Plays the hovered sample once its wait has passed, on the listing's
     /// own player: called on every render while one is hovered.
     pub(crate) fn tick(&mut self, delay_ms: u32) {
-        let Some((ix, since)) = self.hovered else { return };
+        let Some((ix, since)) = self.hovered else {
+            return;
+        };
         if self.played == Some(ix) || since.elapsed().as_millis() < u128::from(delay_ms) {
             return;
         }
@@ -757,90 +976,110 @@ impl HoverDemo {
             // Spread to reach the card's end: what is left over is less than
             // a tile, shared out between them.
             .justify_between()
-            .children(SAMPLES.into_iter().take(count.clamp(1, SAMPLES.len())).enumerate().map(|(ix, name)| {
-                let started = self.hovered.filter(|(row, _)| *row == ix).map(|(_, since)| since);
-                let waited = started.map(|since| (now - since).as_secs_f32() * 1000.0);
-                let status: AnyElement = match waited {
-                    None => div().h(px(14.0)).into_any_element(),
-                    Some(ms) if ms >= delay => div()
-                        .h(px(14.0))
-                        .flex()
-                        .items_center()
-                        .gap(px(6.0))
-                        .text_xs()
-                        .text_color(rgb(theme::accent()))
-                        .child(equalizer(ms / 1000.0))
-                        .child(t!("Tocando"))
-                        .into_any_element(),
-                    Some(ms) => div()
-                        .h(px(14.0))
-                        .w_full()
-                        .px(px(12.0))
-                        .flex()
-                        .items_center()
-                        .child(
-                            div()
+            .children(
+                SAMPLES
+                    .into_iter()
+                    .take(count.clamp(1, SAMPLES.len()))
+                    .enumerate()
+                    .map(|(ix, name)| {
+                        let started = self
+                            .hovered
+                            .filter(|(row, _)| *row == ix)
+                            .map(|(_, since)| since);
+                        let waited = started.map(|since| (now - since).as_secs_f32() * 1000.0);
+                        let status: AnyElement = match waited {
+                            None => div().h(px(14.0)).into_any_element(),
+                            Some(ms) if ms >= delay => div()
+                                .h(px(14.0))
+                                .flex()
+                                .items_center()
+                                .gap(px(6.0))
+                                .text_xs()
+                                .text_color(rgb(theme::accent()))
+                                .child(equalizer(ms / 1000.0))
+                                .child(t!("Tocando"))
+                                .into_any_element(),
+                            Some(ms) => div()
+                                .h(px(14.0))
                                 .w_full()
-                                .h(px(4.0))
-                                .rounded_full()
-                                .bg(rgb(theme::bg_hover()))
+                                .px(px(12.0))
+                                .flex()
+                                .items_center()
                                 .child(
                                     div()
-                                        .h_full()
+                                        .w_full()
+                                        .h(px(4.0))
                                         .rounded_full()
-                                        .bg(rgb(theme::accent()))
-                                        .w(gpui::relative((ms / delay).min(1.0))),
-                                ),
-                        )
-                        .into_any_element(),
-                };
-                div()
-                    .id(ElementId::NamedInteger("hover-audio-demo".into(), ix as u64))
-                    .size(px(HOVER_TILE))
-                    .flex_shrink_0()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .justify_center()
-                    .gap(px(6.0))
-                    .rounded(px(10.0))
-                    .border_1()
-                    .map(|this| {
-                        if started.is_some() {
-                            this.border_color(rgb(theme::accent())).bg(rgb(theme::accent_subtle()))
-                        } else {
-                            this.border_color(rgb(theme::border())).bg(rgb(theme::bg()))
-                        }
-                    })
-                    .on_hover(cx.listener(move |view: &mut V, hovered: &bool, _window, cx| {
-                        let state = demo(view);
-                        if *hovered {
-                            state.hovered = Some((ix, Instant::now()));
-                        } else if state.hovered.is_some_and(|(row, _)| row == ix) {
-                            state.hovered = None;
-                        }
-                        // Leaving one sound for another silences the first at
-                        // once, as in the listing.
-                        if state.played.take().is_some() {
-                            crate::explorer::hover_audio::stop();
-                        }
-                        cx.notify();
-                    }))
-                    .child(Icon::new(Icon::empty()).path("icons/music.svg").size_6().text_color(rgb(theme::fg_secondary())))
-                    .child(
+                                        .bg(rgb(theme::bg_hover()))
+                                        .child(
+                                            div()
+                                                .h_full()
+                                                .rounded_full()
+                                                .bg(rgb(theme::accent()))
+                                                .w(gpui::relative((ms / delay).min(1.0))),
+                                        ),
+                                )
+                                .into_any_element(),
+                        };
                         div()
-                            .w_full()
-                            .px(px(8.0))
-                            .text_xs()
-                            .text_center()
-                            .text_color(rgb(theme::fg()))
-                            .whitespace_nowrap()
-                            .overflow_hidden()
-                            .text_ellipsis()
-                            .child(name),
-                    )
-                    .child(status)
-            }))
+                            .id(ElementId::NamedInteger(
+                                "hover-audio-demo".into(),
+                                ix as u64,
+                            ))
+                            .size(px(HOVER_TILE))
+                            .flex_shrink_0()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .justify_center()
+                            .gap(px(6.0))
+                            .rounded(px(10.0))
+                            .border_1()
+                            .map(|this| {
+                                if started.is_some() {
+                                    this.border_color(rgb(theme::accent()))
+                                        .bg(rgb(theme::accent_subtle()))
+                                } else {
+                                    this.border_color(rgb(theme::border())).bg(rgb(theme::bg()))
+                                }
+                            })
+                            .on_hover(cx.listener(
+                                move |view: &mut V, hovered: &bool, _window, cx| {
+                                    let state = demo(view);
+                                    if *hovered {
+                                        state.hovered = Some((ix, Instant::now()));
+                                    } else if state.hovered.is_some_and(|(row, _)| row == ix) {
+                                        state.hovered = None;
+                                    }
+                                    // Leaving one sound for another silences the first at
+                                    // once, as in the listing.
+                                    if state.played.take().is_some() {
+                                        crate::explorer::hover_audio::stop();
+                                    }
+                                    cx.notify();
+                                },
+                            ))
+                            .child(
+                                Icon::new(Icon::empty())
+                                    .path("icons/music.svg")
+                                    .size_6()
+                                    .text_color(rgb(theme::fg_secondary())),
+                            )
+                            .child(
+                                div()
+                                    .w_full()
+                                    .px(px(8.0))
+                                    .text_xs()
+                                    .text_center()
+                                    .text_color(rgb(theme::fg()))
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(name),
+                            )
+                            .child(status)
+                    }),
+            )
     }
 }
 
@@ -917,10 +1156,19 @@ fn hit(out: &mut [f32], at: f32, freq: f32, decay: f32, gain: f32) {
 fn sweep(out: &mut [f32], at: f32, from: f32, slide: f32, length: f32, decay: f32, gain: f32) {
     let start = (at * RATE as f32) as usize;
     let mut phase = 0.0f32;
-    for (k, slot) in out.iter_mut().enumerate().skip(start).take((length * RATE as f32) as usize) {
+    for (k, slot) in out
+        .iter_mut()
+        .enumerate()
+        .skip(start)
+        .take((length * RATE as f32) as usize)
+    {
         let dt = (k - start) as f32 / RATE as f32;
         phase += (from + dt * slide) / RATE as f32;
-        let shape = if decay > 0.0 { (-dt * decay).exp() } else { (dt / length * std::f32::consts::PI).sin() };
+        let shape = if decay > 0.0 {
+            (-dt * decay).exp()
+        } else {
+            (dt / length * std::f32::consts::PI).sin()
+        };
         *slot += (phase * std::f32::consts::TAU).sin() * shape * gain;
     }
 }
@@ -964,7 +1212,9 @@ fn synth(ix: usize) -> Vec<f32> {
         3 => {
             for (i, slot) in out.iter_mut().enumerate() {
                 let x = t(i);
-                *slot = ((x * 880.0 * TAU).sin() + 0.5 * (x * 2210.0 * TAU).sin() + 0.25 * (x * 3520.0 * TAU).sin())
+                *slot = ((x * 880.0 * TAU).sin()
+                    + 0.5 * (x * 2210.0 * TAU).sin()
+                    + 0.25 * (x * 3520.0 * TAU).sin())
                     * (-x * 2.5).exp()
                     * 0.4;
             }
@@ -994,7 +1244,11 @@ fn synth(ix: usize) -> Vec<f32> {
             for (i, slot) in out.iter_mut().enumerate() {
                 let x = t(i);
                 let syllable = (x * 6.0).fract();
-                let on = if x < 1.3 && syllable < 0.55 { (syllable / 0.55 * PI).sin() } else { 0.0 };
+                let on = if x < 1.3 && syllable < 0.55 {
+                    (syllable / 0.55 * PI).sin()
+                } else {
+                    0.0
+                };
                 let pitch = 260.0 - x * 40.0;
                 *slot = ((x * pitch * TAU).sin() + 0.4 * (x * pitch * 3.0 * TAU).sin()) * on * 0.4;
             }
@@ -1017,7 +1271,8 @@ fn synth(ix: usize) -> Vec<f32> {
         // Applause: many small claps.
         10 => {
             for (i, slot) in out.iter_mut().enumerate() {
-                *slot = noise() * 0.12 * (1.0 - t(i) / 1.6).max(0.0) + if noise() > 0.97 { noise() * 0.5 } else { 0.0 };
+                *slot = noise() * 0.12 * (1.0 - t(i) / 1.6).max(0.0)
+                    + if noise() > 0.97 { noise() * 0.5 } else { 0.0 };
             }
         }
         // Water: bubbles rising.
@@ -1043,7 +1298,8 @@ fn synth(ix: usize) -> Vec<f32> {
             for (i, slot) in out.iter_mut().enumerate() {
                 let x = t(i);
                 phase += (1600.0 + 40.0 * (x * 7.0 * TAU).sin()) / RATE as f32;
-                *slot = (phase * TAU).sin() * 0.35 * (x * 8.0).min(1.0) * ((1.6 - x) * 8.0).min(1.0);
+                *slot =
+                    (phase * TAU).sin() * 0.35 * (x * 8.0).min(1.0) * ((1.6 - x) * 8.0).min(1.0);
             }
         }
     }
@@ -1059,7 +1315,11 @@ fn synth(ix: usize) -> Vec<f32> {
 
 /// A chosen entry, said back in the test.
 fn chosen(label: &str) -> SharedString {
-    tf!("Você escolheu \"{item}\". No teste, nada acontece.", item = label).into()
+    tf!(
+        "Você escolheu \"{item}\". No teste, nada acontece.",
+        item = label
+    )
+    .into()
 }
 
 #[derive(Clone, Copy)]
@@ -1070,7 +1330,13 @@ enum Panel {
 }
 
 enum TestEntry {
-    Item { label: &'static str, icon: Option<&'static str>, submenu: bool, shortcut: Option<&'static str>, windows: bool },
+    Item {
+        label: &'static str,
+        icon: Option<&'static str>,
+        submenu: bool,
+        shortcut: Option<&'static str>,
+        windows: bool,
+    },
     Separator,
     Note(&'static str),
 }
@@ -1086,17 +1352,24 @@ fn hides(compact: &nohrs_core::config::Compact, edge: Edge) -> bool {
 
 // Height of the top bars that hide, and of those that stay.
 fn top_hidden(compact: &nohrs_core::config::Compact) -> f32 {
-    (if compact.hide_tabs { TABS_H } else { 0.0 }) + (if compact.hide_header { HEADER_H } else { 0.0 })
+    (if compact.hide_tabs { TABS_H } else { 0.0 })
+        + (if compact.hide_header { HEADER_H } else { 0.0 })
 }
 
 fn top_fixed(compact: &nohrs_core::config::Compact) -> f32 {
-    (if compact.hide_tabs { 0.0 } else { TABS_H }) + (if compact.hide_header { 0.0 } else { HEADER_H })
+    (if compact.hide_tabs { 0.0 } else { TABS_H })
+        + (if compact.hide_header { 0.0 } else { HEADER_H })
 }
 
 // A bar sliding over the listing from its edge, `p` of the way out.
 fn slide(inner: Div, edge: Edge, size: f32, p: f32) -> Div {
     let hidden = -(1.0 - p) * size;
-    let strip = div().absolute().top_0().bottom_0().w(px(size)).overflow_hidden();
+    let strip = div()
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .w(px(size))
+        .overflow_hidden();
     let inner = inner.absolute().top_0().bottom_0();
     match edge {
         Edge::Left => strip.left_0().child(inner.left(px(hidden))),
@@ -1127,7 +1400,12 @@ pub(crate) fn mini_window(height: f32) -> Div {
 }
 
 pub(crate) fn line(width: f32, color: u32) -> Div {
-    div().h(px(4.0)).w(px(width)).flex_shrink_0().rounded(px(2.0)).bg(rgb(color))
+    div()
+        .h(px(4.0))
+        .w(px(width))
+        .flex_shrink_0()
+        .rounded(px(2.0))
+        .bg(rgb(color))
 }
 
 fn tab_strip() -> Div {
@@ -1142,7 +1420,14 @@ fn tab_strip() -> Div {
             .rounded_t(px(5.0))
             .when(active, |this| this.bg(rgb(theme::bg())))
             .child(div().size(px(6.0)).rounded(px(1.5)).bg(rgb(FOLDER)))
-            .child(line(width - 26.0, if active { theme::fg_secondary() } else { theme::border() }))
+            .child(line(
+                width - 26.0,
+                if active {
+                    theme::fg_secondary()
+                } else {
+                    theme::border()
+                },
+            ))
     };
     div()
         .h(px(TABS_H))
@@ -1216,7 +1501,12 @@ fn titled(title: &'static str, body: Div) -> Div {
         .gap(px(5.0))
         .p(px(6.0))
         .bg(rgb(theme::toolbar_bg()))
-        .child(div().text_color(rgb(theme::muted())).whitespace_nowrap().child(title))
+        .child(
+            div()
+                .text_color(rgb(theme::muted()))
+                .whitespace_nowrap()
+                .child(title),
+        )
         .child(body)
 }
 
@@ -1244,16 +1534,18 @@ fn sidebar(tags: bool) -> Div {
             .child(place(52.0, false))
             .child(place(34.0, false))
             .when(tags, |this| {
-                this.child(div().h(px(6.0))).children([0xEF4444, 0x3B82F6, 0x22C55E].into_iter().map(|color| {
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(4.0))
-                        .px(px(3.0))
-                        .py(px(2.0))
-                        .child(div().size(px(6.0)).rounded_full().bg(rgb(color)))
-                        .child(line(30.0, theme::border()))
-                }))
+                this.child(div().h(px(6.0))).children(
+                    [0xEF4444, 0x3B82F6, 0x22C55E].into_iter().map(|color| {
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(4.0))
+                            .px(px(3.0))
+                            .py(px(2.0))
+                            .child(div().size(px(6.0)).rounded_full().bg(rgb(color)))
+                            .child(line(30.0, theme::border()))
+                    }),
+                )
             }),
     )
 }
@@ -1265,7 +1557,13 @@ fn preview_panel() -> Div {
             .flex()
             .flex_col()
             .gap(px(4.0))
-            .child(div().w_full().h(px(46.0)).rounded(px(4.0)).bg(rgb(theme::accent_subtle())))
+            .child(
+                div()
+                    .w_full()
+                    .h(px(46.0))
+                    .rounded(px(4.0))
+                    .bg(rgb(theme::accent_subtle())),
+            )
             .child(line(60.0, theme::border()))
             .child(line(40.0, theme::border())),
     )
@@ -1285,7 +1583,12 @@ fn terminal() -> Div {
                 .child(div().text_color(rgb(0x9A9CA3)).child(t!("Terminal")))
                 .child(div().text_color(rgb(0x6B6E76)).child(t!("(quando aberto)"))),
         )
-        .child(div().text_color(rgb(0x22C55E)).font_family("Consolas").child("> _"))
+        .child(
+            div()
+                .text_color(rgb(0x22C55E))
+                .font_family("Consolas")
+                .child("> _"),
+        )
 }
 
 fn listing() -> Div {
@@ -1298,8 +1601,19 @@ fn listing() -> Div {
             .py(px(3.0))
             .rounded(px(3.0))
             .when(selected, |this| this.bg(rgb(theme::accent_subtle())))
-            .child(div().size(px(7.0)).rounded(px(1.5)).bg(rgb(if folder { FOLDER } else { theme::muted() })))
-            .child(line(width, if selected { theme::accent() } else { theme::border() }))
+            .child(div().size(px(7.0)).rounded(px(1.5)).bg(rgb(if folder {
+                FOLDER
+            } else {
+                theme::muted()
+            })))
+            .child(line(
+                width,
+                if selected {
+                    theme::accent()
+                } else {
+                    theme::border()
+                },
+            ))
     };
     div()
         .flex_1()
@@ -1311,7 +1625,15 @@ fn listing() -> Div {
         .p(px(6.0))
         .bg(rgb(theme::bg()))
         .overflow_hidden()
-        .child(div().flex().gap(px(30.0)).px(px(4.0)).pb(px(3.0)).child(line(26.0, theme::muted())).child(line(18.0, theme::muted())))
+        .child(
+            div()
+                .flex()
+                .gap(px(30.0))
+                .px(px(4.0))
+                .pb(px(3.0))
+                .child(line(26.0, theme::muted()))
+                .child(line(18.0, theme::muted())),
+        )
         .child(row(70.0, true, false))
         .child(row(54.0, true, false))
         .child(row(88.0, true, true))
@@ -1339,9 +1661,18 @@ fn bottom_bar() -> Div {
 
 // Four bars bobbing: playing, without a sound.
 fn equalizer(time: f32) -> Div {
-    div().h(px(12.0)).flex().items_end().gap(px(2.0)).children((0..4).map(|ix| {
-        let phase = time * 9.0 + ix as f32 * 1.7;
-        let height = 3.0 + (phase.sin() * 0.5 + 0.5) * 9.0;
-        div().w(px(3.0)).h(px(height)).rounded(px(1.0)).bg(rgb(theme::accent()))
-    }))
+    div()
+        .h(px(12.0))
+        .flex()
+        .items_end()
+        .gap(px(2.0))
+        .children((0..4).map(|ix| {
+            let phase = time * 9.0 + ix as f32 * 1.7;
+            let height = 3.0 + (phase.sin() * 0.5 + 0.5) * 9.0;
+            div()
+                .w(px(3.0))
+                .h(px(height))
+                .rounded(px(1.0))
+                .bg(rgb(theme::accent()))
+        }))
 }

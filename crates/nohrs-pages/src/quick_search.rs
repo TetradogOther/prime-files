@@ -18,7 +18,9 @@ use gpui::prelude::*;
 use gpui::*;
 use nohrs_core::t;
 
-use crate::explorer::palette::{Chosen, FILL_MARGIN, FILL_MAX, Palette, PaletteBox, PaletteHost, PaletteMedia};
+use crate::explorer::palette::{
+    Chosen, FILL_MARGIN, FILL_MAX, Palette, PaletteBox, PaletteHost, PaletteMedia,
+};
 
 actions!(
     quick_search,
@@ -71,7 +73,10 @@ pub fn install(cx: &mut App) {
 /// Takes the settings the quick search follows.
 pub fn apply_config(config: &nohrs_core::config::Config) {
     crate::quick_keys::set(&config.launcher.hotkey);
-    WAVEFORMS.store(config.ui.audio_waveforms, std::sync::atomic::Ordering::Relaxed);
+    WAVEFORMS.store(
+        config.ui.audio_waveforms,
+        std::sync::atomic::Ordering::Relaxed,
+    );
 }
 
 // Closes the quick search when it is open.
@@ -83,7 +88,9 @@ fn close_open(cx: &mut App) -> bool {
     crate::quick_keys::set_open(false);
     // Not from inside another window's update, which gpui refuses.
     cx.defer(move |cx| {
-        handle.update(cx, |_, window, _| window.remove_window()).ok();
+        handle
+            .update(cx, |_, window, _| window.remove_window())
+            .ok();
     });
     true
 }
@@ -93,7 +100,8 @@ pub fn toggle(cx: &mut App) {
     if close_open(cx) {
         return;
     }
-    let target = crate::file_dialog::foreground_file_dialog().map_or(Target::Anywhere, Target::Dialog);
+    let target =
+        crate::file_dialog::foreground_file_dialog().map_or(Target::Anywhere, Target::Dialog);
     let width = WIDTH + 2.0 * FILL_MARGIN;
     let height = 56.0 + 34.0 + 2.0 + 2.0 * FILL_MARGIN;
     let bounds = match cx.primary_display() {
@@ -152,7 +160,9 @@ pub fn toggle(cx: &mut App) {
 impl QuickSearch {
     fn new(target: Target, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subscriptions = vec![
-            cx.observe_global::<crate::explorer::everything::Everything>(|this, cx| this.palette_index_changed(cx)),
+            cx.observe_global::<crate::explorer::everything::Everything>(|this, cx| {
+                this.palette_index_changed(cx)
+            }),
             // A click on another program sends it away, as Listary's bar.
             cx.observe_window_activation(window, |this, window, cx| {
                 if !window.is_window_active() {
@@ -160,7 +170,13 @@ impl QuickSearch {
                 }
             }),
         ];
-        let mut this = Self { palette: None, media: PaletteMedia::default(), target, closing: false, _subscriptions: subscriptions };
+        let mut this = Self {
+            palette: None,
+            media: PaletteMedia::default(),
+            target,
+            closing: false,
+            _subscriptions: subscriptions,
+        };
         this.toggle_palette(window, cx);
         this.close_when_left(window, cx);
         this
@@ -177,7 +193,9 @@ impl QuickSearch {
             let mut away = 0;
             let mut looks = 0;
             loop {
-                cx.background_executor().timer(std::time::Duration::from_millis(120)).await;
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(120))
+                    .await;
                 let keep = this
                     .update_in(cx, |this, window, cx| {
                         if this.closing {
@@ -248,7 +266,9 @@ impl PaletteHost for QuickSearch {
     }
 
     fn palette_folder(&self, _cx: &App) -> String {
-        dirs::home_dir().map(|home| home.to_string_lossy().into_owned()).unwrap_or_default()
+        dirs::home_dir()
+            .map(|home| home.to_string_lossy().into_owned())
+            .unwrap_or_default()
     }
 
     fn palette_waveforms(&self) -> bool {
@@ -258,7 +278,11 @@ impl PaletteHost for QuickSearch {
     fn palette_chose(&mut self, chosen: Chosen, _window: &mut Window, cx: &mut Context<Self>) {
         // The preview's Open is Enter on a file.
         let (path, dir, in_folder) = match chosen {
-            Chosen::Path { path, dir, in_folder } => (path, dir, in_folder),
+            Chosen::Path {
+                path,
+                dir,
+                in_folder,
+            } => (path, dir, in_folder),
             Chosen::Open(path) => (path, false, false),
             Chosen::Tab(_) | Chosen::Empty => return,
         };
@@ -304,7 +328,8 @@ impl PaletteHost for QuickSearch {
     }
 
     fn palette_ctrl_enter_hint(&self) -> Option<&'static str> {
-        (crate::file_dialog::picking().is_none() && matches!(self.target, Target::Anywhere)).then(|| t!("Abrir a pasta"))
+        (crate::file_dialog::picking().is_none() && matches!(self.target, Target::Anywhere))
+            .then(|| t!("Abrir a pasta"))
     }
 }
 
@@ -313,7 +338,12 @@ impl Render for QuickSearch {
         let card = self.render_palette(window, cx);
         // The window is the card and the room for its shadow, so it grows
         // and shrinks with the list.
-        if let Some(height) = self.palette.as_ref().map(|palette| palette.height).filter(|height| *height > 0.0) {
+        if let Some(height) = self
+            .palette
+            .as_ref()
+            .map(|palette| palette.height)
+            .filter(|height| *height > 0.0)
+        {
             let wanted = (height.min(FILL_MAX) + 2.0 * FILL_MARGIN).ceil();
             let current = window.viewport_size();
             if (f32::from(current.height) - wanted).abs() > 1.0 {
@@ -336,7 +366,9 @@ fn parent_of(path: &str) -> String {
 fn show_in_prime_files(folder: String, select: Option<String>, cx: &mut App) {
     let shown = crate::windows::with_target_now(cx, |root, window, cx| {
         root.show_explorer(cx);
-        root.explorer_entity().update(cx, |page, cx| page.open_path(folder.clone(), select.clone(), window, cx));
+        root.explorer_entity().update(cx, |page, cx| {
+            page.open_path(folder.clone(), select.clone(), window, cx)
+        });
         window.activate_window();
     });
     if shown.is_none() {
@@ -355,9 +387,13 @@ fn show_in_prime_files(folder: String, select: Option<String>, cx: &mut App) {
 #[allow(unsafe_code)]
 mod platform {
     use windows::Win32::Foundation::HWND;
-    use windows::Win32::Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute};
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute,
+    };
     use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
-    use windows::Win32::UI::Input::KeyboardAndMouse::{INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_MOVE, MOUSEINPUT, SendInput};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_MOVE, MOUSEINPUT, SendInput,
+    };
     use windows::Win32::UI::WindowsAndMessaging::{
         BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
     };
@@ -399,7 +435,14 @@ mod platform {
             let nudge = INPUT {
                 r#type: INPUT_MOUSE,
                 Anonymous: INPUT_0 {
-                    mi: MOUSEINPUT { dx: 0, dy: 0, mouseData: 0, dwFlags: MOUSEEVENTF_MOVE, time: 0, dwExtraInfo: 0 },
+                    mi: MOUSEINPUT {
+                        dx: 0,
+                        dy: 0,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_MOVE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
                 },
             };
             SendInput(&[nudge], std::mem::size_of::<INPUT>() as i32);

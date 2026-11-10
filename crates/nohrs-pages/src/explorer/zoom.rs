@@ -2,8 +2,8 @@
 //! through ever larger icon tiles, the way File Pilot and Explorer's
 //! Ctrl+wheel do, instead of two fixed modes.
 
-use nohrs_core::k;
 use super::types::ViewMode;
+use nohrs_core::k;
 
 /// Zoom at or below which the listing is the list table rather than tiles.
 pub const LIST_MAX: f32 = 0.1;
@@ -90,9 +90,18 @@ pub const MENU_STOPS: [(&str, f32); 6] = [
 pub fn next_stop(zoom: f32, direction: f32) -> f32 {
     const EPSILON: f32 = 0.001;
     if direction > 0.0 {
-        MENU_STOPS.iter().map(|(_, stop)| *stop).find(|stop| *stop > zoom + EPSILON).unwrap_or(zoom)
+        MENU_STOPS
+            .iter()
+            .map(|(_, stop)| *stop)
+            .find(|stop| *stop > zoom + EPSILON)
+            .unwrap_or(zoom)
     } else {
-        MENU_STOPS.iter().rev().map(|(_, stop)| *stop).find(|stop| *stop < zoom - EPSILON).unwrap_or(zoom)
+        MENU_STOPS
+            .iter()
+            .rev()
+            .map(|(_, stop)| *stop)
+            .find(|stop| *stop < zoom - EPSILON)
+            .unwrap_or(zoom)
     }
 }
 

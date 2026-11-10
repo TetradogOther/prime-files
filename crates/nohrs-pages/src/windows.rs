@@ -18,8 +18,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    AnyWindowHandle, App, AppContext as _, AsyncApp, Bounds, Context, Entity, Global, Pixels, Task, WeakEntity,
-    Window, WindowBounds, point, px, size,
+    AnyWindowHandle, App, AppContext as _, AsyncApp, Bounds, Context, Entity, Global, Pixels, Task,
+    WeakEntity, Window, WindowBounds, point, px, size,
 };
 use gpui_component::Root;
 use gpui_component::resizable::ResizableState;
@@ -68,18 +68,31 @@ pub fn open_window(request: WindowRequest, cx: &mut App) -> anyhow::Result<AnyWi
     let Some(setup) = cx.try_global::<WindowSetup>().cloned() else {
         anyhow::bail!("the window setup was not installed");
     };
-    let primary = cx.try_global::<OpenWindows>().is_none_or(|open| open.windows.is_empty());
-    let bounds = request.bounds.or_else(|| primary.then(|| kept_bounds(&setup, cx)).flatten()).unwrap_or_else(|| {
-        WindowBounds::Windowed(Bounds::centered(None, size(px(config::WINDOW_WIDTH), px(config::WINDOW_HEIGHT)), cx))
-    });
+    let primary = cx
+        .try_global::<OpenWindows>()
+        .is_none_or(|open| open.windows.is_empty());
+    let bounds = request
+        .bounds
+        .or_else(|| primary.then(|| kept_bounds(&setup, cx)).flatten())
+        .unwrap_or_else(|| {
+            WindowBounds::Windowed(Bounds::centered(
+                None,
+                size(px(config::WINDOW_WIDTH), px(config::WINDOW_HEIGHT)),
+                cx,
+            ))
+        });
     let traffic_lights = TrafficLightsHook::new().center_vertically(UNIFIED_TOOLBAR_HEIGHT);
-    let mut options = nohrs_ui::window::unified_window_options(bounds.get_bounds(), &traffic_lights);
+    let mut options =
+        nohrs_ui::window::unified_window_options(bounds.get_bounds(), &traffic_lights);
     options.window_bounds = Some(bounds);
     // gpui places a window on the primary screen unless told which: bounds
     // on a second monitor were thrown away for the default ones.
     let origin = bounds.get_bounds().origin;
-    options.display_id =
-        cx.displays().iter().find(|screen| screen.bounds().contains(&origin)).map(|screen| screen.id());
+    options.display_id = cx
+        .displays()
+        .iter()
+        .find(|screen| screen.bounds().contains(&origin))
+        .map(|screen| screen.id());
 
     // The file is read again for every window after the first: by then it may
     // have changed, and the windows' own watchers keep each one current.
@@ -119,7 +132,9 @@ pub fn open_window(request: WindowRequest, cx: &mut App) -> anyhow::Result<AnyWi
             });
         }
         if primary {
-            view.update(cx, |root, cx| root.keep_window_bounds(setup.store.clone(), window, cx));
+            view.update(cx, |root, cx| {
+                root.keep_window_bounds(setup.store.clone(), window, cx)
+            });
         }
         if request.background {
             window.minimize_window();
@@ -131,23 +146,44 @@ pub fn open_window(request: WindowRequest, cx: &mut App) -> anyhow::Result<AnyWi
 
 /// Opens `folder` in a window of its own near `origin` (screen pixels): a tab
 /// dragged out of its window and let go there.
-pub fn open_window_at(folder: String, origin: gpui::Point<Pixels>, window_size: gpui::Size<Pixels>, cx: &mut App) {
+pub fn open_window_at(
+    folder: String,
+    origin: gpui::Point<Pixels>,
+    window_size: gpui::Size<Pixels>,
+    cx: &mut App,
+) {
     let width = (window_size.width * 0.85).max(px(640.0));
     let height = (window_size.height * 0.85).max(px(420.0));
     // The pointer lands on the new window's tab row, as when a browser tab is
     // torn off.
-    let mut bounds = Bounds::new(point(origin.x - px(120.0), origin.y - px(18.0)), size(width, height));
+    let mut bounds = Bounds::new(
+        point(origin.x - px(120.0), origin.y - px(18.0)),
+        size(width, height),
+    );
     // Kept inside the monitor it was let go on: gpui drops bounds that do not
     // fit their screen for its default ones, far from the pointer.
-    if let Some(screen) = cx.displays().into_iter().find(|screen| screen.bounds().contains(&origin)) {
+    if let Some(screen) = cx
+        .displays()
+        .into_iter()
+        .find(|screen| screen.bounds().contains(&origin))
+    {
         let area = screen.bounds();
         bounds.size.width = bounds.size.width.min(area.size.width);
         bounds.size.height = bounds.size.height.min(area.size.height);
-        bounds.origin.x = bounds.origin.x.clamp(area.origin.x, area.right() - bounds.size.width);
-        bounds.origin.y = bounds.origin.y.clamp(area.origin.y, area.bottom() - bounds.size.height);
+        bounds.origin.x = bounds
+            .origin
+            .x
+            .clamp(area.origin.x, area.right() - bounds.size.width);
+        bounds.origin.y = bounds
+            .origin
+            .y
+            .clamp(area.origin.y, area.bottom() - bounds.size.height);
     }
-    let request =
-        WindowRequest { path: Some(PathBuf::from(folder)), bounds: Some(WindowBounds::Windowed(bounds)), background: false };
+    let request = WindowRequest {
+        path: Some(PathBuf::from(folder)),
+        bounds: Some(WindowBounds::Windowed(bounds)),
+        background: false,
+    };
     open_window(request, cx).log_err();
 }
 
@@ -196,7 +232,11 @@ pub(crate) fn with_target<R>(
 ) -> Option<R> {
     let (handle, root) = cx.update(target).ok()??;
     let root: Entity<RootView> = root.upgrade()?;
-    handle.update(cx, |_, window, cx| root.update(cx, |root, cx| f(root, window, cx))).ok()
+    handle
+        .update(cx, |_, window, cx| {
+            root.update(cx, |root, cx| f(root, window, cx))
+        })
+        .ok()
 }
 
 /// [`with_target`] from the app itself, between window updates (a deferred
@@ -207,7 +247,11 @@ pub(crate) fn with_target_now<R>(
 ) -> Option<R> {
     let (handle, root) = target(cx)?;
     let root: Entity<RootView> = root.upgrade()?;
-    handle.update(cx, |_, window, cx| root.update(cx, |root, cx| f(root, window, cx))).ok()
+    handle
+        .update(cx, |_, window, cx| {
+            root.update(cx, |root, cx| f(root, window, cx))
+        })
+        .ok()
 }
 
 // ---- The main window's place on screen ----
@@ -229,13 +273,23 @@ fn kept_bounds(setup: &WindowSetup, cx: &App) -> Option<WindowBounds> {
     if kept.width < 320.0 || kept.height < 240.0 {
         return None;
     }
-    let bounds = Bounds::new(point(px(kept.x), px(kept.y)), size(px(kept.width), px(kept.height)));
+    let bounds = Bounds::new(
+        point(px(kept.x), px(kept.y)),
+        size(px(kept.width), px(kept.height)),
+    );
     let title_bar = Bounds::new(bounds.origin, size(bounds.size.width, px(40.0)));
-    let visible = cx.displays().iter().any(|display| display.bounds().intersects(&title_bar));
+    let visible = cx
+        .displays()
+        .iter()
+        .any(|display| display.bounds().intersects(&title_bar));
     if !visible {
         return None;
     }
-    Some(if kept.maximized { WindowBounds::Maximized(bounds) } else { WindowBounds::Windowed(bounds) })
+    Some(if kept.maximized {
+        WindowBounds::Maximized(bounds)
+    } else {
+        WindowBounds::Windowed(bounds)
+    })
 }
 
 impl RootView {
@@ -254,7 +308,9 @@ impl RootView {
         cx.observe_window_bounds(window, move |_root, window, cx| {
             let (bounds, maximized) = match window.window_bounds() {
                 WindowBounds::Windowed(bounds) => (bounds, false),
-                WindowBounds::Maximized(bounds) | WindowBounds::Fullscreen(bounds) => (bounds, true),
+                WindowBounds::Maximized(bounds) | WindowBounds::Fullscreen(bounds) => {
+                    (bounds, true)
+                }
             };
             // Windows puts a minimized window at -32000, -32000.
             if f32::from(bounds.origin.x) <= -30000.0 || f32::from(bounds.origin.y) <= -30000.0 {
@@ -270,11 +326,14 @@ impl RootView {
             let store = store.clone();
             // A drag reports every step; only where it ends is written.
             let task = cx.spawn(async move |_, cx| {
-                cx.background_executor().timer(Duration::from_millis(400)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(400))
+                    .await;
                 let Some(bytes) = serde_json::to_vec(&kept).log_err() else {
                     return;
                 };
-                cx.background_spawn(async move { store.put(&WINDOW_KEY, &bytes).log_err() }).await;
+                cx.background_spawn(async move { store.put(&WINDOW_KEY, &bytes).log_err() })
+                    .await;
             });
             *pending.borrow_mut() = Some(task);
         })

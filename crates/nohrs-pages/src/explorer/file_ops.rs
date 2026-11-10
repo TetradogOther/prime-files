@@ -9,8 +9,8 @@
 //! surfaced to the footer status bar — the aggregated error dialog and progress
 //! UI are tracked separately in #188.
 
-use nohrs_core::{k, t, tf};
 use nohrs_core::i18n;
+use nohrs_core::{k, t, tf};
 use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -69,7 +69,10 @@ impl ExplorerClipboard {
         let clipboard = cx.default_global::<ExplorerClipboard>();
         clipboard.generation = clipboard.generation.wrapping_add(1);
         clipboard.cut = match &entry {
-            Some((ClipMode::Cut, paths)) => paths.iter().map(|path| path.to_string_lossy().to_lowercase()).collect(),
+            Some((ClipMode::Cut, paths)) => paths
+                .iter()
+                .map(|path| path.to_string_lossy().to_lowercase())
+                .collect(),
             _ => Default::default(),
         };
         clipboard.entry = entry;
@@ -147,7 +150,11 @@ pub(crate) fn copy_files(paths: &[PathBuf], cx: &mut App) {
     if paths.is_empty() {
         return;
     }
-    let text = paths.iter().map(|path| path.to_string_lossy()).collect::<Vec<_>>().join("\n");
+    let text = paths
+        .iter()
+        .map(|path| path.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("\n");
     write_system_clipboard(ClipMode::Copy, paths, text, cx);
     ExplorerClipboard::write(Some((ClipMode::Copy, paths.to_vec())), cx);
 }
@@ -297,7 +304,9 @@ mod windows_clipboard {
                 let mut buffer = vec![0u16; length + 1];
                 let written = unsafe { DragQueryFileW(drop_handle, index, Some(&mut buffer)) };
                 let written = (written as usize).min(length);
-                Some(PathBuf::from(std::ffi::OsString::from_wide(&buffer[..written])))
+                Some(PathBuf::from(std::ffi::OsString::from_wide(
+                    &buffer[..written],
+                )))
             })
             .collect();
         if paths.is_empty() {
@@ -449,7 +458,10 @@ fn free_destination(dir: &Path, name: &OsStr) -> Result<PathBuf> {
         return Ok(dst);
     }
     let name = name.to_str().ok_or_else(|| {
-        Error::Other(tf!("{path} já existe e não dá para numerar o nome", path = dst.display()))
+        Error::Other(tf!(
+            "{path} já existe e não dá para numerar o nome",
+            path = dst.display()
+        ))
     })?;
     ops::destination_in(dir, OsStr::new(&ops::unique_name(dir, name)))
 }
@@ -626,7 +638,11 @@ impl OpReport {
             }
             return (
                 StatusLevel::Error,
-                tf!("{failed} de {total} falharam", failed = self.failures.len(), total = total),
+                tf!(
+                    "{failed} de {total} falharam",
+                    failed = self.failures.len(),
+                    total = total
+                ),
             );
         }
         match self.leftovers.as_slice() {
@@ -921,11 +937,22 @@ impl ExplorerPane {
     // failure) on the background executor, then reloads the listing and reports
     // the outcome in the status bar. `total` and `success_label` describe the
     // batch for the success / partial-failure messages.
-    pub(crate) fn run_fs_op<F>(&mut self, total: usize, success_label: String, cx: &mut Context<Self>, op: F)
-    where
+    pub(crate) fn run_fs_op<F>(
+        &mut self,
+        total: usize,
+        success_label: String,
+        cx: &mut Context<Self>,
+        op: F,
+    ) where
         F: FnOnce() -> OpReport + Send + 'static,
     {
-        self.run_fs_op_with(total, success_label, cx, move || (op(), ()), |(), _| Vec::new());
+        self.run_fs_op_with(
+            total,
+            success_label,
+            cx,
+            move || (op(), ()),
+            |(), _| Vec::new(),
+        );
     }
 
     // [`run_fs_op`](Self::run_fs_op) for batches that carry an outcome of their
@@ -955,14 +982,22 @@ impl ExplorerPane {
             let done = done.clone();
             async move |this: WeakEntity<Self>, cx: &mut AsyncApp| {
                 loop {
-                    cx.background_executor().timer(std::time::Duration::from_millis(300)).await;
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(300))
+                        .await;
                     if done.get() {
                         return;
                     }
-                    let Some((count, copied, total)) = nohrs_services::fs::ops::transfers::summary() else {
+                    let Some((count, copied, total)) =
+                        nohrs_services::fs::ops::transfers::summary()
+                    else {
                         continue;
                     };
-                    let percent = if total > 0 { copied.saturating_mul(100) / total } else { 0 };
+                    let percent = if total > 0 {
+                        copied.saturating_mul(100) / total
+                    } else {
+                        0
+                    };
                     let text = tf!(
                         "Copiando {count} arquivo(s)… {percent}% ({copied} de {total})",
                         count = count,
@@ -988,7 +1023,10 @@ impl ExplorerPane {
             async move {
                 let (report, outcome) = task.await;
                 done.set(true);
-                let landed = cx.update(|cx| on_complete(outcome, cx)).log_err().unwrap_or_default();
+                let landed = cx
+                    .update(|cx| on_complete(outcome, cx))
+                    .log_err()
+                    .unwrap_or_default();
                 // Before the update, not inside it: this is what writes the
                 // failures to the log, and a batch can outlive the pane that
                 // started it. Computed in there, a closed pane would take the
@@ -1025,12 +1063,19 @@ impl ExplorerPane {
         // item in the trash would succeed, and it would be a one-way door.
         let ledger = self.trash_ledger.clone();
         if let Err(error) = ledger.to_record() {
-            self.set_status(StatusLevel::Error, tf!("Não dá para mandar para a Lixeira: {error}", error = error));
+            self.set_status(
+                StatusLevel::Error,
+                tf!("Não dá para mandar para a Lixeira: {error}", error = error),
+            );
             cx.notify();
             return;
         }
         let total = paths.len();
-        let label = i18n::plural(total, k!("{n} item enviado para a Lixeira"), k!("{n} itens enviados para a Lixeira"));
+        let label = i18n::plural(
+            total,
+            k!("{n} item enviado para a Lixeira"),
+            k!("{n} itens enviados para a Lixeira"),
+        );
         self.run_fs_op_with(
             total,
             label,
@@ -1055,8 +1100,10 @@ impl ExplorerPane {
                 for (path, error) in &failed {
                     report.failed(format!("{}: {error}", path.display()));
                 }
-                let trashed: Vec<PathBuf> =
-                    paths.into_iter().filter(|path| !failed.iter().any(|(gone, _)| gone == path)).collect();
+                let trashed: Vec<PathBuf> = paths
+                    .into_iter()
+                    .filter(|path| !failed.iter().any(|(gone, _)| gone == path))
+                    .collect();
                 (report, trashed)
             },
             |trashed, _| {
@@ -1106,7 +1153,11 @@ impl ExplorerPane {
             return;
         }
         for path in &paths[1..] {
-            if let Some(entry) = self.filtered_entries.iter().find(|entry| super::same_path(&entry.path, path)) {
+            if let Some(entry) = self
+                .filtered_entries
+                .iter()
+                .find(|entry| super::same_path(&entry.path, path))
+            {
                 self.selection.insert(entry.path.clone());
             }
         }
@@ -1153,15 +1204,29 @@ impl ExplorerPane {
             Undo::Moved(pairs) | Undo::Renamed(pairs) => self.replay_moves(kind, pairs, back, cx),
             Undo::Trashed(paths) if back => self.replay_restore(kind, paths, back, cx),
             Undo::Trashed(paths) => self.replay_trash(kind, paths, back, cx),
-            Undo::Copied(paths) | Undo::Created(paths) if back => self.replay_trash(kind, paths, back, cx),
-            Undo::Copied(paths) | Undo::Created(paths) => self.replay_restore(kind, paths, back, cx),
+            Undo::Copied(paths) | Undo::Created(paths) if back => {
+                self.replay_trash(kind, paths, back, cx)
+            }
+            Undo::Copied(paths) | Undo::Created(paths) => {
+                self.replay_restore(kind, paths, back, cx)
+            }
         }
     }
 
     // Brings items back from the Recycle Bin.
-    fn replay_restore(&mut self, kind: UndoKind, paths: Vec<PathBuf>, back: bool, cx: &mut Context<Self>) {
+    fn replay_restore(
+        &mut self,
+        kind: UndoKind,
+        paths: Vec<PathBuf>,
+        back: bool,
+        cx: &mut Context<Self>,
+    ) {
         let total = paths.len();
-        let label = i18n::plural(total, k!("{n} item restaurado"), k!("{n} itens restaurados"));
+        let label = i18n::plural(
+            total,
+            k!("{n} item restaurado"),
+            k!("{n} itens restaurados"),
+        );
         self.run_fs_op_with(
             total,
             label,
@@ -1171,7 +1236,9 @@ impl ExplorerPane {
                 // single-threaded apartment and panics on a pool thread already
                 // in the multithreaded one, and a panic on gpui's pool aborts
                 // the app (as for deleting, `ops::os_trash_delete`).
-                let restored = std::thread::Builder::new().name("trash-restore".into()).spawn(move || restore_batch(paths));
+                let restored = std::thread::Builder::new()
+                    .name("trash-restore".into())
+                    .spawn(move || restore_batch(paths));
                 match restored.map(|thread| thread.join()) {
                     Ok(Ok(outcome)) => outcome,
                     Ok(Err(_)) | Err(_) => {
@@ -1190,18 +1257,35 @@ impl ExplorerPane {
 
     // Sends items to the Recycle Bin: a deletion done again, or a copy or a
     // new folder taken back (from there a wrong undo can still be taken back).
-    fn replay_trash(&mut self, kind: UndoKind, paths: Vec<PathBuf>, back: bool, cx: &mut Context<Self>) {
+    fn replay_trash(
+        &mut self,
+        kind: UndoKind,
+        paths: Vec<PathBuf>,
+        back: bool,
+        cx: &mut Context<Self>,
+    ) {
         let ledger = self.trash_ledger.clone();
         if let Err(error) = ledger.to_record() {
-            self.set_status(StatusLevel::Error, tf!("Não dá para mandar para a Lixeira: {error}", error = error));
+            self.set_status(
+                StatusLevel::Error,
+                tf!("Não dá para mandar para a Lixeira: {error}", error = error),
+            );
             cx.notify();
             return;
         }
         let total = paths.len();
         let label = if kind == UndoKind::Copied {
-            i18n::plural(total, k!("{n} cópia enviada para a Lixeira"), k!("{n} cópias enviadas para a Lixeira"))
+            i18n::plural(
+                total,
+                k!("{n} cópia enviada para a Lixeira"),
+                k!("{n} cópias enviadas para a Lixeira"),
+            )
         } else {
-            i18n::plural(total, k!("{n} item enviado para a Lixeira"), k!("{n} itens enviados para a Lixeira"))
+            i18n::plural(
+                total,
+                k!("{n} item enviado para a Lixeira"),
+                k!("{n} itens enviados para a Lixeira"),
+            )
         };
         self.run_fs_op_with(
             total,
@@ -1216,17 +1300,23 @@ impl ExplorerPane {
                         return (report, Vec::new());
                     }
                 };
-                let (present, gone): (Vec<PathBuf>, Vec<PathBuf>) =
-                    paths.into_iter().partition(|path| std::fs::symlink_metadata(path).is_ok());
+                let (present, gone): (Vec<PathBuf>, Vec<PathBuf>) = paths
+                    .into_iter()
+                    .partition(|path| std::fs::symlink_metadata(path).is_ok());
                 for path in &gone {
-                    report.failed(tf!("{path}: não está mais onde estava", path = path.display()));
+                    report.failed(tf!(
+                        "{path}: não está mais onde estava",
+                        path = path.display()
+                    ));
                 }
                 let failed = ops::trash_paths(&present, record);
                 for (path, error) in &failed {
                     report.failed(format!("{}: {error}", path.display()));
                 }
-                let trashed: Vec<PathBuf> =
-                    present.into_iter().filter(|path| !failed.iter().any(|(gone, _)| gone == path)).collect();
+                let trashed: Vec<PathBuf> = present
+                    .into_iter()
+                    .filter(|path| !failed.iter().any(|(gone, _)| gone == path))
+                    .collect();
                 (report, trashed)
             },
             move |trashed, _| {
@@ -1239,12 +1329,26 @@ impl ExplorerPane {
     // Moves each item of a move or rename back where it came from (`back`),
     // or to where it went again. A name taken there since is left alone, as
     // the Explorer does, and said in the footer.
-    fn replay_moves(&mut self, kind: UndoKind, pairs: Vec<(PathBuf, PathBuf)>, back: bool, cx: &mut Context<Self>) {
+    fn replay_moves(
+        &mut self,
+        kind: UndoKind,
+        pairs: Vec<(PathBuf, PathBuf)>,
+        back: bool,
+        cx: &mut Context<Self>,
+    ) {
         let total = pairs.len();
         let label = match (kind, back) {
-            (UndoKind::Renamed, true) => i18n::plural(total, k!("{n} nome desfeito"), k!("{n} nomes desfeitos")),
-            (UndoKind::Renamed, false) => i18n::plural(total, k!("{n} item renomeado"), k!("{n} itens renomeados")),
-            (_, true) => i18n::plural(total, k!("{n} item movido de volta"), k!("{n} itens movidos de volta")),
+            (UndoKind::Renamed, true) => {
+                i18n::plural(total, k!("{n} nome desfeito"), k!("{n} nomes desfeitos"))
+            }
+            (UndoKind::Renamed, false) => {
+                i18n::plural(total, k!("{n} item renomeado"), k!("{n} itens renomeados"))
+            }
+            (_, true) => i18n::plural(
+                total,
+                k!("{n} item movido de volta"),
+                k!("{n} itens movidos de volta"),
+            ),
             (_, false) => i18n::plural(total, k!("{n} item movido"), k!("{n} itens movidos")),
         };
         self.run_fs_op_with(
@@ -1256,17 +1360,27 @@ impl ExplorerPane {
                 let mut done = Vec::new();
                 // Undone newest first, so a folder moved after its parent is
                 // undone before the parent it went into; redone in order.
-                let ordered: Vec<(PathBuf, PathBuf)> = if back { pairs.into_iter().rev().collect() } else { pairs };
+                let ordered: Vec<(PathBuf, PathBuf)> = if back {
+                    pairs.into_iter().rev().collect()
+                } else {
+                    pairs
+                };
                 for (from, to) in ordered {
                     let (src, dst) = if back { (&to, &from) } else { (&from, &to) };
                     if !ops::would_conflict(src) {
-                        report.failed(tf!("{path}: não está mais onde estava", path = src.display()));
+                        report.failed(tf!(
+                            "{path}: não está mais onde estava",
+                            path = src.display()
+                        ));
                         continue;
                     }
                     // A rename that only changed capitals (`foto.jpg` to
                     // `Foto.jpg`) finds its own source at the destination.
                     if !same_place(src, dst) && ops::would_conflict(dst) {
-                        report.failed(tf!("{path}: o lugar de destino já está ocupado", path = dst.display()));
+                        report.failed(tf!(
+                            "{path}: o lugar de destino já está ocupado",
+                            path = dst.display()
+                        ));
                         continue;
                     }
                     match apply_to_free_name(ClipMode::Cut, src, dst) {
@@ -1283,8 +1397,10 @@ impl ExplorerPane {
                 (report, done)
             },
             move |done, cx| {
-                let landed: Vec<PathBuf> =
-                    done.iter().map(|(from, to)| if back { from.clone() } else { to.clone() }).collect();
+                let landed: Vec<PathBuf> = done
+                    .iter()
+                    .map(|(from, to)| if back { from.clone() } else { to.clone() })
+                    .collect();
                 // Tags follow the item, as they do on a rename.
                 for (from, to) in &done {
                     let (old, new) = if back { (to, from) } else { (from, to) };
@@ -1358,8 +1474,16 @@ impl ExplorerPane {
         write_system_clipboard(mode, &buffers, paths.join("\n"), cx);
         ExplorerClipboard::write(Some((mode, buffers)), cx);
         let message = match mode {
-            ClipMode::Copy => i18n::plural(paths.len(), k!("{n} item copiado"), k!("{n} itens copiados")),
-            ClipMode::Cut => i18n::plural(paths.len(), k!("{n} item recortado"), k!("{n} itens recortados")),
+            ClipMode::Copy => i18n::plural(
+                paths.len(),
+                k!("{n} item copiado"),
+                k!("{n} itens copiados"),
+            ),
+            ClipMode::Cut => i18n::plural(
+                paths.len(),
+                k!("{n} item recortado"),
+                k!("{n} itens recortados"),
+            ),
         };
         self.set_status(StatusLevel::Info, message);
         cx.notify();
@@ -1613,10 +1737,17 @@ impl ExplorerPane {
                     let result = match resolution {
                         // Filtered out above; kept for exhaustiveness without panicking.
                         ConflictResolution::Skip => continue,
-                        ConflictResolution::Rename => free_destination(&dest_dir, &name)
-                            .and_then(|dst| apply_to_free_name(mode, &src, &dst).map(|applied| (applied, dst, true))),
+                        ConflictResolution::Rename => {
+                            free_destination(&dest_dir, &name).and_then(|dst| {
+                                apply_to_free_name(mode, &src, &dst)
+                                    .map(|applied| (applied, dst, true))
+                            })
+                        }
                         ConflictResolution::Overwrite => ops::destination_in(&dest_dir, &name)
-                            .and_then(|dst| overwrite_apply(mode, &src, &dst).map(|applied| (applied, dst, false))),
+                            .and_then(|dst| {
+                                overwrite_apply(mode, &src, &dst)
+                                    .map(|applied| (applied, dst, false))
+                            }),
                     };
                     match result {
                         Ok((applied, dst, undoable)) => {
@@ -1647,7 +1778,11 @@ impl ExplorerPane {
                             .collect(),
                     )),
                     ClipMode::Copy => remember(Undo::Copied(
-                        landed.iter().filter(|(_, _, undoable)| *undoable).map(|(_, to, _)| to.clone()).collect(),
+                        landed
+                            .iter()
+                            .filter(|(_, _, undoable)| *undoable)
+                            .map(|(_, to, _)| to.clone())
+                            .collect(),
                     )),
                 }
                 landed.into_iter().map(|(_, to, _)| to).collect()
@@ -1779,8 +1914,10 @@ impl ExplorerPane {
         });
         cx.spawn(async move |this: WeakEntity<Self>, cx| {
             let (original_path, final_name, renamed) = task.await;
-            this.update(cx, |pane, cx| pane.finish_rename(&original_path, &final_name, renamed, cx))
-                .log_err();
+            this.update(cx, |pane, cx| {
+                pane.finish_rename(&original_path, &final_name, renamed, cx)
+            })
+            .log_err();
         })
         .detach();
         cx.notify();
@@ -1816,13 +1953,22 @@ impl ExplorerPane {
                 // Naming the folder "Nova pasta" just made is part of making
                 // it; any other rename is a batch of its own for Ctrl+Z.
                 if !rename_created(original_path, &renamed) {
-                    remember(Undo::Renamed(vec![(original_path.to_path_buf(), renamed.clone())]));
+                    remember(Undo::Renamed(vec![(
+                        original_path.to_path_buf(),
+                        renamed.clone(),
+                    )]));
                 }
                 self.reload(cx);
-                self.set_status(StatusLevel::Info, tf!("Renomeado para {name}", name = final_name));
+                self.set_status(
+                    StatusLevel::Info,
+                    tf!("Renomeado para {name}", name = final_name),
+                );
             }
             Err(error) => {
-                self.set_status(StatusLevel::Error, tf!("Não foi possível renomear: {error}", error = error));
+                self.set_status(
+                    StatusLevel::Error,
+                    tf!("Não foi possível renomear: {error}", error = error),
+                );
             }
         }
         cx.notify();
@@ -1837,7 +1983,11 @@ impl ExplorerPane {
         let Some(path) = self.rename_when_listed.take() else {
             return;
         };
-        if let Some(index) = self.filtered_entries.iter().position(|entry| super::same_path(&entry.path, &path)) {
+        if let Some(index) = self
+            .filtered_entries
+            .iter()
+            .position(|entry| super::same_path(&entry.path, &path))
+        {
             self.select_single(index);
             self.scroll_entry_into_view(index);
             self.begin_rename(index, window, cx);
@@ -1860,7 +2010,11 @@ impl ExplorerPane {
         if click_count != 1 || !plain || !was_sole_selection || self.renaming.is_some() {
             return;
         }
-        let Some(path) = self.filtered_entries.get(ix).map(|entry| entry.path.clone()) else {
+        let Some(path) = self
+            .filtered_entries
+            .get(ix)
+            .map(|entry| entry.path.clone())
+        else {
             return;
         };
         let delay = double_click_time();
@@ -1868,7 +2022,11 @@ impl ExplorerPane {
             cx.background_executor().timer(delay).await;
             this.update_in(cx, |pane, window, cx| {
                 pane.slow_rename = None;
-                let Some(index) = pane.filtered_entries.iter().position(|entry| entry.path == path) else {
+                let Some(index) = pane
+                    .filtered_entries
+                    .iter()
+                    .position(|entry| entry.path == path)
+                else {
                     return;
                 };
                 if pane.selection.len() == 1 && pane.is_selected(index) && pane.renaming.is_none() {
@@ -2300,9 +2458,17 @@ impl ExplorerPane {
         if paths.is_empty() {
             return;
         }
-        let text = paths.iter().map(|path| format!("\"{path}\"")).collect::<Vec<_>>().join("\r\n");
+        let text = paths
+            .iter()
+            .map(|path| format!("\"{path}\""))
+            .collect::<Vec<_>>()
+            .join("\r\n");
         cx.write_to_clipboard(ClipboardItem::new_string(text));
-        let message = i18n::plural(paths.len(), k!("Caminho copiado"), k!("{n} caminhos copiados"));
+        let message = i18n::plural(
+            paths.len(),
+            k!("Caminho copiado"),
+            k!("{n} caminhos copiados"),
+        );
         self.set_status(StatusLevel::Info, message);
         cx.notify();
     }
@@ -2323,9 +2489,19 @@ impl ExplorerPane {
 
     /// Asks the page for a new tab on `path` (a folder), or on the folder
     /// holding it with it selected.
-    pub(crate) fn open_path_in_new_tab(&mut self, path: &str, is_dir: bool, middle: bool, cx: &mut Context<Self>) {
+    pub(crate) fn open_path_in_new_tab(
+        &mut self,
+        path: &str,
+        is_dir: bool,
+        middle: bool,
+        cx: &mut Context<Self>,
+    ) {
         let event = if is_dir {
-            PaneEvent::OpenInNewTab { folder: path.to_string(), select: None, middle }
+            PaneEvent::OpenInNewTab {
+                folder: path.to_string(),
+                select: None,
+                middle,
+            }
         } else {
             let Some(parent) = std::path::Path::new(path).parent() else {
                 return;
@@ -2351,12 +2527,22 @@ impl ExplorerPane {
 
     /// Explorer's Properties window for the selection.
     pub(crate) fn show_selection_properties(&mut self, cx: &mut Context<Self>) {
-        let paths: Vec<PathBuf> = self.selected_paths().into_iter().map(PathBuf::from).collect();
+        let paths: Vec<PathBuf> = self
+            .selected_paths()
+            .into_iter()
+            .map(PathBuf::from)
+            .collect();
         if paths.is_empty() {
             return;
         }
         if let Err(error) = super::drag::show_properties(&paths) {
-            self.set_status(StatusLevel::Error, tf!("Não foi possível abrir as propriedades: {error}", error = error));
+            self.set_status(
+                StatusLevel::Error,
+                tf!(
+                    "Não foi possível abrir as propriedades: {error}",
+                    error = error
+                ),
+            );
             cx.notify();
         }
     }
@@ -2434,7 +2620,10 @@ struct Histories {
 }
 
 #[cfg(not(test))]
-static HISTORY: std::sync::Mutex<Histories> = std::sync::Mutex::new(Histories { undo: Vec::new(), redo: Vec::new() });
+static HISTORY: std::sync::Mutex<Histories> = std::sync::Mutex::new(Histories {
+    undo: Vec::new(),
+    redo: Vec::new(),
+});
 const UNDO_DEPTH: usize = 30;
 
 #[cfg(not(test))]
@@ -2482,7 +2671,16 @@ fn file_replayed(batch: Undo, back: bool) {
     if batch.is_empty() {
         return;
     }
-    with_history(|history| push_capped(if back { &mut history.redo } else { &mut history.undo }, batch));
+    with_history(|history| {
+        push_capped(
+            if back {
+                &mut history.redo
+            } else {
+                &mut history.undo
+            },
+            batch,
+        )
+    });
 }
 
 // A rename of the folder just made by "Nova pasta" is part of making it:
@@ -2511,13 +2709,14 @@ fn same_place(a: &Path, b: &Path) -> bool {
 fn restore_batch(batch: Vec<PathBuf>) -> (OpReport, Vec<PathBuf>) {
     let mut report = OpReport::default();
     let mut restored = Vec::new();
-    let mut store = match nohrs_services::fs::trash::default_store(nohrs_services::fs::trash::open_ledger) {
-        Ok(store) => store,
-        Err(error) => {
-            report.failed(error.to_string());
-            return (report, restored);
-        }
-    };
+    let mut store =
+        match nohrs_services::fs::trash::default_store(nohrs_services::fs::trash::open_ledger) {
+            Ok(store) => store,
+            Err(error) => {
+                report.failed(error.to_string());
+                return (report, restored);
+            }
+        };
     let items = match store.list() {
         Ok(items) => items,
         Err(error) => {
@@ -2533,13 +2732,14 @@ fn restore_batch(batch: Vec<PathBuf>) -> (OpReport, Vec<PathBuf>) {
             .filter(|item| same_place(&item.original_path, path))
             .max_by_key(|item| item.deleted_at_unix);
         match item {
-            Some(item) => {
-                match store.restore(item) {
-                    Ok(()) => restored.push(path.clone()),
-                    Err(error) => report.failed(format!("{}: {error}", path.display())),
-                }
-            }
-            None => report.failed(tf!("{path}: não está mais na Lixeira", path = path.display())),
+            Some(item) => match store.restore(item) {
+                Ok(()) => restored.push(path.clone()),
+                Err(error) => report.failed(format!("{}: {error}", path.display())),
+            },
+            None => report.failed(tf!(
+                "{path}: não está mais na Lixeira",
+                path = path.display()
+            )),
         }
     }
     (report, restored)

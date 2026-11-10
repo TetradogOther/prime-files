@@ -59,7 +59,10 @@ struct Entry {
 impl Volume {
     /// A volume whose first entry, the root, is named `root`.
     pub fn new(root: &str) -> Self {
-        let mut volume = Self { root: root.to_string(), ..Self::default() };
+        let mut volume = Self {
+            root: root.to_string(),
+            ..Self::default()
+        };
         volume.push(NO_PARENT, root, true, 0, 0);
         volume
     }
@@ -114,7 +117,10 @@ pub fn write(out: &mut impl Write, volumes: &[Volume]) -> io::Result<()> {
         out.write_all(volume.root.as_bytes())?;
         out.write_all(&(volume.entries.len() as u64).to_le_bytes())?;
         for entry in &volume.entries {
-            let name = volume.names.get(entry.start as usize..entry.start as usize + entry.len as usize).unwrap_or("");
+            let name = volume
+                .names
+                .get(entry.start as usize..entry.start as usize + entry.len as usize)
+                .unwrap_or("");
             out.write_all(&entry.parent.to_le_bytes())?;
             out.write_all(&entry.size.to_le_bytes())?;
             out.write_all(&entry.modified.to_le_bytes())?;
@@ -136,7 +142,10 @@ pub fn write_error(out: &mut impl Write, message: &str) -> io::Result<()> {
 }
 
 fn invalid(what: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, format!("indexer snapshot: {what}"))
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("indexer snapshot: {what}"),
+    )
 }
 
 fn read_array<const N: usize>(input: &mut impl Read) -> io::Result<[u8; N]> {
@@ -159,14 +168,18 @@ pub fn read(input: &mut impl Read, sink: &mut impl Sink) -> io::Result<()> {
         let length = u16::from_le_bytes(read_array(input)?) as usize;
         let mut message = Vec::new();
         read_text(input, length, &mut message)?;
-        return Err(io::Error::other(String::from_utf8_lossy(&message).into_owned()));
+        return Err(io::Error::other(
+            String::from_utf8_lossy(&message).into_owned(),
+        ));
     }
     if &magic != MAGIC {
         return Err(invalid("not a snapshot"));
     }
     let version = u32::from_le_bytes(read_array(input)?);
     if version != VERSION {
-        return Err(invalid(&format!("version {version}, this app reads {VERSION}")));
+        return Err(invalid(&format!(
+            "version {version}, this app reads {VERSION}"
+        )));
     }
     let volumes = u32::from_le_bytes(read_array(input)?);
     if volumes > 64 {
@@ -176,7 +189,9 @@ pub fn read(input: &mut impl Read, sink: &mut impl Sink) -> io::Result<()> {
     for _ in 0..volumes {
         let length = u16::from_le_bytes(read_array(input)?) as usize;
         read_text(input, length, &mut buffer)?;
-        let root = std::str::from_utf8(&buffer).map_err(|_| invalid("root is not UTF-8"))?.to_string();
+        let root = std::str::from_utf8(&buffer)
+            .map_err(|_| invalid("root is not UTF-8"))?
+            .to_string();
         sink.volume(&root);
         let count = u64::from_le_bytes(read_array(input)?);
         if count > MOST_ENTRIES {
@@ -191,7 +206,11 @@ pub fn read(input: &mut impl Read, sink: &mut impl Sink) -> io::Result<()> {
             if length > LONGEST_NAME {
                 return Err(invalid("name too long"));
             }
-            let in_order = if index == 0 { parent == NO_PARENT } else { u64::from(parent) < index };
+            let in_order = if index == 0 {
+                parent == NO_PARENT
+            } else {
+                u64::from(parent) < index
+            };
             if !in_order {
                 return Err(invalid("entry before its parent"));
             }
@@ -216,7 +235,8 @@ mod tests {
             self.0.push(format!("volume {root}"));
         }
         fn entry(&mut self, parent: u32, name: &str, dir: bool, size: u64, modified: u32) {
-            self.0.push(format!("{parent} {name} {dir} {size} {modified}"));
+            self.0
+                .push(format!("{parent} {name} {dir} {size} {modified}"));
         }
     }
 

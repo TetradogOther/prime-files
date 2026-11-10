@@ -480,7 +480,11 @@ impl crate::pane_group::PaneItem for ExplorerPane {
         if self.compact != *settings {
             self.compact = settings.clone();
         }
-        if !self.top_reveal.as_ref().is_some_and(|mine| std::rc::Rc::ptr_eq(mine, top)) {
+        if !self
+            .top_reveal
+            .as_ref()
+            .is_some_and(|mine| std::rc::Rc::ptr_eq(mine, top))
+        {
             self.top_reveal = Some(top.clone());
         }
     }
@@ -1197,7 +1201,12 @@ impl ExplorerPane {
                 .collect();
         }
 
-        entries::sort_entries_with(&mut self.filtered_entries, self.sort_key, self.sort_asc, self.folder_order);
+        entries::sort_entries_with(
+            &mut self.filtered_entries,
+            self.sort_key,
+            self.sort_asc,
+            self.folder_order,
+        );
         if self.view_mode == ViewMode::Tree {
             // Groups would pull a folder's children away from it.
             self.group_runs.clear();

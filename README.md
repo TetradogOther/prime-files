@@ -56,11 +56,12 @@ Dependências de execução: `libxkbcommon0`, `libwayland-client0`, `libwayland-
 
 No Linux ainda não existem estas partes, que são do Windows:
 
-- o menu do botão direito do Explorador;
+- o menu do botão direito do Explorador (no Linux o menu oferece os programas que o ambiente gráfico registra para aquele tipo de arquivo);
 - o índice NTFS no estilo do Everything (a busca varre as pastas, em vez de ler o índice do disco);
 - o plugin do Listary;
-- as miniaturas do Shell do Windows (o visualizador abre as imagens ele mesmo, mas não há o cache de miniaturas do Windows);
-- a atualização automática dentro do programa (o instalador do Windows é quem se atualiza; no Linux a versão vem pelo pacote).
+- as miniaturas do Shell do Windows (no Linux o visualizador usa o cache de miniaturas do freedesktop e o tema de ícones do ambiente gráfico);
+- a atualização automática dentro do programa (o instalador do Windows é quem se atualiza; no Linux a versão vem pelo pacote);
+- o atalho global de busca disparado por Ctrl duas vezes (o atalho gravado pelo usuário funciona pelo X11).
 
 O resto funciona igual: abas, divisão em dois painéis, visualizador, terminal embutido, busca, atalhos e o modo compacto. Registrar o Prime Files como o programa que abre pastas também funciona, do jeito do desktop (pelo `mimeapps.list`).
 
@@ -76,7 +77,7 @@ Mais detalhes em [`docs/build-and-display-linux.md`](docs/build-and-display-linu
 - **Ouvir sons passando o mouse** sobre arquivos de áudio, com o tempo de espera ajustável
 - **Armazenamento** de cada unidade em Este Computador e na barra lateral
 - **Terminal** embutido com abas (Ctrl+')
-- **Nove idiomas**: português, inglês, espanhol, francês, alemão, italiano, russo, japonês e chinês simplificado
+- **Doze idiomas**: português, inglês, espanhol, catalão, francês, alemão, italiano, húngaro, russo, japonês, árabe e chinês simplificado
 - **Modo compacto** no estilo do Zen Browser: abas, barra de rota, barra lateral, visualizador e barra de baixo escondidos até o mouse encostar na borda, por cima da lista ou empurrando-a, numa moldura de cantos arredondados
 - **Explorador padrão** do Windows, opcional (Configurações › Integração com o Windows): pastas, drives e Win+E abrem no Prime Files
 - **Listary**, opcional (Configurações › Integração com o Windows): pastas abertas pelo Listary abrem no Prime Files; o desinstalador devolve ao Explorador

@@ -70,7 +70,9 @@ pub fn logging_ready() {
 
 fn write(stage: &str, elapsed: Option<f64>) {
     match elapsed {
-        Some(ms) => tracing::info!(target: "nohrs::startup", stage, ms = format!("{ms:.1}"), "startup"),
+        Some(ms) => {
+            tracing::info!(target: "nohrs::startup", stage, ms = format!("{ms:.1}"), "startup")
+        }
         None => tracing::info!(target: "nohrs::startup", stage, "startup (no process time)"),
     }
 }
@@ -81,22 +83,52 @@ fn since_process_start() -> Option<f64> {
     use windows::Win32::Foundation::FILETIME;
     use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
 
-    let (mut created, mut exited, mut kernel, mut user) =
-        (FILETIME::default(), FILETIME::default(), FILETIME::default(), FILETIME::default());
+    let (mut created, mut exited, mut kernel, mut user) = (
+        FILETIME::default(),
+        FILETIME::default(),
+        FILETIME::default(),
+        FILETIME::default(),
+    );
     // SAFETY: the pseudo-handle of this process and four out parameters.
-    unsafe { GetProcessTimes(GetCurrentProcess(), &mut created, &mut exited, &mut kernel, &mut user) }.ok()?;
+    unsafe {
+        GetProcessTimes(
+            GetCurrentProcess(),
+            &mut created,
+            &mut exited,
+            &mut kernel,
+            &mut user,
+        )
+    }
+    .ok()?;
     let created = (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime);
     // FILETIME counts 100 ns from 1601; `SystemTime` on Windows reads the same
     // precise clock, from 1970.
     const FROM_1601_TO_1970: u64 = 116_444_736_000_000_000;
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?;
-    let now = u64::try_from(now.as_nanos() / 100).ok()?.checked_add(FROM_1601_TO_1970)?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?;
+    let now = u64::try_from(now.as_nanos() / 100)
+        .ok()?
+        .checked_add(FROM_1601_TO_1970)?;
     Some(now.checked_sub(created)? as f64 / 10_000.0)
 }
 
 #[cfg(not(windows))]
 fn since_process_start() -> Option<f64> {
-    None
+    // The kernel writes the moment the process began in `/proc/self/stat`,
+    // in clock ticks since the machine booted; `/proc/uptime` says how long
+    // it has been up.
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    // The command may hold spaces and parentheses: the fields after the
+    // closing parenthesis are the ones the kernel writes.
+    let fields = stat.rsplit_once(')')?.1;
+    let starttime = fields.split_whitespace().nth(19)?;
+    let ticks: f64 = starttime.parse().ok()?;
+    let uptime = std::fs::read_to_string("/proc/uptime").ok()?;
+    let seconds: f64 = uptime.split_whitespace().next()?.parse().ok()?;
+    // The clock of the kernel counts in a hundredth of a second.
+    let elapsed = seconds - ticks / 100.0;
+    (elapsed > 0.0).then_some(elapsed * 1000.0)
 }
 
 #[cfg(test)]

@@ -124,7 +124,7 @@ impl Default for Theme {
 pub struct Ui {
     /// Interface language: `"auto"` follows the Windows regional format
     /// (then the country), or one of `"pt-BR"`, `"en"`, `"es"`, `"fr"`, `"de"`,
-    /// `"it"`, `"ru"`, `"ja"`, `"zh-CN"`, `"ar"`, `"hu"`.
+    /// `"it"`, `"ca"`, `"ru"`, `"ja"`, `"zh-CN"`, `"ar"`, `"hu"`.
     pub language: String,
     /// Column the listing is sorted by on load.
     pub default_sort: SortOrder,
@@ -261,11 +261,34 @@ pub struct Menu {
 /// The icons the menu's row can hold, in the order of a fresh config.
 pub const MENU_QUICK_DEFAULT: &[&str] = &["cut", "copy", "copy_path", "rename", "delete"];
 /// The menu's entries, in the order of a fresh config.
-pub const MENU_ITEMS_DEFAULT: &[&str] = &["new_tab", "windows", "copy_path", "tags", "more_options", "customize"];
+pub const MENU_ITEMS_DEFAULT: &[&str] = &[
+    "new_tab",
+    "windows",
+    "copy_path",
+    "tags",
+    "more_options",
+    "customize",
+];
 /// Every id `quick` may hold.
-pub const MENU_QUICK_ALL: &[&str] = &["cut", "copy", "copy_path", "rename", "delete", "new_tab", "properties"];
+pub const MENU_QUICK_ALL: &[&str] = &[
+    "cut",
+    "copy",
+    "copy_path",
+    "rename",
+    "delete",
+    "new_tab",
+    "properties",
+];
 /// Every id `items` may hold.
-pub const MENU_ITEMS_ALL: &[&str] = &["new_tab", "windows", "copy_path", "tags", "more_options", "customize", "properties"];
+pub const MENU_ITEMS_ALL: &[&str] = &[
+    "new_tab",
+    "windows",
+    "copy_path",
+    "tags",
+    "more_options",
+    "customize",
+    "properties",
+];
 
 impl Default for Menu {
     fn default() -> Self {
@@ -940,7 +963,7 @@ impl Config {
              accent = \"orange\"   # \"orange\" | \"blue\" | \"teal\" | \"green\" | \"purple\" | \"pink\" | \"red\" | hex\n\
              \n\
              [ui]\n\
-             language = \"auto\"   # \"auto\" (Windows region) | \"pt-BR\" | \"en\" | \"es\" | \"fr\" | \"de\" | \"it\" | \"ru\" | \"ja\" | \"zh-CN\" | \"ar\" | \"hu\"\n\
+             language = \"auto\"   # \"auto\" (Windows region) | \"pt-BR\" | \"en\" | \"es\" | \"ca\" | \"fr\" | \"de\" | \"it\" | \"ru\" | \"ja\" | \"zh-CN\" | \"ar\" | \"hu\"\n\
              default_sort =\"name\"   # \"name\" | \"modified\" | \"size\" | \"kind\"\n\
              default_sort_descending = false  # true = Z to A, largest or newest first\n\
              show_hidden = false\n\
@@ -1030,8 +1053,12 @@ fn read_theme(table: &toml::Table, theme: &mut Theme, diagnostics: &mut Vec<Diag
 fn read_ui(table: &toml::Table, ui: &mut Ui, diagnostics: &mut Vec<Diagnostic>) {
     if let Some(value) = table.get("language") {
         match value.as_str().map(str::trim) {
-            Some(language) if language.eq_ignore_ascii_case("auto") => ui.language = "auto".to_string(),
-            Some(language) if crate::i18n::Lang::parse(language).is_some() => ui.language = language.to_string(),
+            Some(language) if language.eq_ignore_ascii_case("auto") => {
+                ui.language = "auto".to_string()
+            }
+            Some(language) if crate::i18n::Lang::parse(language).is_some() => {
+                ui.language = language.to_string()
+            }
             _ => diagnostics.push(Diagnostic::warn(format!(
                 "invalid ui.language {value}; using {:?}",
                 ui.language
@@ -1075,7 +1102,11 @@ fn read_ui(table: &toml::Table, ui: &mut Ui, diagnostics: &mut Vec<Diagnostic>) 
         }
     }
     if let Some(value) = table.get("name_lines") {
-        match value.as_integer().and_then(|lines| u32::try_from(lines).ok()).filter(|&lines| lines <= 20) {
+        match value
+            .as_integer()
+            .and_then(|lines| u32::try_from(lines).ok())
+            .filter(|&lines| lines <= 20)
+        {
             Some(lines) => ui.name_lines = lines,
             None => diagnostics.push(Diagnostic::warn(format!(
                 "invalid ui.name_lines {value}; using {}",
@@ -1084,7 +1115,11 @@ fn read_ui(table: &toml::Table, ui: &mut Ui, diagnostics: &mut Vec<Diagnostic>) 
         }
     }
     if let Some(value) = table.get("scroll_smoothness") {
-        match value.as_integer().and_then(|v| u32::try_from(v).ok()).filter(|&v| v <= 100) {
+        match value
+            .as_integer()
+            .and_then(|v| u32::try_from(v).ok())
+            .filter(|&v| v <= 100)
+        {
             Some(smoothness) => ui.scroll_smoothness = smoothness,
             None => diagnostics.push(Diagnostic::warn(format!(
                 "invalid ui.scroll_smoothness {value}; using {}",
@@ -1129,7 +1164,11 @@ fn read_ui(table: &toml::Table, ui: &mut Ui, diagnostics: &mut Vec<Diagnostic>) 
         }
     }
     if let Some(value) = table.get("hover_audio_delay_ms") {
-        match value.as_integer().and_then(|delay| u32::try_from(delay).ok()).filter(|&delay| delay <= 10_000) {
+        match value
+            .as_integer()
+            .and_then(|delay| u32::try_from(delay).ok())
+            .filter(|&delay| delay <= 10_000)
+        {
             Some(delay) => ui.hover_audio_delay_ms = delay,
             None => diagnostics.push(Diagnostic::warn(format!(
                 "invalid ui.hover_audio_delay_ms {value}; using {}",
@@ -1229,23 +1268,42 @@ fn read_explorer(table: &toml::Table, explorer: &mut Explorer, diagnostics: &mut
 }
 
 fn read_menu(table: &toml::Table, menu: &mut Menu, diagnostics: &mut Vec<Diagnostic>) {
-    for (key, slot) in [("quick", &mut menu.quick), ("items", &mut menu.items), ("hidden", &mut menu.hidden)] {
-        let Some(value) = table.get(key) else { continue };
-        let strings: Option<Vec<String>> = value
-            .as_array()
-            .and_then(|array| array.iter().map(|item| item.as_str().map(str::to_string)).collect());
+    for (key, slot) in [
+        ("quick", &mut menu.quick),
+        ("items", &mut menu.items),
+        ("hidden", &mut menu.hidden),
+    ] {
+        let Some(value) = table.get(key) else {
+            continue;
+        };
+        let strings: Option<Vec<String>> = value.as_array().and_then(|array| {
+            array
+                .iter()
+                .map(|item| item.as_str().map(str::to_string))
+                .collect()
+        });
         match strings {
             Some(strings) => *slot = strings,
-            None => diagnostics.push(Diagnostic::warn(format!("invalid menu.{key} {value}; expected a list of strings"))),
+            None => diagnostics.push(Diagnostic::warn(format!(
+                "invalid menu.{key} {value}; expected a list of strings"
+            ))),
         }
     }
     if let Some(value) = table.get("classic") {
         match value.as_bool() {
             Some(flag) => menu.classic = flag,
-            None => diagnostics.push(Diagnostic::warn(format!("invalid menu.classic {value}; using {}", menu.classic))),
+            None => diagnostics.push(Diagnostic::warn(format!(
+                "invalid menu.classic {value}; using {}",
+                menu.classic
+            ))),
         }
     }
-    warn_unknown_keys(table, &["quick", "items", "hidden", "classic"], "menu.", diagnostics);
+    warn_unknown_keys(
+        table,
+        &["quick", "items", "hidden", "classic"],
+        "menu.",
+        diagnostics,
+    );
 }
 
 fn read_updates(table: &toml::Table, updates: &mut Updates, diagnostics: &mut Vec<Diagnostic>) {
@@ -1281,7 +1339,11 @@ fn read_compact(table: &toml::Table, compact: &mut Compact, diagnostics: &mut Ve
     read_bool("overlay", &mut compact.overlay);
     let mut read_number = |key: &str, max: u32, slot: &mut u32| {
         if let Some(value) = table.get(key) {
-            match value.as_integer().and_then(|v| u32::try_from(v).ok()).filter(|&v| v <= max) {
+            match value
+                .as_integer()
+                .and_then(|v| u32::try_from(v).ok())
+                .filter(|&v| v <= max)
+            {
                 Some(number) => *slot = number,
                 None => diagnostics.push(Diagnostic::warn(format!(
                     "invalid compact.{key} {value} (0..={max}); using {slot}"
@@ -1339,13 +1401,22 @@ fn read_layout(table: &toml::Table, layout: &mut Layout, diagnostics: &mut Vec<D
         if let Some(value) = table.get(key) {
             match value.as_bool() {
                 Some(flag) => *slot = flag,
-                None => diagnostics.push(Diagnostic::warn(format!("invalid layout.{key} {value}; using {slot}"))),
+                None => diagnostics.push(Diagnostic::warn(format!(
+                    "invalid layout.{key} {value}; using {slot}"
+                ))),
             }
         }
     }
     warn_unknown_keys(
         table,
-        &["sidebar", "preview", "terminal", "vertical_tabs", "move_grips", "sidebar_tags"],
+        &[
+            "sidebar",
+            "preview",
+            "terminal",
+            "vertical_tabs",
+            "move_grips",
+            "sidebar_tags",
+        ],
         "layout.",
         diagnostics,
     );
@@ -2005,8 +2076,15 @@ mod tests {
             background_tabs = false
         "#;
         let (config, diagnostics) = Config::from_toml_str(toml);
-        assert_eq!(config.menu.quick, vec!["copy_path".to_string(), "delete".to_string()]);
-        assert_eq!(config.menu.items, Menu::default().items, "a string is not a list");
+        assert_eq!(
+            config.menu.quick,
+            vec!["copy_path".to_string(), "delete".to_string()]
+        );
+        assert_eq!(
+            config.menu.items,
+            Menu::default().items,
+            "a string is not a list"
+        );
         assert_eq!(config.menu.hidden, vec!["Enviar para".to_string()]);
         assert!(!config.explorer.background_tabs);
         assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
@@ -2039,7 +2117,10 @@ mod tests {
         assert!(!config.compact.overlay);
         assert_eq!(config.compact.animation_ms, 90);
         assert_eq!(config.compact.edge_px, Compact::default().edge_px);
-        assert_eq!(config.compact.hide_delay_ms, Compact::default().hide_delay_ms);
+        assert_eq!(
+            config.compact.hide_delay_ms,
+            Compact::default().hide_delay_ms
+        );
         assert_eq!(diagnostics.len(), 2);
     }
 

@@ -224,7 +224,9 @@ impl Thumbnails {
                 let Some(slots) = self.entries.get_mut(&path) else {
                     continue;
                 };
-                if let Some(at) = slots.iter().position(|slot| slot.kind == kind && slot.size == size)
+                if let Some(at) = slots
+                    .iter()
+                    .position(|slot| slot.kind == kind && slot.size == size)
                     && let Entry::Ready(image) = slots.swap_remove(at).entry
                 {
                     self.ready_bytes -= image_bytes(&image);
@@ -275,7 +277,14 @@ impl Thumbnails {
         size: u32,
         cx: &mut Context<ExplorerPane>,
     ) -> Option<Arc<RenderImage>> {
-        self.fetch(path, Kind::Thumbnail, false, size, |pane| &mut pane.thumbnails, cx)
+        self.fetch(
+            path,
+            Kind::Thumbnail,
+            false,
+            size,
+            |pane| &mut pane.thumbnails,
+            cx,
+        )
     }
 
     /// The Shell's picture of `path` fitted in `size` pixels, for the
@@ -288,11 +297,11 @@ impl Thumbnails {
 
     // What `picture` answers, given what `get` handed over.
     fn picture_of(&self, path: &str, size: u32, held: Option<Arc<RenderImage>>) -> Picture {
-        let Some(slot) = self
-            .entries
-            .get(path)
-            .and_then(|slots| slots.iter().find(|slot| slot.kind == Kind::Thumbnail && slot.size == size))
-        else {
+        let Some(slot) = self.entries.get(path).and_then(|slots| {
+            slots
+                .iter()
+                .find(|slot| slot.kind == Kind::Thumbnail && slot.size == size)
+        }) else {
             return Picture::Waiting(held);
         };
         match &slot.entry {
@@ -316,7 +325,14 @@ impl Thumbnails {
         size: u32,
         cx: &mut Context<ExplorerPane>,
     ) -> Option<Arc<RenderImage>> {
-        self.fetch(path, Kind::Icon, is_dir, size, |pane| &mut pane.thumbnails, cx)
+        self.fetch(
+            path,
+            Kind::Icon,
+            is_dir,
+            size,
+            |pane| &mut pane.thumbnails,
+            cx,
+        )
     }
 
     /// Like [`Self::icon`], for a cache held elsewhere in the pane: `slot`
@@ -370,7 +386,10 @@ impl Thumbnails {
             self.entries.insert(path.to_string(), Vec::new());
         }
         let slots = self.entries.get_mut(path)?;
-        match slots.iter_mut().find(|slot| slot.kind == kind && slot.size == size) {
+        match slots
+            .iter_mut()
+            .find(|slot| slot.kind == kind && slot.size == size)
+        {
             Some(slot) => {
                 slot.last_seen = frame;
                 if slot.retry_at.is_some_and(|at| Instant::now() >= at) {
@@ -388,7 +407,9 @@ impl Thumbnails {
                 match &slot.entry {
                     Entry::Ready(image) => return Some(image.clone()),
                     Entry::Failed => return None,
-                    Entry::Loading { shown: Some(image), .. } => return Some(image.clone()),
+                    Entry::Loading {
+                        shown: Some(image), ..
+                    } => return Some(image.clone()),
                     Entry::Loading { shown: None, .. } => {}
                 }
             }
@@ -411,7 +432,9 @@ impl Thumbnails {
         }
         slots
             .iter_mut()
-            .filter(|slot| slot.kind == kind && slot.size < size && matches!(slot.entry, Entry::Ready(_)))
+            .filter(|slot| {
+                slot.kind == kind && slot.size < size && matches!(slot.entry, Entry::Ready(_))
+            })
             .max_by_key(|slot| slot.size)
             .and_then(|slot| {
                 slot.last_seen = frame;
@@ -425,11 +448,11 @@ impl Thumbnails {
     fn arrived(&mut self, path: &str, kind: Kind, size: u32, answer: Answer, cx: &mut App) {
         // A reply for a slot no longer held belongs to a directory that was
         // left, or a tile that scrolled away, while it was in flight.
-        let Some(slot) = self
-            .entries
-            .get_mut(path)
-            .and_then(|slots| slots.iter_mut().find(|slot| slot.kind == kind && slot.size == size))
-        else {
+        let Some(slot) = self.entries.get_mut(path).and_then(|slots| {
+            slots
+                .iter_mut()
+                .find(|slot| slot.kind == kind && slot.size == size)
+        }) else {
             return;
         };
         let shown = match std::mem::replace(&mut slot.entry, Entry::Failed) {
@@ -445,7 +468,10 @@ impl Thumbnails {
         if kind == Kind::Thumbnail {
             if let Some(shown) = &shown {
                 self.ready_bytes -= image_bytes(shown);
-                if image.as_ref().is_none_or(|image| !Arc::ptr_eq(image, shown)) {
+                if image
+                    .as_ref()
+                    .is_none_or(|image| !Arc::ptr_eq(image, shown))
+                {
                     cx.drop_image(shown.clone(), None);
                 }
             }
@@ -631,7 +657,11 @@ impl Service {
         if !per_class {
             return None;
         }
-        self.class_icons.lock().ok()?.get(&(class.to_owned(), size)).cloned()
+        self.class_icons
+            .lock()
+            .ok()?
+            .get(&(class.to_owned(), size))
+            .cloned()
     }
 
     fn remember_class_icon(&self, class: &str, size: u32, image: &Arc<RenderImage>) {
@@ -763,9 +793,10 @@ mod tests {
                 cache.loading += 1;
             }
             // Icons are shared by a whole extension and tiny: never evicted.
-            cache
-                .entries
-                .insert("icon".into(), vec![slot(Kind::Icon, 16, Entry::Ready(image(16)), 0)]);
+            cache.entries.insert(
+                "icon".into(),
+                vec![slot(Kind::Icon, 16, Entry::Ready(image(16)), 0)],
+            );
 
             cache.begin_frame(cx);
 
@@ -846,24 +877,54 @@ mod tests {
     fn a_stand_in_is_asked_for_again_and_the_picture_replaces_it(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             let mut cache = Thumbnails::default();
-            cache.entries.insert("v.mp4".into(), vec![slot(Kind::Thumbnail, 64, loading(), 0)]);
+            cache.entries.insert(
+                "v.mp4".into(),
+                vec![slot(Kind::Thumbnail, 64, loading(), 0)],
+            );
             cache.loading = 1;
 
             let cone = image(64);
-            cache.arrived("v.mp4", Kind::Thumbnail, 64, Answer { image: Some(cone.clone()), settled: false }, cx);
+            cache.arrived(
+                "v.mp4",
+                Kind::Thumbnail,
+                64,
+                Answer {
+                    image: Some(cone.clone()),
+                    settled: false,
+                },
+                cx,
+            );
             let held = &cache.entries["v.mp4"][0];
             assert!(matches!(&held.entry, Entry::Ready(shown) if Arc::ptr_eq(shown, &cone)));
-            assert!(held.retry_at.is_some(), "a stand-in must be asked for again");
-            assert_eq!((held.retries, cache.loading, cache.ready_bytes), (1, 0, 64 * 64 * 4));
+            assert!(
+                held.retry_at.is_some(),
+                "a stand-in must be asked for again"
+            );
+            assert_eq!(
+                (held.retries, cache.loading, cache.ready_bytes),
+                (1, 0, 64 * 64 * 4)
+            );
 
             // Asked again: the cone stays on screen meanwhile.
             let slot = &mut cache.entries.get_mut("v.mp4").unwrap()[0];
             slot.retry_at = None;
-            slot.entry = Entry::Loading { task: Task::ready(()), shown: Some(cone.clone()) };
+            slot.entry = Entry::Loading {
+                task: Task::ready(()),
+                shown: Some(cone.clone()),
+            };
             cache.loading = 1;
 
             let frame = image(64);
-            cache.arrived("v.mp4", Kind::Thumbnail, 64, Answer { image: Some(frame.clone()), settled: true }, cx);
+            cache.arrived(
+                "v.mp4",
+                Kind::Thumbnail,
+                64,
+                Answer {
+                    image: Some(frame.clone()),
+                    settled: true,
+                },
+                cx,
+            );
             let held = &cache.entries["v.mp4"][0];
             assert!(matches!(&held.entry, Entry::Ready(shown) if Arc::ptr_eq(shown, &frame)));
             assert!(held.retry_at.is_none(), "the real picture is final");
@@ -875,7 +936,16 @@ mod tests {
             slot.entry = loading();
             cache.loading = 1;
             cache.ready_bytes = 0;
-            cache.arrived("v.mp4", Kind::Thumbnail, 64, Answer { image: Some(cone), settled: false }, cx);
+            cache.arrived(
+                "v.mp4",
+                Kind::Thumbnail,
+                64,
+                Answer {
+                    image: Some(cone),
+                    settled: false,
+                },
+                cx,
+            );
             assert!(cache.entries["v.mp4"][0].retry_at.is_none());
             assert_eq!(retry_delay(0), QUICK_RETRY);
             assert_eq!(retry_delay(1), FIRST_RETRY);
@@ -903,7 +973,11 @@ mod tests {
             let pixels = |image: Option<RenderImage>| {
                 image.map(|image| {
                     let size = image.size(0);
-                    (size.width.0, size.height.0, image.as_bytes(0).map(<[u8]>::to_vec).unwrap_or_default())
+                    (
+                        size.width.0,
+                        size.height.0,
+                        image.as_bytes(0).map(<[u8]>::to_vec).unwrap_or_default(),
+                    )
                 })
             };
             let icon = pixels(platform::extract(path, 256, Mode::Icon));
@@ -912,7 +986,9 @@ mod tests {
                 let is_icon = answer.is_some() && answer == icon;
                 println!(
                     "{path} {mode:?}: {} is_icon={is_icon}",
-                    answer.as_ref().map_or("none".to_string(), |(w, h, _)| format!("{w}x{h}"))
+                    answer
+                        .as_ref()
+                        .map_or("none".to_string(), |(w, h, _)| format!("{w}x{h}"))
                 );
             }
         }
@@ -940,7 +1016,8 @@ mod tests {
     fn the_thumbnail_cache_is_looked_up_by_the_md5_of_the_file_uri() {
         let cache = temp_folder();
         let normal = cache.path().join("thumbnails/normal");
-        std::fs::create_dir_all(&normal).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        std::fs::create_dir_all(&normal)
+            .unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
         let path = "/tmp/a picture.png";
         let name = platform::md5_hex(b"file:///tmp/a%20picture.png");
         image::RgbaImage::new(128, 96)
@@ -961,7 +1038,8 @@ mod tests {
     fn the_thumbnail_cache_is_looked_up_by_the_md5_of_the_path_too() {
         let cache = temp_folder();
         let normal = cache.path().join("thumbnails/normal");
-        std::fs::create_dir_all(&normal).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        std::fs::create_dir_all(&normal)
+            .unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
         let path = "/tmp/a picture.png";
         let name = platform::md5_hex(path.as_bytes());
         image::RgbaImage::new(128, 96)
@@ -984,8 +1062,10 @@ mod tests {
         let thumbnails = cache.path().join("thumbnails");
         let normal = thumbnails.join("normal");
         let large = thumbnails.join("large");
-        std::fs::create_dir_all(&normal).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
-        std::fs::create_dir_all(&large).unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        std::fs::create_dir_all(&normal)
+            .unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
+        std::fs::create_dir_all(&large)
+            .unwrap_or_else(|error| panic!("the folder of the cache: {error}"));
         let path = "/tmp/a picture.png";
         let name = platform::md5_hex(path.as_bytes());
         image::RgbaImage::new(128, 128)
@@ -1007,7 +1087,11 @@ mod tests {
     #[test]
     fn a_file_the_cache_does_not_have_has_no_picture() {
         let cache = temp_folder();
-        let found = platform::cached_thumbnail_in(&cache.path().join("thumbnails"), "/tmp/a picture.png", 128);
+        let found = platform::cached_thumbnail_in(
+            &cache.path().join("thumbnails"),
+            "/tmp/a picture.png",
+            128,
+        );
         assert!(found.is_none());
     }
 
@@ -1016,7 +1100,10 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn the_name_of_a_picture_in_the_cache_is_the_md5_of_the_uri() {
-        assert_eq!(platform::md5_hex(b"file:///tmp/a.png"), "a04bfd79b77efaccf5f6adb271b86f1e");
+        assert_eq!(
+            platform::md5_hex(b"file:///tmp/a.png"),
+            "a04bfd79b77efaccf5f6adb271b86f1e"
+        );
         assert_eq!(platform::md5_hex(b""), "d41d8cd98f00b204e9800998ecf8427e");
     }
 
@@ -1078,21 +1165,25 @@ mod platform {
     //! COM and GDI have no safe bindings, and the alternative — decoding every
     //! format ourselves — would still leave video frames and program icons out.
 
+    use super::Mode;
     use gpui::RenderImage;
+    use windows::Win32::Foundation::ERROR_SUCCESS;
     use windows::Win32::Foundation::SIZE;
     use windows::Win32::Graphics::Gdi::{
         BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC,
         DeleteObject, GetDIBits, GetObjectW, HBITMAP, HGDIOBJ,
     };
     use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
+    use windows::Win32::System::Registry::{
+        HKEY, HKEY_CLASSES_ROOT, KEY_READ, RegCloseKey, RegOpenKeyExW,
+    };
+    use windows::Win32::UI::Shell::{
+        ASSOCF_NOTRUNCATE, ASSOCSTR, ASSOCSTR_DEFAULTICON, ASSOCSTR_PROGID, AssocQueryStringW,
+    };
     use windows::Win32::UI::Shell::{
         IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_ICONONLY, SIIGBF_INCACHEONLY,
         SIIGBF_RESIZETOFIT, SIIGBF_THUMBNAILONLY,
     };
-    use super::Mode;
-    use windows::Win32::Foundation::ERROR_SUCCESS;
-    use windows::Win32::System::Registry::{HKEY, HKEY_CLASSES_ROOT, KEY_READ, RegCloseKey, RegOpenKeyExW};
-    use windows::Win32::UI::Shell::{ASSOCF_NOTRUNCATE, ASSOCSTR, ASSOCSTR_DEFAULTICON, ASSOCSTR_PROGID, AssocQueryStringW};
     use windows::core::{HSTRING, PCWSTR, PWSTR};
 
     pub fn init_thread() {
@@ -1146,8 +1237,19 @@ mod platform {
     /// does get one, the generic icon every such file shows.)
     pub fn icon_is_per_class(extension: &str) -> bool {
         const PER_FILE: [&str; 13] = [
-            "exe", "lnk", "url", "ico", "cur", "ani", "scr", "cpl", "msc", "appref-ms",
-            "website", "library-ms", "search-ms",
+            "exe",
+            "lnk",
+            "url",
+            "ico",
+            "cur",
+            "ani",
+            "scr",
+            "cpl",
+            "msc",
+            "appref-ms",
+            "website",
+            "library-ms",
+            "search-ms",
         ];
         if PER_FILE.contains(&extension) {
             return false;
@@ -1184,14 +1286,23 @@ mod platform {
         }
         .ok()
         .ok()?;
-        let end = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+        let end = buffer
+            .iter()
+            .position(|&unit| unit == 0)
+            .unwrap_or(buffer.len());
         Some(String::from_utf16_lossy(&buffer[..end]))
     }
 
     fn key_exists(subkey: &str) -> bool {
         let mut key = HKEY::default();
         let opened = unsafe {
-            RegOpenKeyExW(HKEY_CLASSES_ROOT, &HSTRING::from(subkey), None, KEY_READ, &mut key)
+            RegOpenKeyExW(
+                HKEY_CLASSES_ROOT,
+                &HSTRING::from(subkey),
+                None,
+                KEY_READ,
+                &mut key,
+            )
         };
         if opened != ERROR_SUCCESS {
             return false;
@@ -1388,7 +1499,10 @@ mod platform {
     /// The picture made from the file itself, for the formats the `image`
     /// crate reads.
     fn generated_thumbnail(path: &str, size: u32) -> Option<RenderImage> {
-        let reader = image::ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+        let reader = image::ImageReader::open(path)
+            .ok()?
+            .with_guessed_format()
+            .ok()?;
         let decoded = reader.decode().ok()?.thumbnail(size, size).into_rgba8();
         to_render_image(decoded)
     }
@@ -1445,7 +1559,11 @@ mod platform {
     /// an icon was found is kept.
     fn find_icon(name: &str, size: u32) -> Option<PathBuf> {
         let key = (name.to_string(), size);
-        if let Some(found) = icon_files().lock().ok().and_then(|files| files.get(&key).cloned()) {
+        if let Some(found) = icon_files()
+            .lock()
+            .ok()
+            .and_then(|files| files.get(&key).cloned())
+        {
             return found;
         }
         let found = search_icon(name, size);
@@ -1628,7 +1746,10 @@ mod platform {
 
     /// Where the themes are: the user's own first, then the system's.
     fn icon_directories() -> Vec<PathBuf> {
-        data_dirs().into_iter().map(|directory| directory.join("icons")).collect()
+        data_dirs()
+            .into_iter()
+            .map(|directory| directory.join("icons"))
+            .collect()
     }
 
     /// Where the desktop keeps its data, the user's own first.
@@ -1709,7 +1830,11 @@ mod platform {
     /// the files of an extension does not change from one to the next.
     fn type_of_path(path: &Path) -> Option<String> {
         let extension = path.extension()?.to_str()?.to_lowercase();
-        if let Some(kind) = known_types().lock().ok().and_then(|known| known.get(&extension).cloned()) {
+        if let Some(kind) = known_types()
+            .lock()
+            .ok()
+            .and_then(|known| known.get(&extension).cloned())
+        {
             return kind;
         }
         let kind = xdg_type(path).or_else(|| type_of_extension(&extension));
@@ -1779,7 +1904,9 @@ mod platform {
                     continue;
                 }
                 let mut fields = line.splitn(3, ':');
-                let (Some(_weight), Some(kind), Some(patterns)) = (fields.next(), fields.next(), fields.next()) else {
+                let (Some(_weight), Some(kind), Some(patterns)) =
+                    (fields.next(), fields.next(), fields.next())
+                else {
                     continue;
                 };
                 for pattern in patterns.split(';') {

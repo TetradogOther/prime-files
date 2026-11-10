@@ -57,7 +57,10 @@ impl FileEntryDto {
 
 /// See [`FileEntryDto::cloud_state`].
 pub fn cloud_state(attributes: u32) -> Option<CloudState> {
-    if attributes & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | FILE_ATTRIBUTE_RECALL_ON_OPEN | FILE_ATTRIBUTE_OFFLINE)
+    if attributes
+        & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+            | FILE_ATTRIBUTE_RECALL_ON_OPEN
+            | FILE_ATTRIBUTE_OFFLINE)
         != 0
     {
         Some(CloudState::OnlineOnly)

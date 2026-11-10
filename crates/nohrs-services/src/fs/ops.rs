@@ -41,7 +41,9 @@ pub mod transfers {
         /// Lists the copy to `destination`.
         pub fn start(destination: &Path) -> Self {
             active().insert(destination.to_path_buf(), (0, 0));
-            Self { destination: destination.to_path_buf() }
+            Self {
+                destination: destination.to_path_buf(),
+            }
         }
 
         /// Records how much of it is written.
@@ -81,11 +83,15 @@ pub mod transfers {
         if active.is_empty() {
             return None;
         }
-        let (copied, total) = active
-            .values()
-            .fold((0u64, 0u64), |(copied, total), (one_copied, one_total)| {
-                (copied.saturating_add(*one_copied), total.saturating_add(*one_total))
-            });
+        let (copied, total) =
+            active
+                .values()
+                .fold((0u64, 0u64), |(copied, total), (one_copied, one_total)| {
+                    (
+                        copied.saturating_add(*one_copied),
+                        total.saturating_add(*one_total),
+                    )
+                });
         Some((active.len(), copied, total))
     }
 
@@ -98,7 +104,10 @@ pub mod transfers {
             let path = Path::new(r"C:\destino\Grande.ZIP");
             let transfer = Transfer::start(path);
             transfer.update(50, 200);
-            assert_eq!(progress(Path::new(r"c:\destino\grande.zip")), Some((50, 200)));
+            assert_eq!(
+                progress(Path::new(r"c:\destino\grande.zip")),
+                Some((50, 200))
+            );
             drop(transfer);
             assert_eq!(progress(path), None);
         }
@@ -872,12 +881,12 @@ fn copy_file(from: &Path, to: &Path, existing: Existing) -> Result<()> {
 #[cfg(windows)]
 #[allow(unsafe_code)]
 fn copy_file_claiming(from: &Path, to: &Path) -> ClaimResult<()> {
-    use windows::Win32::Storage::FileSystem::{COPY_FILE_FAIL_IF_EXISTS, CopyFileExW};
-    use windows::core::PCWSTR;
     use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::Storage::FileSystem::{COPY_FILE_FAIL_IF_EXISTS, CopyFileExW};
     use windows::Win32::Storage::FileSystem::{
         COPYPROGRESSROUTINE_PROGRESS, LPPROGRESS_ROUTINE_CALLBACK_REASON, PROGRESS_CONTINUE,
     };
+    use windows::core::PCWSTR;
 
     // Called by CopyFileExW after each chunk, on this same thread.
     unsafe extern "system" fn progress(
@@ -1122,7 +1131,13 @@ fn rename_no_replace(src: &Path, dst: &Path) -> Option<std::io::Result<()>> {
     let (from, to) = (wide(src), wide(dst));
     // SAFETY: both buffers are NUL-terminated UTF-16 and outlive the call,
     // which only reads them.
-    let moved = unsafe { MoveFileExW(PCWSTR(from.as_ptr()), PCWSTR(to.as_ptr()), MOVE_FILE_FLAGS(0)) };
+    let moved = unsafe {
+        MoveFileExW(
+            PCWSTR(from.as_ptr()),
+            PCWSTR(to.as_ptr()),
+            MOVE_FILE_FLAGS(0),
+        )
+    };
     Some(moved.map_err(win32_io_error))
 }
 
@@ -1369,14 +1384,18 @@ fn trash_in_one_batch(
 // A thread of its own starts with no apartment at all, and joining it turns
 // any panic left in the crate into an ordinary error.
 #[cfg(windows)]
-fn on_own_thread(work: impl FnOnce() -> std::result::Result<(), ::trash::Error> + Send) -> Result<()> {
+fn on_own_thread(
+    work: impl FnOnce() -> std::result::Result<(), ::trash::Error> + Send,
+) -> Result<()> {
     std::thread::scope(|scope| {
         std::thread::Builder::new()
             .name("nohrs-trash".into())
             .spawn_scoped(scope, work)
             .map_err(|error| Error::Other(format!("failed to move to trash: {error}")))?
             .join()
-            .map_err(|_| Error::Other("failed to move to trash: the system trash call crashed".into()))?
+            .map_err(|_| {
+                Error::Other("failed to move to trash: the system trash call crashed".into())
+            })?
             .map_err(|error| Error::Other(format!("failed to move to trash: {error}")))
     })
 }
@@ -2176,7 +2195,12 @@ mod tests {
             }
         }
 
-        fn run(&self, asked: &[&str], batch_fails_on: Option<&str>, stuck: &[&str]) -> Vec<PathBuf> {
+        fn run(
+            &self,
+            asked: &[&str],
+            batch_fails_on: Option<&str>,
+            stuck: &[&str],
+        ) -> Vec<PathBuf> {
             let asked: Vec<PathBuf> = asked.iter().map(PathBuf::from).collect();
             trash_in_one_batch(
                 &asked,
@@ -2197,7 +2221,9 @@ mod tests {
                 },
                 |path| {
                     self.single_calls.borrow_mut().push(path.to_path_buf());
-                    if stuck.iter().any(|name| Path::new(name) == path) || !self.on_disk.borrow().contains(path) {
+                    if stuck.iter().any(|name| Path::new(name) == path)
+                        || !self.on_disk.borrow().contains(path)
+                    {
                         return Err(Error::Other(format!("cannot trash {}", path.display())));
                     }
                     self.on_disk.borrow_mut().remove(path);
@@ -2217,8 +2243,16 @@ mod tests {
         let failed = trash.run(&["a", "b", "c", "d"], None, &[]);
 
         assert!(failed.is_empty());
-        assert_eq!(trash.batch_calls.get(), 1, "one system call for the whole selection");
-        assert!(trash.single_calls.borrow().is_empty(), "{:?}", trash.single_calls.borrow());
+        assert_eq!(
+            trash.batch_calls.get(),
+            1,
+            "one system call for the whole selection"
+        );
+        assert!(
+            trash.single_calls.borrow().is_empty(),
+            "{:?}",
+            trash.single_calls.borrow()
+        );
         assert!(trash.on_disk.borrow().is_empty());
     }
 
@@ -2262,7 +2296,9 @@ mod tests {
     #[test]
     fn trash_paths_moves_real_files_and_reports_the_missing_one() {
         let dir = tempdir().unwrap();
-        let files: Vec<PathBuf> = (0..3).map(|n| dir.path().join(format!("lixo {n}.txt"))).collect();
+        let files: Vec<PathBuf> = (0..3)
+            .map(|n| dir.path().join(format!("lixo {n}.txt")))
+            .collect();
         for file in &files {
             fs::write(file, "x").unwrap();
         }
@@ -2290,10 +2326,16 @@ mod tests {
         // wrote the file anew with `std::io::copy` and stamped it with the time
         // of the paste, so a folder of photos pasted elsewhere lost every date.
         let dir = tempdir().unwrap();
-        let long_ago = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
+        let long_ago =
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
         let file = dir.path().join("foto.jpg");
         fs::write(&file, "payload").unwrap();
-        fs::File::options().write(true).open(&file).unwrap().set_modified(long_ago).unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&file)
+            .unwrap()
+            .set_modified(long_ago)
+            .unwrap();
         let tree = dir.path().join("album");
         fs::create_dir(&tree).unwrap();
         fs::copy(&file, tree.join("dentro.jpg")).unwrap();
@@ -2303,8 +2345,14 @@ mod tests {
 
         let modified = |path: PathBuf| fs::metadata(path).unwrap().modified().unwrap();
         assert_eq!(modified(dir.path().join("copia.jpg")), long_ago);
-        assert_eq!(modified(dir.path().join("album copia").join("dentro.jpg")), long_ago);
-        assert_eq!(fs::read_to_string(dir.path().join("copia.jpg")).unwrap(), "payload");
+        assert_eq!(
+            modified(dir.path().join("album copia").join("dentro.jpg")),
+            long_ago
+        );
+        assert_eq!(
+            fs::read_to_string(dir.path().join("copia.jpg")).unwrap(),
+            "payload"
+        );
     }
 
     #[cfg(windows)]
@@ -2341,7 +2389,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let file = dir.path().join("em uso.mp4");
         fs::write(&file, "x").unwrap();
-        let _held = fs::OpenOptions::new().read(true).share_mode(0).open(&file).unwrap();
+        let _held = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&file)
+            .unwrap();
         let copy = dir.path().join("copia.mp4");
 
         let failure = copy_path_no_replace(&file, &copy).unwrap_err();
@@ -2364,8 +2416,14 @@ mod tests {
         fs::create_dir(&src).unwrap();
         let file = src.join("foto.jpg");
         fs::write(&file, "payload").unwrap();
-        let long_ago = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
-        fs::File::options().write(true).open(&file).unwrap().set_modified(long_ago).unwrap();
+        let long_ago =
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
+        fs::File::options()
+            .write(true)
+            .open(&file)
+            .unwrap()
+            .set_modified(long_ago)
+            .unwrap();
         let dst = dir.path().join("movida");
 
         let kind = move_path_no_replace(&src, &dst).unwrap();
@@ -2397,15 +2455,28 @@ mod tests {
             .arg(&target)
             .output()
             .unwrap();
-        assert!(made.status.success(), "{}", String::from_utf8_lossy(&made.stderr));
+        assert!(
+            made.status.success(),
+            "{}",
+            String::from_utf8_lossy(&made.stderr)
+        );
         let dst = dir.path().join("projeto-movido");
 
         assert_eq!(move_path_no_replace(&src, &dst).unwrap(), MoveKind::Rename);
 
         let moved = dst.join("atalho");
-        assert!(fs::symlink_metadata(&moved).unwrap().is_symlink(), "still a link, not a copy");
-        assert_eq!(fs::read_to_string(moved.join("dentro.txt")).unwrap(), "theirs");
-        assert_eq!(fs::read_to_string(target.join("dentro.txt")).unwrap(), "theirs");
+        assert!(
+            fs::symlink_metadata(&moved).unwrap().is_symlink(),
+            "still a link, not a copy"
+        );
+        assert_eq!(
+            fs::read_to_string(moved.join("dentro.txt")).unwrap(),
+            "theirs"
+        );
+        assert_eq!(
+            fs::read_to_string(target.join("dentro.txt")).unwrap(),
+            "theirs"
+        );
     }
 
     #[cfg(windows)]
@@ -2467,9 +2538,18 @@ mod tests {
 
         // On a case-insensitive filesystem `Foto.jpg` is taken — by the very
         // file being renamed. Where case matters it is simply free.
-        assert!(!would_collide_with_another(&photo, &dir.path().join("Foto.jpg")));
-        assert!(would_collide_with_another(&photo, &other), "another file is a collision");
-        assert!(!would_collide_with_another(&photo, &dir.path().join("nova.jpg")));
+        assert!(!would_collide_with_another(
+            &photo,
+            &dir.path().join("Foto.jpg")
+        ));
+        assert!(
+            would_collide_with_another(&photo, &other),
+            "another file is a collision"
+        );
+        assert!(!would_collide_with_another(
+            &photo,
+            &dir.path().join("nova.jpg")
+        ));
 
         let renamed = rename_in_place(&photo, "Foto.jpg").unwrap();
         let names: Vec<String> = fs::read_dir(dir.path())

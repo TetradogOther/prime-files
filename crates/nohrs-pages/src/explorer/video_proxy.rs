@@ -40,16 +40,29 @@ pub(crate) fn ffmpeg() -> Option<&'static Path> {
     static FOUND: OnceLock<Option<PathBuf>> = OnceLock::new();
     FOUND
         .get_or_init(|| {
-            let name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
-            let beside = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(name)));
-            beside.into_iter().chain(on_path(name)).find(|candidate| candidate.is_file())
+            let name = if cfg!(windows) {
+                "ffmpeg.exe"
+            } else {
+                "ffmpeg"
+            };
+            let beside = std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(|dir| dir.join(name)));
+            beside
+                .into_iter()
+                .chain(on_path(name))
+                .find(|candidate| candidate.is_file())
         })
         .as_deref()
 }
 
 fn on_path(name: &str) -> Vec<PathBuf> {
     std::env::var_os("PATH")
-        .map(|paths| std::env::split_paths(&paths).map(|dir| dir.join(name)).collect())
+        .map(|paths| {
+            std::env::split_paths(&paths)
+                .map(|dir| dir.join(name))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -84,7 +97,10 @@ pub(crate) fn make(
     progress: &mut dyn FnMut(Option<f32>),
 ) -> Result<PathBuf, String> {
     let ffmpeg = ffmpeg().ok_or_else(|| {
-        nohrs_core::t!("O Windows não abre este formato de vídeo. Instale o FFmpeg para ver a prévia.").to_string()
+        nohrs_core::t!(
+            "O Windows não abre este formato de vídeo. Instale o FFmpeg para ver a prévia."
+        )
+        .to_string()
     })?;
     let out = proxy_path(path);
     if out.is_file() {
@@ -142,13 +158,23 @@ pub(crate) fn make(
             }
         }
     }
-    let output = child.wait_with_output().map_err(|error| error.to_string())?;
+    let output = child
+        .wait_with_output()
+        .map_err(|error| error.to_string())?;
     if !output.status.success() {
         std::fs::remove_file(&part).ok();
         let said = String::from_utf8_lossy(&output.stderr);
-        let first = said.lines().find(|line| !line.trim().is_empty()).unwrap_or("").trim().to_string();
+        let first = said
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .unwrap_or("")
+            .trim()
+            .to_string();
         tracing::warn!("ffmpeg could not convert {path}: {said}");
-        return Err(nohrs_core::tf!("O FFmpeg não conseguiu converter este vídeo: {error}", error = first));
+        return Err(nohrs_core::tf!(
+            "O FFmpeg não conseguiu converter este vídeo: {error}",
+            error = first
+        ));
     }
     std::fs::rename(&part, &out).map_err(|error| error.to_string())?;
     prune(&out);
@@ -174,7 +200,12 @@ fn probe(ffmpeg: &Path, path: &str) -> Probe {
     let mut command = Command::new(ffprobe);
     command
         .args(["-v", "error", "-select_streams", "v:0"])
-        .args(["-show_entries", "stream=pix_fmt:format=duration", "-of", "default=nw=1"])
+        .args([
+            "-show_entries",
+            "stream=pix_fmt:format=duration",
+            "-of",
+            "default=nw=1",
+        ])
         .arg(path)
         .stdin(Stdio::null())
         .stderr(Stdio::null());
@@ -193,7 +224,11 @@ fn parse_probe(text: &str) -> Probe {
     let mut probe = Probe::default();
     for line in text.lines() {
         if let Some(seconds) = line.strip_prefix("duration=") {
-            probe.duration = seconds.trim().parse::<f64>().ok().filter(|seconds| *seconds > 0.0);
+            probe.duration = seconds
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .filter(|seconds| *seconds > 0.0);
         } else if let Some(format) = line.strip_prefix("pix_fmt=") {
             probe.alpha = has_alpha(format.trim());
         }
@@ -206,7 +241,9 @@ fn has_alpha(format: &str) -> bool {
     format.starts_with("yuva")
         || format.starts_with("gbrap")
         || format.starts_with("ya")
-        || ["argb", "rgba", "abgr", "bgra", "rgba64", "bgra64"].iter().any(|name| format.starts_with(name))
+        || ["argb", "rgba", "abgr", "bgra", "rgba64", "bgra64"]
+            .iter()
+            .any(|name| format.starts_with(name))
 }
 
 // Keeps the copies under `CACHE_LIMIT`, the least recently made going first;
@@ -220,7 +257,11 @@ fn prune(keep: &Path) {
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let metadata = entry.metadata().ok()?;
-            Some((entry.path(), metadata.len(), metadata.modified().unwrap_or(std::time::UNIX_EPOCH)))
+            Some((
+                entry.path(),
+                metadata.len(),
+                metadata.modified().unwrap_or(std::time::UNIX_EPOCH),
+            ))
         })
         .collect();
     let mut total: u64 = copies.iter().map(|(_, size, _)| size).sum();
@@ -253,6 +294,11 @@ mod tests {
     fn the_copy_is_kept_by_path_without_case() {
         assert_eq!(proxy_path(r"C:\x\Clip.MOV"), proxy_path(r"c:\x\clip.mov"));
         assert_ne!(proxy_path(r"C:\x\a.mov"), proxy_path(r"C:\x\b.mov"));
-        assert_eq!(proxy_path(r"C:\x\a.mov").extension().and_then(|e| e.to_str()), Some("mp4"));
+        assert_eq!(
+            proxy_path(r"C:\x\a.mov")
+                .extension()
+                .and_then(|e| e.to_str()),
+            Some("mp4")
+        );
     }
 }

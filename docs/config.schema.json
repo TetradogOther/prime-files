@@ -522,7 +522,7 @@
         },
         "language": {
           "default": "auto",
-          "description": "Interface language: `\"auto\"` follows the Windows regional format\n(then the country), or one of `\"pt-BR\"`, `\"en\"`, `\"es\"`, `\"fr\"`, `\"de\"`,\n`\"it\"`, `\"ru\"`, `\"ja\"`, `\"zh-CN\"`, `\"ar\"`, `\"hu\"`.",
+          "description": "Interface language: `\"auto\"` follows the Windows regional format\n(then the country), or one of `\"pt-BR\"`, `\"en\"`, `\"es\"`, `\"fr\"`, `\"de\"`,\n`\"it\"`, `\"ca\"`, `\"ru\"`, `\"ja\"`, `\"zh-CN\"`, `\"ar\"`, `\"hu\"`.",
           "type": "string"
         },
         "name_lines": {

@@ -44,8 +44,12 @@ pub fn render(
 
     let is_selected = page.is_selected(ix);
     let is_cut = crate::explorer::file_ops::is_cut(&item.path, cx);
-    let tree_view =page.view_mode == crate::explorer::types::ViewMode::Tree;
-    let depth = if tree_view { page.tree_depth(&item.path) } else { 0 };
+    let tree_view = page.view_mode == crate::explorer::types::ViewMode::Tree;
+    let depth = if tree_view {
+        page.tree_depth(&item.path)
+    } else {
+        0
+    };
     let tree_folder = tree_view && item.kind == "dir";
     let tree_open = tree_folder && page.tree_open(&item.path);
 
@@ -152,21 +156,21 @@ pub fn render(
             }),
         )
         .on_mouse_down(
-                gpui::MouseButton::Middle,
-                cx.listener(move |this, _: &gpui::MouseDownEvent, _window, cx| {
-                    cx.stop_propagation();
-                    this.open_entry_in_new_tab(ix, cx);
-                }),
-            )
+            gpui::MouseButton::Middle,
+            cx.listener(move |this, _: &gpui::MouseDownEvent, _window, cx| {
+                cx.stop_propagation();
+                this.open_entry_in_new_tab(ix, cx);
+            }),
+        )
         .on_mouse_down(
-                gpui::MouseButton::Right,
-                cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
-                    // The rows sit inside the listing, whose own right click is
-                    // the folder's menu.
-                    cx.stop_propagation();
-                    this.open_context_menu(Some(ix), event.modifiers.shift, window, cx);
-                }),
-            )
+            gpui::MouseButton::Right,
+            cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                // The rows sit inside the listing, whose own right click is
+                // the folder's menu.
+                cx.stop_propagation();
+                this.open_context_menu(Some(ix), event.modifiers.shift, window, cx);
+            }),
+        )
         .child(
             ListItem::new(("file-row", ix))
                 .w(px(total_width))
@@ -197,13 +201,21 @@ pub fn render(
                         {
                             this.record_click(ix, mouse.up.click_count);
                             let modifiers = mouse.up.modifiers;
-                            let plain = !(modifiers.shift || modifiers.platform || modifiers.control);
+                            let plain =
+                                !(modifiers.shift || modifiers.platform || modifiers.control);
                             // On the name only, as the Explorer does: the other
                             // columns of a selected row are where it is dragged.
                             let was_sole_selection = this.selection.len() == 1
                                 && this.is_selected(ix)
                                 && !this.press_on_row_blank(ix, mouse.up.position);
-                            this.arm_slow_rename(ix, mouse.up.click_count, plain, was_sole_selection, window, cx);
+                            this.arm_slow_rename(
+                                ix,
+                                mouse.up.click_count,
+                                plain,
+                                was_sole_selection,
+                                window,
+                                cx,
+                            );
                             if modifiers.shift {
                                 this.select_range_to(ix);
                             } else if modifiers.platform || modifiers.control {
@@ -281,7 +293,9 @@ pub fn render(
                                     )
                                 })
                                 .when(depth > 0, |this| {
-                                    this.child(div().w(px(depth as f32 * TREE_INDENT)).flex_shrink_0())
+                                    this.child(
+                                        div().w(px(depth as f32 * TREE_INDENT)).flex_shrink_0(),
+                                    )
                                 })
                                 .when(!has_content_matches && !tree_folder, |this| {
                                     this.child(div().w(px(20.0)).flex_shrink_0())
@@ -381,7 +395,10 @@ pub fn render(
                                                     .gap(px(3.0))
                                                     .pl(px(6.0))
                                                     .children(tag_colors.iter().map(|color| {
-                                                        div().size(px(8.0)).rounded_full().bg(rgb(*color))
+                                                        div()
+                                                            .size(px(8.0))
+                                                            .rounded_full()
+                                                            .bg(rgb(*color))
                                                     })),
                                             )
                                         })
@@ -496,7 +513,10 @@ pub fn render(
 /// It used to be the bare text field set where the label was, which sat a
 /// little off the label's line and, in the grid, flush left under a centered
 /// icon.
-pub(crate) fn rename_field(input: &Entity<gpui_component::input::InputState>, small_text: bool) -> Div {
+pub(crate) fn rename_field(
+    input: &Entity<gpui_component::input::InputState>,
+    small_text: bool,
+) -> Div {
     div()
         .h(px(if small_text { 20.0 } else { 24.0 }))
         .flex()
@@ -513,7 +533,13 @@ pub(crate) fn rename_field(input: &Entity<gpui_component::input::InputState>, sm
                 .appearance(false)
                 .h_full()
                 .px(px(0.0))
-                .map(|field| if small_text { field.text_xs() } else { field.text_sm() })
+                .map(|field| {
+                    if small_text {
+                        field.text_xs()
+                    } else {
+                        field.text_sm()
+                    }
+                })
                 .text_color(rgb(theme::fg())),
         )
 }
@@ -529,9 +555,21 @@ pub(crate) fn cloud_badge(state: nohrs_models::file_entry::CloudState) -> impl I
     use nohrs_models::file_entry::CloudState;
     const GREEN: u32 = 0x22A045;
     let (glyph, color, tip) = match state {
-        CloudState::OnlineOnly => ("\u{e753}", theme::fg_secondary(), nohrs_core::t!("Disponível só online")),
-        CloudState::OnDevice => ("\u{e930}", GREEN, nohrs_core::t!("Disponível neste dispositivo")),
-        CloudState::AlwaysKept => ("\u{ec61}", GREEN, nohrs_core::t!("Sempre mantido neste dispositivo")),
+        CloudState::OnlineOnly => (
+            "\u{e753}",
+            theme::fg_secondary(),
+            nohrs_core::t!("Disponível só online"),
+        ),
+        CloudState::OnDevice => (
+            "\u{e930}",
+            GREEN,
+            nohrs_core::t!("Disponível neste dispositivo"),
+        ),
+        CloudState::AlwaysKept => (
+            "\u{ec61}",
+            GREEN,
+            nohrs_core::t!("Sempre mantido neste dispositivo"),
+        ),
     };
     div()
         .id(SharedString::from(tip))
@@ -551,7 +589,11 @@ pub(crate) const CUT_OPACITY: f32 = 0.45;
 /// opened half-written.
 pub(crate) fn copy_progress(path: &str) -> Option<impl IntoElement> {
     let (copied, total) = nohrs_services::fs::ops::transfers::progress(std::path::Path::new(path))?;
-    let percent = if total > 0 { copied.saturating_mul(100) / total } else { 0 };
+    let percent = if total > 0 {
+        copied.saturating_mul(100) / total
+    } else {
+        0
+    };
     Some(
         div()
             .flex_shrink_0()

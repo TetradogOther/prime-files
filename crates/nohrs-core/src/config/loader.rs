@@ -119,14 +119,18 @@ fn without_value(text: &str, section: &str, key: &str) -> String {
         if trimmed.starts_with('[') {
             in_section = line.trim() == header;
         } else if in_section
-            && trimmed.strip_prefix(key).is_some_and(|rest| rest.trim_start().starts_with('='))
+            && trimmed
+                .strip_prefix(key)
+                .is_some_and(|rest| rest.trim_start().starts_with('='))
         {
             continue;
         }
         kept.push(line);
     }
-    let mut out = kept.join("
-");
+    let mut out = kept.join(
+        "
+",
+    );
     if text.ends_with('\n') {
         out.push('\n');
     }
@@ -144,8 +148,10 @@ fn with_value(text: &str, section: &str, key: &str, value: &str) -> String {
         }
         lines.push(header);
         lines.push(format!("{key} = {value}"));
-        return lines.join("
-") + "
+        return lines.join(
+            "
+",
+        ) + "
 ";
     };
     let end = lines[start + 1..]
@@ -164,7 +170,10 @@ fn with_value(text: &str, section: &str, key: &str, value: &str) -> String {
             let comment = comment_start(&lines[ix])
                 .map(|at| lines[ix][at..].to_string())
                 .unwrap_or_default();
-            let indent: String = lines[ix].chars().take_while(|c| c.is_whitespace()).collect();
+            let indent: String = lines[ix]
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .collect();
             lines[ix] = format!("{indent}{key} = {value}{comment}");
         }
         None => {
@@ -177,8 +186,10 @@ fn with_value(text: &str, section: &str, key: &str, value: &str) -> String {
             lines.insert(at, format!("{key} = {value}"));
         }
     }
-    lines.join("
-") + "
+    lines.join(
+        "
+",
+    ) + "
 "
 }
 
@@ -214,9 +225,13 @@ mod tests {
 
     #[test]
     fn without_value_drops_only_that_key_in_that_section() {
-        let text = "[keybindings]\ncopy = \"ctrl-shift-c\"\ncopy_path = \"ctrl-p\"\n\n[ui]\ncopy = 1\n";
+        let text =
+            "[keybindings]\ncopy = \"ctrl-shift-c\"\ncopy_path = \"ctrl-p\"\n\n[ui]\ncopy = 1\n";
         let out = without_value(text, "keybindings", "copy");
-        assert_eq!(out, "[keybindings]\ncopy_path = \"ctrl-p\"\n\n[ui]\ncopy = 1\n");
+        assert_eq!(
+            out,
+            "[keybindings]\ncopy_path = \"ctrl-p\"\n\n[ui]\ncopy = 1\n"
+        );
         assert_eq!(without_value(&out, "keybindings", "copy"), out);
     }
 
@@ -248,33 +263,54 @@ default_sort = \"name\"
 [explorer]
 ";
         let out = with_value(text, "ui", "show_hidden", "true");
-        assert_eq!(out, "[ui]
+        assert_eq!(
+            out,
+            "[ui]
 default_sort = \"name\"
 show_hidden = true
 
 [explorer]
-");
+"
+        );
         let out = with_value(&out, "theme", "mode", "\"light\"");
-        assert!(out.ends_with("[explorer]
+        assert!(out.ends_with(
+            "[explorer]
 
 [theme]
 mode = \"light\"
-"));
+"
+        ));
         // A `#` inside a value is not a comment.
-        let out = with_value("[theme]
+        let out = with_value(
+            "[theme]
 accent = \"#fff\" # hex
-", "theme", "accent", "\"#000\"");
-        assert_eq!(out, "[theme]
+",
+            "theme",
+            "accent",
+            "\"#000\"",
+        );
+        assert_eq!(
+            out,
+            "[theme]
 accent = \"#000\" # hex
-");
+"
+        );
         // A key that only shares a prefix is not the key.
-        let out = with_value("[ui]
+        let out = with_value(
+            "[ui]
 show_hidden_x = 1
-", "ui", "show_hidden", "true");
-        assert_eq!(out, "[ui]
+",
+            "ui",
+            "show_hidden",
+            "true",
+        );
+        assert_eq!(
+            out,
+            "[ui]
 show_hidden_x = 1
 show_hidden = true
-");
+"
+        );
     }
 
     #[test]

@@ -6,19 +6,22 @@ use std::io::{self, BufReader, Read as _, Write as _};
 use std::path::PathBuf;
 
 use windows::Win32::Foundation::{
-    CloseHandle, ERROR_CANCELLED, ERROR_SERVICE_DOES_NOT_EXIST, HANDLE, HLOCAL, LocalFree, WIN32_ERROR,
+    CloseHandle, ERROR_CANCELLED, ERROR_SERVICE_DOES_NOT_EXIST, HANDLE, HLOCAL, LocalFree,
+    WIN32_ERROR,
 };
 use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
 use windows::Win32::Security::{GetTokenInformation, TOKEN_QUERY, TOKEN_USER, TokenUser};
 use windows::Win32::System::Pipes::WaitNamedPipeW;
 use windows::Win32::System::Services::{
-    CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatus, SC_MANAGER_CONNECT, SERVICE_QUERY_STATUS,
-    SERVICE_RUNNING, SERVICE_STATUS,
+    CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatus, SC_MANAGER_CONNECT,
+    SERVICE_QUERY_STATUS, SERVICE_RUNNING, SERVICE_STATUS,
 };
 use windows::Win32::System::Threading::{
     GetCurrentProcess, GetExitCodeProcess, INFINITE, OpenProcessToken, WaitForSingleObject,
 };
-use windows::Win32::UI::Shell::{SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW};
+use windows::Win32::UI::Shell::{
+    SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW,
+};
 use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
 use windows::core::{HSTRING, PWSTR};
 
@@ -44,14 +47,20 @@ pub fn status() -> Status {
     let found = match unsafe { OpenServiceW(manager, &name, SERVICE_QUERY_STATUS) } {
         Ok(service) => {
             let mut state = SERVICE_STATUS::default();
-            let running =
-                unsafe { QueryServiceStatus(service, &mut state) }.is_ok() && state.dwCurrentState == SERVICE_RUNNING;
+            let running = unsafe { QueryServiceStatus(service, &mut state) }.is_ok()
+                && state.dwCurrentState == SERVICE_RUNNING;
             if let Err(error) = unsafe { CloseServiceHandle(service) } {
                 eprintln!("CloseServiceHandle failed: {error}");
             }
-            if running { Status::Running } else { Status::Stopped }
+            if running {
+                Status::Running
+            } else {
+                Status::Stopped
+            }
         }
-        Err(error) if WIN32_ERROR::from_error(&error) == Some(ERROR_SERVICE_DOES_NOT_EXIST) => Status::NotInstalled,
+        Err(error) if WIN32_ERROR::from_error(&error) == Some(ERROR_SERVICE_DOES_NOT_EXIST) => {
+            Status::NotInstalled
+        }
         Err(_) => Status::Stopped,
     };
     if let Err(error) = unsafe { CloseServiceHandle(manager) } {
@@ -64,7 +73,11 @@ fn connect() -> io::Result<File> {
     const ERROR_PIPE_BUSY: i32 = 231;
     let name = HSTRING::from(PIPE_NAME);
     for _ in 0..3 {
-        match std::fs::OpenOptions::new().read(true).write(true).open(PIPE_NAME) {
+        match std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(PIPE_NAME)
+        {
             // Another request is being answered: wait for the pipe, then try again.
             Err(error) if error.raw_os_error() == Some(ERROR_PIPE_BUSY) => {
                 if !unsafe { WaitNamedPipeW(&name, 30_000) }.as_bool() {
@@ -100,12 +113,21 @@ pub fn snapshot(sink: &mut impl protocol::Sink) -> io::Result<()> {
 /// The string SID of the user running this program.
 pub fn current_user_sid() -> io::Result<String> {
     let mut token = HANDLE::default();
-    unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) }.map_err(io::Error::from)?;
+    unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) }
+        .map_err(io::Error::from)?;
     let mut size = 0u32;
     // The first call says how much room the answer needs.
     let _sizing = unsafe { GetTokenInformation(token, TokenUser, None, 0, &mut size) };
     let mut buffer = vec![0u8; size as usize];
-    let read = unsafe { GetTokenInformation(token, TokenUser, Some(buffer.as_mut_ptr().cast()), size, &mut size) };
+    let read = unsafe {
+        GetTokenInformation(
+            token,
+            TokenUser,
+            Some(buffer.as_mut_ptr().cast()),
+            size,
+            &mut size,
+        )
+    };
     if let Err(error) = unsafe { CloseHandle(token) } {
         eprintln!("CloseHandle failed: {error}");
     }
@@ -130,19 +152,33 @@ pub fn shipped_indexer() -> io::Result<PathBuf> {
     let candidates = [
         Some(beside.clone()),
         app.parent()
-            .filter(|folder| folder.file_name().is_some_and(|name| name.eq_ignore_ascii_case("deps")))
+            .filter(|folder| {
+                folder
+                    .file_name()
+                    .is_some_and(|name| name.eq_ignore_ascii_case("deps"))
+            })
             .and_then(|deps| deps.parent())
             .map(|up| up.join(EXE_NAME)),
     ];
-    candidates.into_iter().flatten().find(|path| path.exists()).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, format!("{} is missing", beside.display()))
-    })
+    candidates
+        .into_iter()
+        .flatten()
+        .find(|path| path.exists())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("{} is missing", beside.display()),
+            )
+        })
 }
 
 /// Runs the shipped indexer elevated with `arguments`, waiting for it.
 /// `None` when the person said no to the UAC prompt; otherwise its exit
 /// code, and what it reported in `report` on failure.
-pub fn run_elevated(arguments: &str, report: &std::path::Path) -> io::Result<Option<(u32, String)>> {
+pub fn run_elevated(
+    arguments: &str,
+    report: &std::path::Path,
+) -> io::Result<Option<(u32, String)>> {
     let program = HSTRING::from(shipped_indexer()?.as_os_str());
     let parameters = HSTRING::from(format!("{arguments} --report \"{}\"", report.display()));
     let verb = HSTRING::from("runas");

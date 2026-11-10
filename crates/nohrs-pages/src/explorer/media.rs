@@ -62,7 +62,12 @@ pub(crate) const PEAK_BLOCKS_PER_SECOND: usize = 100;
 
 enum Update {
     Frame(RenderImage),
-    State { position: f64, duration: f64, playing: bool, has_video: bool },
+    State {
+        position: f64,
+        duration: f64,
+        playing: bool,
+        has_video: bool,
+    },
     /// The next stretch of `MediaPreview::peaks`.
     Peaks(Vec<f32>),
     /// Converting with FFmpeg (`Some`), or done with it (`None`).
@@ -91,7 +96,18 @@ pub(crate) fn is_media(path: &str) -> bool {
     is_audio(path)
         || matches!(
             extension(path).as_str(),
-            "mp4" | "m4v" | "mov" | "wmv" | "avi" | "mkv" | "webm" | "mpg" | "mpeg" | "3gp" | "ts" | "mts"
+            "mp4"
+                | "m4v"
+                | "mov"
+                | "wmv"
+                | "avi"
+                | "mkv"
+                | "webm"
+                | "mpg"
+                | "mpeg"
+                | "3gp"
+                | "ts"
+                | "mts"
         )
 }
 
@@ -125,7 +141,10 @@ impl MediaPreview {
         // Queued before the engine exists; the player applies it as it starts.
         let volume = f64::from_bits(MEDIA_VOLUME.load(Ordering::Relaxed));
         commands
-            .send(Command::Volume(effective_volume(volume, MEDIA_MUTED.load(Ordering::Relaxed))))
+            .send(Command::Volume(effective_volume(
+                volume,
+                MEDIA_MUTED.load(Ordering::Relaxed),
+            )))
             .ok();
         if is_audio(&path) {
             // Its own reader on its own thread: playback starts at once and
@@ -160,14 +179,20 @@ impl MediaPreview {
                                 cx.drop_image(old, None);
                             }
                         }
-                        Update::State { position, duration, playing, has_video } => {
+                        Update::State {
+                            position,
+                            duration,
+                            playing,
+                            has_video,
+                        } => {
                             media.position = position;
                             media.duration = duration;
                             media.playing = playing;
                             media.has_video = has_video;
                         }
                         Update::Peaks(stretch) => {
-                            media.peak_max = stretch.iter().fold(media.peak_max, |max, &p| max.max(p));
+                            media.peak_max =
+                                stretch.iter().fold(media.peak_max, |max, &p| max.max(p));
                             Arc::make_mut(&mut media.peaks).extend(stretch);
                         }
                         Update::Preparing(progress) => media.preparing = progress,
@@ -208,7 +233,11 @@ impl MediaPreview {
     /// Plays or pauses.
     pub(crate) fn toggle(&mut self) {
         self.playing = !self.playing;
-        self.send(if self.playing { Command::Play } else { Command::Pause });
+        self.send(if self.playing {
+            Command::Play
+        } else {
+            Command::Pause
+        });
     }
 
     /// Jumps to `fraction` (0..=1) of the length, once it is known.
@@ -230,8 +259,12 @@ impl MediaPreview {
 impl ExplorerPane {
     /// Opens `path` in the preview's player, paused on its first frame.
     pub(crate) fn open_media_preview(&mut self, path: String, cx: &mut Context<Self>) {
-        let Some(media) = MediaPreview::start(path, self.preview_autoplay, |pane: &mut Self| pane.preview_media.as_mut(), cx)
-        else {
+        let Some(media) = MediaPreview::start(
+            path,
+            self.preview_autoplay,
+            |pane: &mut Self| pane.preview_media.as_mut(),
+            cx,
+        ) else {
             return;
         };
         self.preview_media = Some(media);
@@ -297,7 +330,10 @@ impl ExplorerPane {
     fn send_media_volume(&mut self, cx: &mut Context<Self>) {
         save_volume(self.media_volume(), self.media_muted(), cx);
         if let Some(media) = self.preview_media.as_ref() {
-            media.send(Command::Volume(effective_volume(self.media_volume(), self.media_muted())));
+            media.send(Command::Volume(effective_volume(
+                self.media_volume(),
+                self.media_muted(),
+            )));
         }
         cx.notify();
     }
@@ -305,7 +341,12 @@ impl ExplorerPane {
 
 /// Heights (0..=1) of `bars` waveform bars spread over `duration` seconds,
 /// each the loudest peak in its stretch. `None` for a stretch not read yet.
-pub(crate) fn waveform_bars(peaks: &[f32], peak_max: f32, duration: f64, bars: usize) -> Vec<Option<f32>> {
+pub(crate) fn waveform_bars(
+    peaks: &[f32],
+    peak_max: f32,
+    duration: f64,
+    bars: usize,
+) -> Vec<Option<f32>> {
     // Until the engine knows the length, what has been read fills the width.
     let blocks = if duration > 0.0 {
         (duration * PEAK_BLOCKS_PER_SECOND as f64).ceil() as usize
@@ -320,7 +361,9 @@ pub(crate) fn waveform_bars(peaks: &[f32], peak_max: f32, duration: f64, bars: u
         .map(|bar| {
             let start = bar * blocks / bars;
             let end = ((bar + 1) * blocks / bars).max(start + 1);
-            let stretch = peaks.get(start..end.min(peaks.len())).filter(|s| !s.is_empty())?;
+            let stretch = peaks
+                .get(start..end.min(peaks.len()))
+                .filter(|s| !s.is_empty())?;
             Some((stretch.iter().fold(0.0f32, |max, &p| max.max(p)) * scale).min(1.0))
         })
         .collect()
@@ -354,11 +397,12 @@ mod platform {
     use windows::Win32::Media::MediaFoundation::{
         CLSID_MFMediaEngineClassFactory, IMFAttributes, IMFMediaEngine, IMFMediaEngineClassFactory,
         IMFMediaEngineNotify, IMFMediaEngineNotify_Impl, IMFSample, MF_MEDIA_ENGINE_CALLBACK,
-        MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT, MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND,
-        MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_SOURCE_READER_ALL_STREAMS,
-        MF_SOURCE_READER_FIRST_AUDIO_STREAM, MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION, MFARGB,
-        MFAudioFormat_Float, MFCreateAttributes, MFCreateMediaType, MFCreateSourceReaderFromURL,
-        MFMediaType_Audio, MFSTARTUP_FULL, MFShutdown, MFStartup,
+        MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT, MF_MT_AUDIO_NUM_CHANNELS,
+        MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
+        MF_SOURCE_READER_ALL_STREAMS, MF_SOURCE_READER_FIRST_AUDIO_STREAM,
+        MF_SOURCE_READERF_ENDOFSTREAM, MF_VERSION, MFARGB, MFAudioFormat_Float, MFCreateAttributes,
+        MFCreateMediaType, MFCreateSourceReaderFromURL, MFMediaType_Audio, MFSTARTUP_FULL,
+        MFShutdown, MFStartup,
     };
     use windows::Win32::System::Com::{
         CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
@@ -375,15 +419,28 @@ mod platform {
     struct Listener;
 
     impl IMFMediaEngineNotify_Impl for Listener_Impl {
-        fn EventNotify(&self, _event: u32, _param1: usize, _param2: u32) -> windows::core::Result<()> {
+        fn EventNotify(
+            &self,
+            _event: u32,
+            _param1: usize,
+            _param2: u32,
+        ) -> windows::core::Result<()> {
             Ok(())
         }
     }
 
-    pub fn run(path: &str, commands: &mpsc::Receiver<Command>, updates: &async_channel::Sender<Update>) {
-        unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok().ok();
+    pub fn run(
+        path: &str,
+        commands: &mpsc::Receiver<Command>,
+        updates: &async_channel::Sender<Update>,
+    ) {
+        unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
+            .ok()
+            .ok();
         if let Err(error) = unsafe { MFStartup(MF_VERSION, MFSTARTUP_FULL) } {
-            updates.send_blocking(Update::Failed(error.message().to_string())).ok();
+            updates
+                .send_blocking(Update::Failed(error.message().to_string()))
+                .ok();
             return;
         }
         let mut wanted = Wanted::default();
@@ -401,7 +458,9 @@ mod platform {
                         if let Err(error) = play(&copy, true, commands, updates, &mut wanted)
                             && error.code() != CLOSED
                         {
-                            updates.send_blocking(Update::Failed(error.message().to_string())).ok();
+                            updates
+                                .send_blocking(Update::Failed(error.message().to_string()))
+                                .ok();
                         }
                     }
                     Some(Err(message)) => {
@@ -411,7 +470,9 @@ mod platform {
                     None => {}
                 }
             } else {
-                updates.send_blocking(Update::Failed(error.message().to_string())).ok();
+                updates
+                    .send_blocking(Update::Failed(error.message().to_string()))
+                    .ok();
             }
         }
         unsafe { MFShutdown() }.ok();
@@ -465,7 +526,9 @@ mod platform {
             closed.get() || updates.is_closed()
         };
         let result = crate::explorer::video_proxy::make(path, &cancelled, &mut |progress| {
-            updates.send_blocking(Update::Preparing(Some(progress))).ok();
+            updates
+                .send_blocking(Update::Preparing(Some(progress)))
+                .ok();
         });
         if closed.get() || updates.is_closed() {
             return None;
@@ -562,7 +625,8 @@ mod platform {
             let has_video = unsafe { engine.HasVideo() }.as_bool();
             // Opened, with a length, and no picture: a video whose images
             // Windows cannot decode, played as sound only.
-            if video && !has_video && unsafe { engine.GetDuration() } > 0.0 && !path_is_proxy(path) {
+            if video && !has_video && unsafe { engine.GetDuration() } > 0.0 && !path_is_proxy(path)
+            {
                 break Err(windows::core::Error::new(
                     windows::core::HRESULT(0xC00D_5212_u32 as i32),
                     nohrs_core::t!("Windows não consegue reproduzir este arquivo"),
@@ -602,7 +666,9 @@ mod platform {
     /// Reads `path`'s sound from start to end and sends its peaks, a stretch
     /// at a time, until the file ends or the preview is closed.
     pub fn waveform(path: &str, updates: &async_channel::Sender<Update>) {
-        unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok().ok();
+        unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
+            .ok()
+            .ok();
         if unsafe { MFStartup(MF_VERSION, MFSTARTUP_FULL) }.is_err() {
             return;
         }
@@ -613,7 +679,10 @@ mod platform {
         unsafe { MFShutdown() }.ok();
     }
 
-    fn read_peaks(path: &str, updates: &async_channel::Sender<Update>) -> windows::core::Result<()> {
+    fn read_peaks(
+        path: &str,
+        updates: &async_channel::Sender<Update>,
+    ) -> windows::core::Result<()> {
         let stream = MF_SOURCE_READER_FIRST_AUDIO_STREAM.0 as u32;
         let reader = unsafe {
             let reader = MFCreateSourceReaderFromURL(&HSTRING::from(path), None)?;
@@ -637,7 +706,9 @@ mod platform {
         loop {
             let mut flags = 0u32;
             let mut sample: Option<IMFSample> = None;
-            unsafe { reader.ReadSample(stream, 0, None, Some(&mut flags), None, Some(&mut sample))? };
+            unsafe {
+                reader.ReadSample(stream, 0, None, Some(&mut flags), None, Some(&mut sample))?
+            };
             if flags & MF_SOURCE_READERF_ENDOFSTREAM.0 as u32 != 0 {
                 break;
             }
@@ -648,7 +719,8 @@ mod platform {
             if !data.is_null() {
                 // Float PCM, as asked; Media Foundation buffers are aligned
                 // for it. Valid until the `Unlock` below.
-                let samples = unsafe { std::slice::from_raw_parts(data as *const f32, length as usize / 4) };
+                let samples =
+                    unsafe { std::slice::from_raw_parts(data as *const f32, length as usize / 4) };
                 for &value in samples {
                     peak = peak.max(value.abs());
                     filled += 1;
@@ -663,7 +735,10 @@ mod platform {
             // without a message per decoded buffer.
             if last_sent.elapsed() >= Duration::from_millis(200) && !stretch.is_empty() {
                 last_sent = Instant::now();
-                if updates.send_blocking(Update::Peaks(std::mem::take(&mut stretch))).is_err() {
+                if updates
+                    .send_blocking(Update::Peaks(std::mem::take(&mut stretch)))
+                    .is_err()
+                {
                     return Ok(());
                 }
             }
@@ -687,22 +762,47 @@ mod platform {
         if width == 0 || height == 0 {
             return None;
         }
-        let scale = (MAX_FRAME.0 as f64 / width as f64).min(MAX_FRAME.1 as f64 / height as f64).min(1.0);
-        let (width, height) = (((width as f64 * scale) as u32).max(1), ((height as f64 * scale) as u32).max(1));
+        let scale = (MAX_FRAME.0 as f64 / width as f64)
+            .min(MAX_FRAME.1 as f64 / height as f64)
+            .min(1.0);
+        let (width, height) = (
+            ((width as f64 * scale) as u32).max(1),
+            ((height as f64 * scale) as u32).max(1),
+        );
         if !matches!(target, Some((_, w, h)) if *w == width && *h == height) {
             let bitmap = unsafe {
-                wic.CreateBitmap(width, height, &GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad)
+                wic.CreateBitmap(
+                    width,
+                    height,
+                    &GUID_WICPixelFormat32bppPBGRA,
+                    WICBitmapCacheOnLoad,
+                )
             }
             .ok()?;
             *target = Some((bitmap, width, height));
         }
         let (bitmap, _, _) = target.as_ref()?;
-        let rect = RECT { left: 0, top: 0, right: width as i32, bottom: height as i32 };
-        let black = MFARGB { rgbBlue: 0, rgbGreen: 0, rgbRed: 0, rgbAlpha: 255 };
+        let rect = RECT {
+            left: 0,
+            top: 0,
+            right: width as i32,
+            bottom: height as i32,
+        };
+        let black = MFARGB {
+            rgbBlue: 0,
+            rgbGreen: 0,
+            rgbRed: 0,
+            rgbAlpha: 255,
+        };
         unsafe { engine.TransferVideoFrame(bitmap, None, &rect, Some(&black)) }.ok()?;
         let lock = unsafe {
             bitmap.Lock(
-                &WICRect { X: 0, Y: 0, Width: width as i32, Height: height as i32 },
+                &WICRect {
+                    X: 0,
+                    Y: 0,
+                    Width: width as i32,
+                    Height: height as i32,
+                },
                 WICBitmapLockRead.0 as u32,
             )
         }
@@ -745,9 +845,15 @@ mod platform {
     /// How often a new frame is drawn while a video plays.
     const FRAME_EVERY: Duration = Duration::from_millis(200);
 
-    pub fn run(path: &str, commands: &mpsc::Receiver<Command>, updates: &async_channel::Sender<Update>) {
+    pub fn run(
+        path: &str,
+        commands: &mpsc::Receiver<Command>,
+        updates: &async_channel::Sender<Update>,
+    ) {
         let Some(info) = probe(path) else {
-            updates.send_blocking(Update::Failed("the file could not be read".into())).ok();
+            updates
+                .send_blocking(Update::Failed("the file could not be read".into()))
+                .ok();
             return;
         };
         if updates
@@ -822,7 +928,12 @@ mod platform {
                 }
             }
             if updates
-                .send_blocking(Update::State { position, duration: info.duration, playing, has_video: info.has_video })
+                .send_blocking(Update::State {
+                    position,
+                    duration: info.duration,
+                    playing,
+                    has_video: info.has_video,
+                })
                 .is_err()
             {
                 break;
@@ -843,7 +954,10 @@ mod platform {
         let Ok(child) = spawn_player(path, position, volume) else {
             return;
         };
-        *player = Some(Player { child, started: Instant::now() });
+        *player = Some(Player {
+            child,
+            started: Instant::now(),
+        });
     }
 
     /// Starts the sound at `position`.
@@ -907,7 +1021,10 @@ mod platform {
                 _ => {}
             }
         }
-        Some(Info { duration, has_video })
+        Some(Info {
+            duration,
+            has_video,
+        })
     }
 
     /// The frame of the video at `position`, scaled to the size of the
@@ -924,7 +1041,10 @@ mod platform {
             .arg("-frames:v")
             .arg("1")
             .arg("-vf")
-            .arg(format!("scale={}:{}:force_original_aspect_ratio=decrease", MAX_FRAME.0, MAX_FRAME.1))
+            .arg(format!(
+                "scale={}:{}:force_original_aspect_ratio=decrease",
+                MAX_FRAME.0, MAX_FRAME.1
+            ))
             .arg("-f")
             .arg("image2pipe")
             .arg("-vcodec")
@@ -1017,13 +1137,15 @@ mod platform {
         };
         // A stretch at a time, as the engine sends them.
         for chunk in peaks.chunks(512) {
-            if updates.send_blocking(Update::Peaks(chunk.to_vec())).is_err() {
+            if updates
+                .send_blocking(Update::Peaks(chunk.to_vec()))
+                .is_err()
+            {
                 return;
             }
         }
     }
 }
-
 
 /// The volume a sound plays at outside a pane, 0 when muted: the settings
 /// page's samples sound as loud as the files do.
@@ -1038,7 +1160,9 @@ pub(crate) fn shared_volume() -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{PEAK_BLOCKS_PER_SECOND, clock, effective_volume, is_audio, is_media, waveform_bars};
+    use super::{
+        PEAK_BLOCKS_PER_SECOND, clock, effective_volume, is_audio, is_media, waveform_bars,
+    };
 
     #[test]
     fn bars_take_the_loudest_peak_of_their_stretch_scaled_to_the_file() {
@@ -1048,7 +1172,11 @@ mod tests {
         let bars = waveform_bars(&peaks, 0.5, 2.0, 4);
         assert_eq!(bars, [Some(1.0), Some(0.2), None, None]);
         // With no length yet, what has been read fills every bar.
-        assert!(waveform_bars(&peaks, 0.5, 0.0, 4).iter().all(Option::is_some));
+        assert!(
+            waveform_bars(&peaks, 0.5, 0.0, 4)
+                .iter()
+                .all(Option::is_some)
+        );
         assert!(waveform_bars(&[], 0.0, 0.0, 4).is_empty());
     }
 
@@ -1101,18 +1229,19 @@ fn load_saved_volume() {
 
 fn save_volume(volume: f64, muted: bool, cx: &mut Context<ExplorerPane>) {
     let text = format!("{volume:.3} {}", u8::from(muted));
-    cx.background_executor().spawn(async move {
-        let path = volume_file();
-        let written = path
-            .parent()
-            .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| {
-                #[allow(clippy::disallowed_methods)]
-                std::fs::write(&path, text)
-            });
-        if let Err(error) = written {
-            tracing::warn!("could not keep the preview volume: {error}");
-        }
-    })
-    .detach();
+    cx.background_executor()
+        .spawn(async move {
+            let path = volume_file();
+            let written = path
+                .parent()
+                .map_or(Ok(()), std::fs::create_dir_all)
+                .and_then(|()| {
+                    #[allow(clippy::disallowed_methods)]
+                    std::fs::write(&path, text)
+                });
+            if let Err(error) = written {
+                tracing::warn!("could not keep the preview volume: {error}");
+            }
+        })
+        .detach();
 }

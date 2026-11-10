@@ -1,10 +1,10 @@
-use nohrs_core::t;
 use crate::explorer::ExplorerPane;
 use crate::explorer::places::{Place, SidebarInputPurpose, THIS_PC};
 use crate::explorer::tags::Tags;
 use gpui::prelude::*;
 use gpui::*;
 use gpui_component::{Icon, IconName, Sizable as _};
+use nohrs_core::t;
 use nohrs_ui::theme::theme;
 
 const ROW_HEIGHT: f32 = 28.0;
@@ -75,11 +75,18 @@ pub fn render(
         list = list.child(row(page, place, 0, None, icon_px, cx));
         // The network places added by hand go under Network, where a share
         // found by discovery would be.
-        if place.parsing_name.eq_ignore_ascii_case(crate::explorer::network::NETWORK) {
+        if place
+            .parsing_name
+            .eq_ignore_ascii_case(crate::explorer::network::NETWORK)
+        {
             list = network_rows(page, list, cx);
         }
     }
-    if !places.other.iter().any(|place| place.parsing_name.eq_ignore_ascii_case(crate::explorer::network::NETWORK)) {
+    if !places.other.iter().any(|place| {
+        place
+            .parsing_name
+            .eq_ignore_ascii_case(crate::explorer::network::NETWORK)
+    }) {
         list = network_rows(page, list, cx);
     }
     if crate::explorer::tags::in_sidebar() {
@@ -161,7 +168,10 @@ fn render_band(
     let height = super::panels::sidebar_band_height();
     let rows = (((height - BAND_PADDING * 2.0 - BAND_HEADER) / BAND_ROW).floor() as usize).max(1);
 
-    let place_items = |page: &mut ExplorerPane, members: &[Place], group: &str, cx: &mut Context<ExplorerPane>| {
+    let place_items = |page: &mut ExplorerPane,
+                       members: &[Place],
+                       group: &str,
+                       cx: &mut Context<ExplorerPane>| {
         members
             .iter()
             .map(|place| band_place(page, place, group, icon_px, cx))
@@ -175,9 +185,19 @@ fn render_band(
         .unwrap_or_else(|| t!("Este Computador").to_string());
     let mut sections: Vec<(String, &'static str, Vec<BandItem>, Option<AnyElement>)> = Vec::new();
     let quick = place_items(page, &places.quick_access, "quick", cx);
-    sections.push((t!("Acesso rápido").to_string(), "icons/star.svg", quick, None));
+    sections.push((
+        t!("Acesso rápido").to_string(),
+        "icons/star.svg",
+        quick,
+        None,
+    ));
     let favorites = place_items(page, &places.favorites, "favorite", cx);
-    sections.push((t!("Favoritos").to_string(), "icons/star.svg", favorites, None));
+    sections.push((
+        t!("Favoritos").to_string(),
+        "icons/star.svg",
+        favorites,
+        None,
+    ));
     let mut drives = Vec::new();
     if let Some(this_pc) = &places.this_pc {
         drives.push(band_place(page, this_pc, "pc", icon_px, cx));
@@ -190,7 +210,11 @@ fn render_band(
         let active = crate::explorer::same_path(&address, &page.cwd);
         other.push(BandItem {
             id: SharedString::from(format!("band-network-{address}")),
-            icon: Icon::new(Icon::empty()).path("icons/server.svg").size_4().text_color(rgb(theme::muted())).into_any_element(),
+            icon: Icon::new(Icon::empty())
+                .path("icons/server.svg")
+                .size_4()
+                .text_color(rgb(theme::muted()))
+                .into_any_element(),
             name: crate::explorer::network::display_name(&address),
             active,
             target: BandTarget::Folder(address.clone()),
@@ -209,13 +233,21 @@ fn render_band(
             let location = crate::explorer::tags::location(tag.id);
             BandItem {
                 id: SharedString::from(format!("band-tag-{}", tag.id)),
-                icon: div().size(px(10.0)).mx(px(3.0)).rounded_full().bg(rgb(tag.color)).into_any_element(),
+                icon: div()
+                    .size(px(10.0))
+                    .mx(px(3.0))
+                    .rounded_full()
+                    .bg(rgb(tag.color))
+                    .into_any_element(),
                 name: tag.name,
                 active: page.cwd == location,
                 target: BandTarget::Folder(location),
                 space: None,
                 menu: Some(BandMenu::Tag(tag.id)),
-                note: counts.get(&tag.id).filter(|count| **count > 0).map(|count| count.to_string()),
+                note: counts
+                    .get(&tag.id)
+                    .filter(|count| **count > 0)
+                    .map(|count| count.to_string()),
                 editing: page
                     .sidebar
                     .input
@@ -234,14 +266,24 @@ fn render_band(
         .rounded(px(4.0))
         .cursor_pointer()
         .text_color(rgb(theme::muted()))
-        .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
-        .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new(t!("Nova tag")).build(window, cx))
+        .hover(|style| {
+            style
+                .bg(rgb(theme::bg_hover()))
+                .text_color(rgb(theme::fg()))
+        })
+        .tooltip(|window, cx| {
+            gpui_component::tooltip::Tooltip::new(t!("Nova tag")).build(window, cx)
+        })
         .on_click(cx.listener(|this, _, window, cx| {
             let name = t!("Nova tag").to_string();
             let id = Tags::create(name.clone(), &[], cx);
             this.begin_sidebar_input(SidebarInputPurpose::RenameTag(id), name, window, cx);
         }))
-        .drag_over::<ExternalPaths>(|style, _, _, _| style.bg(rgb(theme::accent_subtle())).text_color(rgb(theme::accent())))
+        .drag_over::<ExternalPaths>(|style, _, _, _| {
+            style
+                .bg(rgb(theme::accent_subtle()))
+                .text_color(rgb(theme::accent()))
+        })
         .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
             cx.stop_propagation();
             this.drop_on_new_tag(paths.paths(), window, cx);
@@ -255,21 +297,44 @@ fn render_band(
     // Not shrunk to the band: as wide as its columns, so the band has
     // something to scroll (in a block parent it took the band's width and
     // the wheel moved nothing).
-    let mut band = div().h_full().flex_shrink_0().flex().items_start().px(px(6.0));
+    let mut band = div()
+        .h_full()
+        .flex_shrink_0()
+        .flex()
+        .items_start()
+        .px(px(6.0));
     let mut first = true;
     for (name, icon, items, extra) in sections {
         if items.is_empty() && extra.is_none() {
             continue;
         }
         if !first {
-            band = band.child(div().w(px(1.0)).h_full().mx(px(6.0)).flex_shrink_0().bg(rgb(theme::border())));
+            band = band.child(
+                div()
+                    .w(px(1.0))
+                    .h_full()
+                    .mx(px(6.0))
+                    .flex_shrink_0()
+                    .bg(rgb(theme::border())),
+            );
         }
         first = false;
         let mut columns = div().flex().items_start();
         let mut items = items.into_iter().peekable();
         while items.peek().is_some() {
-            let column: Vec<AnyElement> = items.by_ref().take(rows).map(|item| band_cell(item, cx)).collect();
-            columns = columns.child(div().w(px(BAND_CELL_WIDTH)).flex_shrink_0().flex().flex_col().children(column));
+            let column: Vec<AnyElement> = items
+                .by_ref()
+                .take(rows)
+                .map(|item| band_cell(item, cx))
+                .collect();
+            columns = columns.child(
+                div()
+                    .w(px(BAND_CELL_WIDTH))
+                    .flex_shrink_0()
+                    .flex()
+                    .flex_col()
+                    .children(column),
+            );
         }
         band = band.child(
             div()
@@ -315,9 +380,21 @@ fn band_place(
         .path
         .as_deref()
         .is_some_and(|path| crate::explorer::same_path(path, &page.cwd));
-    let icon = match page.sidebar.icons.icon_in(&place.parsing_name, true, icon_px, |pane| &mut pane.sidebar.icons, cx) {
-        Some(image) => img(ImageSource::Render(image)).size(px(ICON_SIZE)).flex_shrink_0().into_any_element(),
-        None => Icon::new(IconName::Folder).size_4().text_color(rgb(theme::gray_500())).into_any_element(),
+    let icon = match page.sidebar.icons.icon_in(
+        &place.parsing_name,
+        true,
+        icon_px,
+        |pane| &mut pane.sidebar.icons,
+        cx,
+    ) {
+        Some(image) => img(ImageSource::Render(image))
+            .size(px(ICON_SIZE))
+            .flex_shrink_0()
+            .into_any_element(),
+        None => Icon::new(IconName::Folder)
+            .size_4()
+            .text_color(rgb(theme::gray_500()))
+            .into_any_element(),
     };
     BandItem {
         id: SharedString::from(format!("band-{group}-{}", place.parsing_name)),
@@ -325,7 +402,10 @@ fn band_place(
         name: place.name.clone(),
         active,
         target: BandTarget::Place(place.clone()),
-        space: place.path.as_deref().and_then(|path| crate::explorer::drives::space(path, cx)),
+        space: place
+            .path
+            .as_deref()
+            .and_then(|path| crate::explorer::drives::space(path, cx)),
         menu: Some(BandMenu::Place(place.clone())),
         note: None,
         editing: None,
@@ -370,8 +450,12 @@ fn band_cell(item: BandItem, cx: &mut Context<ExplorerPane>) -> AnyElement {
         .rounded(px(6.0))
         .cursor_pointer()
         .when(item.active, |this| this.bg(rgb(theme::accent_subtle())))
-        .when(!item.active, |this| this.hover(|this| this.bg(rgb(theme::bg_hover()))))
-        .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+        .when(!item.active, |this| {
+            this.hover(|this| this.bg(rgb(theme::bg_hover())))
+        })
+        .tooltip(move |window, cx| {
+            gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+        })
         .on_click(cx.listener(move |this, _, window, cx| match &opened {
             BandTarget::Place(place) => this.open_place(place, window, cx),
             BandTarget::Folder(folder) => this.change_dir(folder.clone(), window, cx),
@@ -405,7 +489,9 @@ fn band_cell(item: BandItem, cx: &mut Context<ExplorerPane>) -> AnyElement {
                     match &menu {
                         BandMenu::Place(place) => this.open_place_menu(place.clone(), window, cx),
                         BandMenu::Tag(tag) => this.open_tag_menu(*tag, window, cx),
-                        BandMenu::NetworkPlace(address) => this.open_network_place_menu(address.clone(), window, cx),
+                        BandMenu::NetworkPlace(address) => {
+                            this.open_network_place_menu(address.clone(), window, cx)
+                        }
                     }
                 }),
             )
@@ -426,7 +512,13 @@ fn band_cell(item: BandItem, cx: &mut Context<ExplorerPane>) -> AnyElement {
             )
         })
         .when_some(item.note, |this, note| {
-            this.child(div().flex_shrink_0().text_xs().text_color(rgb(theme::muted())).child(note))
+            this.child(
+                div()
+                    .flex_shrink_0()
+                    .text_xs()
+                    .text_color(rgb(theme::muted()))
+                    .child(note),
+            )
         })
         .into_any_element()
 }
@@ -440,12 +532,18 @@ fn network_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<Explore
         list = list.child(
             simple_row(
                 SharedString::from(format!("network-place-{address}")),
-                Icon::new(Icon::empty()).path("icons/server.svg").size_4().text_color(rgb(theme::muted())).into_any_element(),
+                Icon::new(Icon::empty())
+                    .path("icons/server.svg")
+                    .size_4()
+                    .text_color(rgb(theme::muted()))
+                    .into_any_element(),
                 crate::explorer::network::display_name(&address),
                 active,
                 1,
             )
-            .on_click(cx.listener(move |this, _, window, cx| this.change_dir(opened.clone(), window, cx)))
+            .on_click(
+                cx.listener(move |this, _, window, cx| this.change_dir(opened.clone(), window, cx)),
+            )
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(move |this, _, window, cx| {
@@ -466,14 +564,22 @@ fn network_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<Explore
         None => list.child(
             simple_row(
                 "network-add",
-                Icon::new(IconName::Plus).size_4().text_color(rgb(theme::muted())).into_any_element(),
+                Icon::new(IconName::Plus)
+                    .size_4()
+                    .text_color(rgb(theme::muted()))
+                    .into_any_element(),
                 t!("Adicionar local de rede").to_string(),
                 false,
                 1,
             )
             .text_color(rgb(theme::muted()))
             .on_click(cx.listener(|this, _, window, cx| {
-                this.begin_sidebar_input(SidebarInputPurpose::NetworkPlace, String::new(), window, cx)
+                this.begin_sidebar_input(
+                    SidebarInputPurpose::NetworkPlace,
+                    String::new(),
+                    window,
+                    cx,
+                )
             })),
         ),
     }
@@ -484,44 +590,61 @@ fn network_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<Explore
 fn tag_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<ExplorerPane>) -> Div {
     let tags = Tags::all(cx);
     let counts = Tags::counts(cx);
-    list = list.child(div().my(px(8.0)).mx(px(6.0)).h(px(1.0)).bg(rgb(theme::border()))).child(
-        div()
-            .id("tags-heading")
-            .flex()
-            .items_center()
-            .justify_between()
-            .rounded(px(4.0))
-            // Files dropped on the heading (or its +) get a new tag of their
-            // own, named at once.
-            .drag_over::<ExternalPaths>(|style, _, _, _| style.bg(rgb(theme::accent_subtle())).text_color(rgb(theme::accent())))
-            .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
-                cx.stop_propagation();
-                this.drop_on_new_tag(paths.paths(), window, cx);
-            }))
-            .h(px(24.0))
-            .pl(px(8.0))
-            .pr(px(4.0))
-            .text_xs()
-            .text_color(rgb(theme::muted()))
-            .child(t!("Tags"))
-            .child(
-                div()
-                    .id("tag-new")
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .size(px(20.0))
-                    .rounded(px(4.0))
-                    .cursor_pointer()
-                    .hover(|style| style.bg(rgb(theme::bg_hover())))
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        let name = t!("Nova tag").to_string();
-                        let id = Tags::create(name.clone(), &[], cx);
-                        this.begin_sidebar_input(SidebarInputPurpose::RenameTag(id), name, window, cx);
-                    }))
-                    .child(Icon::new(IconName::Plus).size_3()),
-            ),
-    );
+    list = list
+        .child(
+            div()
+                .my(px(8.0))
+                .mx(px(6.0))
+                .h(px(1.0))
+                .bg(rgb(theme::border())),
+        )
+        .child(
+            div()
+                .id("tags-heading")
+                .flex()
+                .items_center()
+                .justify_between()
+                .rounded(px(4.0))
+                // Files dropped on the heading (or its +) get a new tag of their
+                // own, named at once.
+                .drag_over::<ExternalPaths>(|style, _, _, _| {
+                    style
+                        .bg(rgb(theme::accent_subtle()))
+                        .text_color(rgb(theme::accent()))
+                })
+                .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
+                    cx.stop_propagation();
+                    this.drop_on_new_tag(paths.paths(), window, cx);
+                }))
+                .h(px(24.0))
+                .pl(px(8.0))
+                .pr(px(4.0))
+                .text_xs()
+                .text_color(rgb(theme::muted()))
+                .child(t!("Tags"))
+                .child(
+                    div()
+                        .id("tag-new")
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .size(px(20.0))
+                        .rounded(px(4.0))
+                        .cursor_pointer()
+                        .hover(|style| style.bg(rgb(theme::bg_hover())))
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            let name = t!("Nova tag").to_string();
+                            let id = Tags::create(name.clone(), &[], cx);
+                            this.begin_sidebar_input(
+                                SidebarInputPurpose::RenameTag(id),
+                                name,
+                                window,
+                                cx,
+                            );
+                        }))
+                        .child(Icon::new(IconName::Plus).size_3()),
+                ),
+        );
     if tags.is_empty() {
         list = list.child(
             div()
@@ -554,13 +677,24 @@ fn tag_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<ExplorerPan
         list = list.child(
             simple_row(
                 SharedString::from(format!("tag-{}", tag.id)),
-                div().size(px(10.0)).mx(px(3.0)).rounded_full().bg(rgb(tag.color)).into_any_element(),
+                div()
+                    .size(px(10.0))
+                    .mx(px(3.0))
+                    .rounded_full()
+                    .bg(rgb(tag.color))
+                    .into_any_element(),
                 tag.name.clone(),
                 active,
                 0,
             )
             .when(count > 0, |this| {
-                this.child(div().flex_shrink_0().text_xs().text_color(rgb(theme::muted())).child(count.to_string()))
+                this.child(
+                    div()
+                        .flex_shrink_0()
+                        .text_xs()
+                        .text_color(rgb(theme::muted()))
+                        .child(count.to_string()),
+                )
             })
             // Three ways to name it, as users asked (Senkozinho and the owner,
             // 07/11/2026; the four tags that come with the app were only
@@ -581,7 +715,12 @@ fn tag_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<ExplorerPan
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                 if event.click_count() >= 3 {
                     this.slow_rename = None;
-                    this.begin_sidebar_input(SidebarInputPurpose::RenameTag(id), tag_name.clone(), window, cx);
+                    this.begin_sidebar_input(
+                        SidebarInputPurpose::RenameTag(id),
+                        tag_name.clone(),
+                        window,
+                        cx,
+                    );
                     return;
                 }
                 this.arm_tag_rename(id, tag_name.clone(), was_active, event, window, cx);
@@ -597,7 +736,10 @@ fn tag_rows(page: &mut ExplorerPane, mut list: Div, cx: &mut Context<ExplorerPan
             // Files and folders dropped on a tag get it, as on Finder's and
             // the Files app's sidebar.
             .drag_over::<ExternalPaths>(move |style, _, _, _| {
-                style.bg(rgb(theme::accent_subtle())).border_1().border_color(rgb(tag_color))
+                style
+                    .bg(rgb(theme::accent_subtle()))
+                    .border_1()
+                    .border_color(rgb(tag_color))
             })
             .on_drop(cx.listener(move |this, paths: &ExternalPaths, _, cx| {
                 cx.stop_propagation();
@@ -622,7 +764,8 @@ impl ExplorerPane {
         cx: &mut Context<Self>,
     ) {
         self.slow_rename = None;
-        let plain = !(event.modifiers().shift || event.modifiers().control || event.modifiers().platform);
+        let plain =
+            !(event.modifiers().shift || event.modifiers().control || event.modifiers().platform);
         if !was_active || event.click_count() != 1 || !plain || self.sidebar.input.is_some() {
             return;
         }
@@ -659,7 +802,10 @@ impl ExplorerPane {
 
     /// Puts tag `id` on what was dropped on it, saying so in the footer.
     fn drop_on_tag(&mut self, id: u32, paths: &[std::path::PathBuf], cx: &mut Context<Self>) {
-        let paths: Vec<String> = paths.iter().map(|path| path.to_string_lossy().into_owned()).collect();
+        let paths: Vec<String> = paths
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect();
         if paths.is_empty() {
             return;
         }
@@ -668,16 +814,28 @@ impl ExplorerPane {
         let text = if added == 0 {
             nohrs_core::tf!("Já tinham a tag {tag}", tag = name)
         } else {
-            nohrs_core::i18n::plural(added, nohrs_core::k!("{n} item marcado com {tag}"), nohrs_core::k!("{n} itens marcados com {tag}"))
-                .replace("{tag}", &name)
+            nohrs_core::i18n::plural(
+                added,
+                nohrs_core::k!("{n} item marcado com {tag}"),
+                nohrs_core::k!("{n} itens marcados com {tag}"),
+            )
+            .replace("{tag}", &name)
         };
         self.set_status(crate::explorer::types::StatusLevel::Info, text);
         cx.notify();
     }
 
     /// A new tag on what was dropped, its name field open.
-    fn drop_on_new_tag(&mut self, paths: &[std::path::PathBuf], window: &mut Window, cx: &mut Context<Self>) {
-        let paths: Vec<String> = paths.iter().map(|path| path.to_string_lossy().into_owned()).collect();
+    fn drop_on_new_tag(
+        &mut self,
+        paths: &[std::path::PathBuf],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let paths: Vec<String> = paths
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect();
         if paths.is_empty() {
             return;
         }
@@ -707,7 +865,9 @@ fn simple_row(
         .rounded(px(4.0))
         .cursor_pointer()
         .when(active, |this| this.bg(rgb(theme::accent_subtle())))
-        .when(!active, |this| this.hover(|this| this.bg(rgb(theme::bg_hover()))))
+        .when(!active, |this| {
+            this.hover(|this| this.bg(rgb(theme::bg_hover())))
+        })
         .child(div().flex_shrink_0().child(icon))
         .child(
             div()
@@ -815,13 +975,22 @@ fn row(
                 )
                 .into_any_element()
         }
-        None => div().w(px(CHEVRON_WIDTH)).flex_shrink_0().into_any_element(),
+        None => div()
+            .w(px(CHEVRON_WIDTH))
+            .flex_shrink_0()
+            .into_any_element(),
     };
     let opened = place.clone();
     let menu = place.clone();
-    let drive_space = place.path.as_deref().and_then(|path| crate::explorer::drives::space(path, cx));
+    let drive_space = place
+        .path
+        .as_deref()
+        .and_then(|path| crate::explorer::drives::space(path, cx));
     div()
-        .id(SharedString::from(format!("place-{depth}-{}", place.parsing_name)))
+        .id(SharedString::from(format!(
+            "place-{depth}-{}",
+            place.parsing_name
+        )))
         .w_full()
         .h(px(ROW_HEIGHT))
         .flex()
@@ -832,7 +1001,9 @@ fn row(
         .rounded(px(4.0))
         .cursor_pointer()
         .when(active, |this| this.bg(rgb(theme::accent_subtle())))
-        .when(!active, |this| this.hover(|this| this.bg(rgb(theme::bg_hover()))))
+        .when(!active, |this| {
+            this.hover(|this| this.bg(rgb(theme::bg_hover())))
+        })
         .on_click(cx.listener(move |this, _, window, cx| this.open_place(&opened, window, cx)))
         .when_some(ExplorerPane::place_address(&place), |this, path| {
             this.on_mouse_down(
@@ -868,7 +1039,10 @@ fn row(
             // without opening This PC.
             this.child(
                 div()
-                    .id(SharedString::from(format!("drive-space-{}", place.parsing_name)))
+                    .id(SharedString::from(format!(
+                        "drive-space-{}",
+                        place.parsing_name
+                    )))
                     .w(px(34.0))
                     .flex_shrink_0()
                     .child(crate::explorer::view::listing::usage_bar(Some(space), 4.0))

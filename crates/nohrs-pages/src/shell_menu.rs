@@ -190,7 +190,15 @@ fn own_items(entries: &[Entry]) -> Vec<MenuItem> {
         .iter()
         .map(|entry| match entry {
             Entry::Separator => MenuItem::separator(),
-            Entry::Command { id, label, checked, radio, enabled, icon, shortcut } => MenuItem {
+            Entry::Command {
+                id,
+                label,
+                checked,
+                radio,
+                enabled,
+                icon,
+                shortcut,
+            } => MenuItem {
                 id: *id,
                 label: label.clone(),
                 shortcut: shortcut.map(str::to_string),
@@ -202,7 +210,11 @@ fn own_items(entries: &[Entry]) -> Vec<MenuItem> {
                 from_windows: false,
                 kind: ItemKind::Command,
             },
-            Entry::Submenu { label, entries, icon } => MenuItem {
+            Entry::Submenu {
+                label,
+                entries,
+                icon,
+            } => MenuItem {
                 id: 0,
                 label: label.clone(),
                 shortcut: None,
@@ -278,7 +290,11 @@ pub fn prepare(request: &Request) -> Prepared {
         items: tidy(items),
         session: Session {
             shell,
-            intercept: request.intercept.iter().map(|verb| verb.to_string()).collect(),
+            intercept: request
+                .intercept
+                .iter()
+                .map(|verb| verb.to_string())
+                .collect(),
         },
     }
 }
@@ -345,7 +361,8 @@ pub fn show(request: &Request) -> Choice {
 #[allow(unsafe_code)]
 pub fn shortcut_target(path: &str) -> Option<String> {
     use windows::Win32::System::Com::{
-        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, IPersistFile, STGM_READ,
+        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
+        IPersistFile, STGM_READ,
     };
     use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
     use windows::core::{HSTRING, Interface};
@@ -357,12 +374,16 @@ pub fn shortcut_target(path: &str) -> Option<String> {
     if let Err(error) = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.ok() {
         tracing::debug!("CoInitializeEx: {error}");
     }
-    let link: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }.ok()?;
+    let link: IShellLinkW =
+        unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER) }.ok()?;
     let file: IPersistFile = link.cast().ok()?;
     unsafe { file.Load(&HSTRING::from(path), STGM_READ) }.ok()?;
     let mut buffer = [0u16; 32768];
     unsafe { link.GetPath(&mut buffer, std::ptr::null_mut(), 0) }.ok()?;
-    let length = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+    let length = buffer
+        .iter()
+        .position(|&unit| unit == 0)
+        .unwrap_or(buffer.len());
     let target = String::from_utf16_lossy(&buffer[..length]);
     (!target.is_empty()).then_some(target)
 }
@@ -387,15 +408,15 @@ mod platform {
     use windows::Win32::UI::Shell::Common::ITEMIDLIST;
     use windows::Win32::UI::Shell::{
         CMF_CANRENAME, CMF_EXPLORE, CMF_EXTENDEDVERBS, CMF_NORMAL, CMIC_MASK_PTINVOKE,
-        CMINVOKECOMMANDINFO, CMINVOKECOMMANDINFOEX, DefSubclassProc,
-        GCS_VERBW, IContextMenu, IContextMenu3, ILFindLastID, IShellFolder, RemoveWindowSubclass,
-        SHBindToParent, SHGetDesktopFolder, SHParseDisplayName, SetWindowSubclass,
+        CMINVOKECOMMANDINFO, CMINVOKECOMMANDINFOEX, DefSubclassProc, GCS_VERBW, IContextMenu,
+        IContextMenu3, ILFindLastID, IShellFolder, RemoveWindowSubclass, SHBindToParent,
+        SHGetDesktopFolder, SHParseDisplayName, SetWindowSubclass,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreatePopupMenu, DeleteMenu, DestroyMenu, GetCursorPos, GetMenuItemCount,
-        GetMenuItemID, GetMenuItemInfoW, HMENU, InsertMenuItemW, MENUITEMINFOW, MF_BYPOSITION,
-        MFS_CHECKED, MFS_DEFAULT, MFS_DISABLED, MFT_RADIOCHECK, MFT_SEPARATOR, MFT_STRING,
-        MIIM_BITMAP, MIIM_FTYPE, MIIM_ID, MIIM_STATE, MIIM_STRING, MIIM_SUBMENU, SW_SHOWNORMAL, TPM_RETURNCMD,
+        CreatePopupMenu, DeleteMenu, DestroyMenu, GetCursorPos, GetMenuItemCount, GetMenuItemID,
+        GetMenuItemInfoW, HMENU, InsertMenuItemW, MENUITEMINFOW, MF_BYPOSITION, MFS_CHECKED,
+        MFS_DEFAULT, MFS_DISABLED, MFT_RADIOCHECK, MFT_SEPARATOR, MFT_STRING, MIIM_BITMAP,
+        MIIM_FTYPE, MIIM_ID, MIIM_STATE, MIIM_STRING, MIIM_SUBMENU, SW_SHOWNORMAL, TPM_RETURNCMD,
         TPM_RIGHTBUTTON, TrackPopupMenuEx, WM_DRAWITEM, WM_INITMENUPOPUP, WM_MEASUREITEM,
         WM_MENUCHAR,
     };
@@ -462,8 +483,10 @@ mod platform {
                 flags |= CMF_EXTENDEDVERBS;
             }
             let position = unsafe { GetMenuItemCount(Some(popup)) }.max(0) as u32;
-            unsafe { shell.QueryContextMenu(popup, position, FIRST_SHELL_ID, LAST_SHELL_ID, flags) }
-                .ok()?;
+            unsafe {
+                shell.QueryContextMenu(popup, position, FIRST_SHELL_ID, LAST_SHELL_ID, flags)
+            }
+            .ok()?;
             remove_verbs(popup, shell, request.hide);
         }
         if !request.own_first && !request.own.is_empty() {
@@ -475,13 +498,22 @@ mod platform {
         let mut point = POINT::default();
         unsafe { GetCursorPos(&mut point) }?;
 
-        let forwarding = shell.as_ref().and_then(|shell| shell.cast::<IContextMenu3>().ok());
+        let forwarding = shell
+            .as_ref()
+            .and_then(|shell| shell.cast::<IContextMenu3>().ok());
         let subclassed = forwarding.is_some()
             && unsafe { SetWindowSubclass(hwnd, Some(forward_menu_messages), SUBCLASS_ID, 0) }
                 .as_bool();
         OPEN_MENU.with(|open| *open.borrow_mut() = forwarding);
         let id = unsafe {
-            TrackPopupMenuEx(popup, (TPM_RETURNCMD | TPM_RIGHTBUTTON).0, point.x, point.y, hwnd, None)
+            TrackPopupMenuEx(
+                popup,
+                (TPM_RETURNCMD | TPM_RIGHTBUTTON).0,
+                point.x,
+                point.y,
+                hwnd,
+                None,
+            )
         }
         .0 as u32;
         OPEN_MENU.with(|open| *open.borrow_mut() = None);
@@ -569,7 +601,13 @@ mod platform {
         if let Err(error) = unsafe { GetCursorPos(&mut point) } {
             tracing::debug!("GetCursorPos: {error}");
         }
-        match invoke(&session.shell, session.hwnd, offset, &session.directory, point) {
+        match invoke(
+            &session.shell,
+            session.hwnd,
+            offset,
+            &session.directory,
+            point,
+        ) {
             Ok(()) => Choice::Ran,
             Err(error) => {
                 tracing::warn!("could not run the menu command: {error}");
@@ -605,7 +643,8 @@ mod platform {
             info.fMask = MIIM_STRING;
             info.dwTypeData = windows::core::PWSTR(text.as_mut_ptr());
             info.cch = text.len() as u32;
-            let raw = if unsafe { GetMenuItemInfoW(menu, position as u32, true, &mut info) }.is_ok() {
+            let raw = if unsafe { GetMenuItemInfoW(menu, position as u32, true, &mut info) }.is_ok()
+            {
                 String::from_utf16_lossy(&text[..info.cch as usize])
             } else {
                 String::new()
@@ -682,8 +721,9 @@ mod platform {
         if raw == -1 || (0..=11).contains(&raw) {
             return MenuIcon::None;
         }
-        crate::explorer::thumbnails::read_bitmap(bitmap)
-            .map_or(MenuIcon::None, |image| MenuIcon::Image(std::sync::Arc::new(image)))
+        crate::explorer::thumbnails::read_bitmap(bitmap).map_or(MenuIcon::None, |image| {
+            MenuIcon::Image(std::sync::Arc::new(image))
+        })
     }
 
     fn directory_of(target: &Target) -> String {
@@ -733,22 +773,32 @@ mod platform {
     // from favorites", as the Explorer shows (issues #11 and #26). Measured:
     // the same file, in one process, through each of the two.
     fn quick_access_menu(hwnd: HWND, path: &str) -> Option<IContextMenu> {
+        use windows::Win32::UI::Shell::Common::STRRET;
         use windows::Win32::UI::Shell::{
             BHID_SFObject, IEnumIDList, IShellItem, SHCONTF_FOLDERS, SHCONTF_NONFOLDERS,
             SHCreateItemFromParsingName, SHGDN_FORPARSING, StrRetToStrW,
         };
-        use windows::Win32::UI::Shell::Common::STRRET;
         use windows::core::{HSTRING, PWSTR};
 
         let quick_access: IShellItem = unsafe {
-            SHCreateItemFromParsingName(&HSTRING::from("shell:::{679f85cb-0220-4080-b29b-5540cc05aab6}"), None)
+            SHCreateItemFromParsingName(
+                &HSTRING::from("shell:::{679f85cb-0220-4080-b29b-5540cc05aab6}"),
+                None,
+            )
         }
         .ok()?;
-        let folder: IShellFolder = unsafe { quick_access.BindToHandler(None, &BHID_SFObject) }.ok()?;
+        let folder: IShellFolder =
+            unsafe { quick_access.BindToHandler(None, &BHID_SFObject) }.ok()?;
         let mut list: Option<IEnumIDList> = None;
-        unsafe { folder.EnumObjects(hwnd, (SHCONTF_FOLDERS.0 | SHCONTF_NONFOLDERS.0) as u32, &mut list) }
-            .ok()
-            .ok()?;
+        unsafe {
+            folder.EnumObjects(
+                hwnd,
+                (SHCONTF_FOLDERS.0 | SHCONTF_NONFOLDERS.0) as u32,
+                &mut list,
+            )
+        }
+        .ok()
+        .ok()?;
         let list = list?;
         let wanted = path.to_lowercase();
         loop {
@@ -769,8 +819,14 @@ mod platform {
             let parsed = unsafe { text.to_string() }.unwrap_or_default();
             unsafe { CoTaskMemFree(Some(text.0 as *const _)) };
             if parsed.to_lowercase() == wanted {
-                return unsafe { folder.GetUIObjectOf::<IContextMenu>(hwnd, &[child.0 as *const ITEMIDLIST], None) }
-                    .ok();
+                return unsafe {
+                    folder.GetUIObjectOf::<IContextMenu>(
+                        hwnd,
+                        &[child.0 as *const ITEMIDLIST],
+                        None,
+                    )
+                }
+                .ok();
             }
         }
     }
@@ -786,7 +842,9 @@ mod platform {
         match target {
             Target::Items(paths) => {
                 let folder_of = |path: &str| {
-                    std::path::Path::new(path).parent().map(|parent| parent.to_path_buf())
+                    std::path::Path::new(path)
+                        .parent()
+                        .map(|parent| parent.to_path_buf())
                 };
                 let first_folder = paths.first().and_then(|path| folder_of(path));
                 let pidls = paths
@@ -824,7 +882,10 @@ mod platform {
             )
         }
         .ok()?;
-        let length = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+        let length = buffer
+            .iter()
+            .position(|&unit| unit == 0)
+            .unwrap_or(buffer.len());
         Some(String::from_utf16_lossy(&buffer[..length]).to_lowercase())
     }
 
@@ -855,14 +916,23 @@ mod platform {
             ptInvoke: point,
             ..Default::default()
         };
-        unsafe { shell.InvokeCommand(&info as *const CMINVOKECOMMANDINFOEX as *const CMINVOKECOMMANDINFO) }
+        unsafe {
+            shell.InvokeCommand(&info as *const CMINVOKECOMMANDINFOEX as *const CMINVOKECOMMANDINFO)
+        }
     }
 
     fn append_entries(menu: HMENU, entries: &[Entry]) -> windows::core::Result<()> {
         for entry in entries {
             match entry {
                 Entry::Separator => append_separator(menu)?,
-                Entry::Command { id, label, checked, radio, enabled, .. } => {
+                Entry::Command {
+                    id,
+                    label,
+                    checked,
+                    radio,
+                    enabled,
+                    ..
+                } => {
                     let mut text = wide(&label.replace('&', "&&"));
                     let mut state = Default::default();
                     if *checked {
@@ -874,7 +944,11 @@ mod platform {
                     let info = MENUITEMINFOW {
                         cbSize: std::mem::size_of::<MENUITEMINFOW>() as u32,
                         fMask: MIIM_FTYPE | MIIM_ID | MIIM_STATE | MIIM_STRING,
-                        fType: if *radio { MFT_STRING | MFT_RADIOCHECK } else { MFT_STRING },
+                        fType: if *radio {
+                            MFT_STRING | MFT_RADIOCHECK
+                        } else {
+                            MFT_STRING
+                        },
                         fState: state,
                         wID: *id,
                         dwTypeData: windows::core::PWSTR(text.as_mut_ptr()),
@@ -976,7 +1050,10 @@ mod platform {
         _id: usize,
         _data: usize,
     ) -> LRESULT {
-        if matches!(message, WM_INITMENUPOPUP | WM_DRAWITEM | WM_MEASUREITEM | WM_MENUCHAR) {
+        if matches!(
+            message,
+            WM_INITMENUPOPUP | WM_DRAWITEM | WM_MEASUREITEM | WM_MENUCHAR
+        ) {
             let handled = OPEN_MENU.with(|open| {
                 let open = open.borrow();
                 let menu = open.as_ref()?;
@@ -1005,7 +1082,9 @@ mod platform {
             let set_mode = GetProcAddress(module, PCSTR(135 as *const u8))?;
             let flush = GetProcAddress(module, PCSTR(136 as *const u8))?;
             Some((
-                std::mem::transmute::<unsafe extern "system" fn() -> isize, SetPreferredAppMode>(set_mode),
+                std::mem::transmute::<unsafe extern "system" fn() -> isize, SetPreferredAppMode>(
+                    set_mode,
+                ),
                 std::mem::transmute::<unsafe extern "system" fn() -> isize, FlushMenuThemes>(flush),
             ))
         });
@@ -1021,7 +1100,6 @@ mod platform {
     fn wide(text: &str) -> Vec<u16> {
         text.encode_utf16().chain(std::iter::once(0)).collect()
     }
-
 }
 
 #[cfg(not(windows))]
@@ -1096,7 +1174,11 @@ mod platform {
 
     /// Runs the program the entry named.
     pub fn run(session: ShellSession, id: u32, _intercept: &[String]) -> Choice {
-        let Some((_, desktop, path)) = session.programs.iter().find(|(program, _, _)| *program == id) else {
+        let Some((_, desktop, path)) = session
+            .programs
+            .iter()
+            .find(|(program, _, _)| *program == id)
+        else {
             return Choice::Dismissed;
         };
         match linux::open_with(Path::new(path), desktop) {
@@ -1143,8 +1225,12 @@ mod tests {
     #[test]
     #[ignore]
     fn print_a_real_menu() {
-        let target = std::env::var("NOHRS_MENU_TARGET").unwrap_or_else(|_| r"C:\Windows\notepad.exe".into());
-        for target in [Target::Items(vec![target.clone()]), Target::Background(r"C:\Windows".into())] {
+        let target =
+            std::env::var("NOHRS_MENU_TARGET").unwrap_or_else(|_| r"C:\Windows\notepad.exe".into());
+        for target in [
+            Target::Items(vec![target.clone()]),
+            Target::Background(r"C:\Windows".into()),
+        ] {
             let prepared = prepare(&Request {
                 hwnd: 0,
                 target: &target,

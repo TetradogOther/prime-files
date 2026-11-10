@@ -55,7 +55,11 @@ impl RootView {
             }
             return;
         };
-        if self.picking_bar.as_ref().is_none_or(|bar| bar.hwnd != dialog.id()) {
+        if self
+            .picking_bar
+            .as_ref()
+            .is_none_or(|bar| bar.hwnd != dialog.id())
+        {
             self.open_picking_bar(dialog.id(), window, cx);
         }
         let pane = self.explorer_entity().read(cx).group.active_pane().clone();
@@ -67,18 +71,23 @@ impl RootView {
             bar.shown_selection = files.clone();
             if !files.is_empty() {
                 let text = names_text(&files);
-                bar.name.update(cx, |name, cx| name.set_value(text, window, cx));
+                bar.name
+                    .update(cx, |name, cx| name.set_value(text, window, cx));
             }
         }
     }
 
     fn open_picking_bar(&mut self, hwnd: isize, window: &mut Window, cx: &mut Context<Self>) {
         let name = cx.new(|cx| InputState::new(window, cx));
-        let enter = cx.subscribe_in(&name, window, |root, _name, event: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = event {
-                root.commit_picking(window, cx);
-            }
-        });
+        let enter = cx.subscribe_in(
+            &name,
+            window,
+            |root, _name, event: &InputEvent, window, cx| {
+                if let InputEvent::PressEnter { .. } = event {
+                    root.commit_picking(window, cx);
+                }
+            },
+        );
         let (types, chosen) = file_dialog::file_types(hwnd);
         let empty = types.is_empty();
         file_dialog::set_patterns(types.get(chosen).and_then(|kind| kind.patterns.clone()));
@@ -98,10 +107,14 @@ impl RootView {
             // types; it is read again for a few seconds.
             cx.spawn_in(window, async move |this, cx| {
                 for _ in 0..12 {
-                    cx.background_executor().timer(std::time::Duration::from_millis(250)).await;
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(250))
+                        .await;
                     let done = this
                         .update(cx, |root, cx| {
-                            let Some(bar) = root.picking_bar.as_mut().filter(|bar| bar.hwnd == hwnd) else {
+                            let Some(bar) =
+                                root.picking_bar.as_mut().filter(|bar| bar.hwnd == hwnd)
+                            else {
                                 return true;
                             };
                             let (types, chosen) = file_dialog::file_types(hwnd);
@@ -109,7 +122,9 @@ impl RootView {
                                 return false;
                             }
                             if bar.typed.is_none() {
-                                file_dialog::set_patterns(types.get(chosen).and_then(|kind| kind.patterns.clone()));
+                                file_dialog::set_patterns(
+                                    types.get(chosen).and_then(|kind| kind.patterns.clone()),
+                                );
                             }
                             bar.types = types;
                             bar.chosen = chosen;
@@ -150,10 +165,13 @@ impl RootView {
             (pane.cwd.clone(), pane.picked_files())
         };
         match resolve(&text, &cwd, &selected) {
-            Typed::Send(paths) => pane.update(cx, |pane, cx| pane.send_to_dialog(paths, window, cx)),
+            Typed::Send(paths) => {
+                pane.update(cx, |pane, cx| pane.send_to_dialog(paths, window, cx))
+            }
             Typed::Folder(folder) => {
                 if let Some(bar) = self.picking_bar.as_ref() {
-                    bar.name.update(cx, |name, cx| name.set_value("", window, cx));
+                    bar.name
+                        .update(cx, |name, cx| name.set_value("", window, cx));
                 }
                 pane.update(cx, |pane, cx| pane.change_dir(folder, window, cx));
             }
@@ -165,7 +183,10 @@ impl RootView {
                 self.refilter_listings(cx);
             }
             Typed::Missing(name) => pane.update(cx, |pane, cx| {
-                pane.set_status(StatusLevel::Warning, tf!("Não foi encontrado: {name}", name = name));
+                pane.set_status(
+                    StatusLevel::Warning,
+                    tf!("Não foi encontrado: {name}", name = name),
+                );
                 cx.notify();
             }),
             Typed::Nothing => {}
@@ -206,7 +227,12 @@ impl RootView {
                     .iter()
                     .enumerate()
                     .map(|(index, kind)| {
-                        type_item(index, kind.label.clone(), bar.typed.is_none() && index == bar.chosen, cx)
+                        type_item(
+                            index,
+                            kind.label.clone(),
+                            bar.typed.is_none() && index == bar.chosen,
+                            cx,
+                        )
                     })
                     .collect()
             };
@@ -304,7 +330,11 @@ impl RootView {
                                             .text_color(rgb(theme::fg()))
                                             .child(type_label),
                                     )
-                                    .child(Icon::new(IconName::ChevronDown).size_3().text_color(rgb(theme::muted()))),
+                                    .child(
+                                        Icon::new(IconName::ChevronDown)
+                                            .size_3()
+                                            .text_color(rgb(theme::muted())),
+                                    ),
                             )
                             .children(menu),
                     ),
@@ -339,7 +369,11 @@ impl RootView {
                                     }
                                 });
                             }))
-                            .child(Icon::new(IconName::Search).size_4().text_color(rgb(theme::muted())))
+                            .child(
+                                Icon::new(IconName::Search)
+                                    .size_4()
+                                    .text_color(rgb(theme::muted())),
+                            )
                             .child(
                                 div()
                                     .flex_1()
@@ -351,19 +385,28 @@ impl RootView {
                                     .text_color(rgb(theme::muted()))
                                     .child(t!("Buscar no computador…")),
                             )
-                            .child(div().flex_shrink_0().text_xs().text_color(rgb(theme::muted())).child("Ctrl+T")),
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .text_xs()
+                                    .text_color(rgb(theme::muted()))
+                                    .child("Ctrl+T"),
+                            ),
                     )
                     .child(div().flex_1())
                     .child(
-                        bar_button("picking-open", t!("Abrir").to_string(), true)
-                            .on_click(cx.listener(|root, _, window, cx| root.commit_picking(window, cx))),
+                        bar_button("picking-open", t!("Abrir").to_string(), true).on_click(
+                            cx.listener(|root, _, window, cx| root.commit_picking(window, cx)),
+                        ),
                     )
-                    .child(bar_button("picking-cancel", t!("Cancelar").to_string(), false).on_click(cx.listener(
-                        |_root, _, _, cx| {
-                            file_dialog::cancel();
-                            cx.notify();
-                        },
-                    ))),
+                    .child(
+                        bar_button("picking-cancel", t!("Cancelar").to_string(), false).on_click(
+                            cx.listener(|_root, _, _, cx| {
+                                file_dialog::cancel();
+                                cx.notify();
+                            }),
+                        ),
+                    ),
             );
         Some(element.into_any_element())
     }
@@ -416,11 +459,18 @@ fn bar_button(id: &'static str, label: String, primary: bool) -> Stateful<Div> {
 // as the Windows dialog writes them.
 fn names_text(files: &[String]) -> String {
     let name = |path: &String| {
-        Path::new(path).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone())
+        Path::new(path)
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.clone())
     };
     match files {
         [single] => name(single),
-        many => many.iter().map(|path| format!("\"{}\"", name(path))).collect::<Vec<_>>().join(" "),
+        many => many
+            .iter()
+            .map(|path| format!("\"{}\"", name(path)))
+            .collect::<Vec<_>>()
+            .join(" "),
     }
 }
 
@@ -429,19 +479,31 @@ fn names_text(files: &[String]) -> String {
 // unless they are whole paths.
 fn resolve(text: &str, cwd: &str, selected: &[String]) -> Typed {
     if text.is_empty() {
-        return if selected.is_empty() { Typed::Nothing } else { Typed::Send(selected.to_vec()) };
+        return if selected.is_empty() {
+            Typed::Nothing
+        } else {
+            Typed::Send(selected.to_vec())
+        };
     }
     if text.contains('*') || text.contains('?') {
         return Typed::Patterns(text.to_string());
     }
     let names: Vec<String> = if text.contains('"') {
-        text.split('"').map(str::trim).filter(|part| !part.is_empty()).map(str::to_string).collect()
+        text.split('"')
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .map(str::to_string)
+            .collect()
     } else {
         vec![text.to_string()]
     };
     let mut paths = Vec::with_capacity(names.len());
     for name in &names {
-        let path = if Path::new(name).is_absolute() { PathBuf::from(name) } else { Path::new(cwd).join(name) };
+        let path = if Path::new(name).is_absolute() {
+            PathBuf::from(name)
+        } else {
+            Path::new(cwd).join(name)
+        };
         if names.len() == 1 && path.is_dir() {
             return Typed::Folder(path.to_string_lossy().into_owned());
         }
@@ -468,16 +530,28 @@ mod tests {
         let b = dir.path().join("b c.png").to_string_lossy().into_owned();
 
         assert_eq!(resolve("", &cwd, &[]), Typed::Nothing);
-        assert_eq!(resolve("", &cwd, std::slice::from_ref(&a)), Typed::Send(vec![a.clone()]));
+        assert_eq!(
+            resolve("", &cwd, std::slice::from_ref(&a)),
+            Typed::Send(vec![a.clone()])
+        );
         assert_eq!(resolve("a.png", &cwd, &[]), Typed::Send(vec![a.clone()]));
-        assert_eq!(resolve(&a, "C:\\elsewhere", &[]), Typed::Send(vec![a.clone()]));
-        assert_eq!(resolve("\"a.png\" \"b c.png\"", &cwd, &[]), Typed::Send(vec![a.clone(), b.clone()]));
+        assert_eq!(
+            resolve(&a, "C:\\elsewhere", &[]),
+            Typed::Send(vec![a.clone()])
+        );
+        assert_eq!(
+            resolve("\"a.png\" \"b c.png\"", &cwd, &[]),
+            Typed::Send(vec![a.clone(), b.clone()])
+        );
         assert_eq!(
             resolve("sub", &cwd, &[]),
             Typed::Folder(dir.path().join("sub").to_string_lossy().into_owned())
         );
         assert_eq!(resolve("*.png", &cwd, &[]), Typed::Patterns("*.png".into()));
-        assert_eq!(resolve("nada.txt", &cwd, &[]), Typed::Missing("nada.txt".into()));
+        assert_eq!(
+            resolve("nada.txt", &cwd, &[]),
+            Typed::Missing("nada.txt".into())
+        );
         assert_eq!(names_text(&[a.clone()]), "a.png");
         assert_eq!(names_text(&[a, b]), "\"a.png\" \"b c.png\"");
     }

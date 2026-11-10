@@ -29,8 +29,14 @@ pub mod theme {
         static FONT: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
         FONT.get_or_init(|| {
             let windows = std::env::var_os("WINDIR").unwrap_or_else(|| "C:\\Windows".into());
-            let fluent = std::path::Path::new(&windows).join("Fonts").join("SegoeIcons.ttf");
-            if fluent.is_file() { "Segoe Fluent Icons" } else { "Segoe MDL2 Assets" }
+            let fluent = std::path::Path::new(&windows)
+                .join("Fonts")
+                .join("SegoeIcons.ttf");
+            if fluent.is_file() {
+                "Segoe Fluent Icons"
+            } else {
+                "Segoe MDL2 Assets"
+            }
         })
     }
 
@@ -66,7 +72,9 @@ pub mod theme {
     pub fn parse_accent(value: &str) -> Option<u32> {
         let value = value.trim();
         if let Some(hex) = value.strip_prefix('#') {
-            return (hex.len() == 6).then(|| u32::from_str_radix(hex, 16).ok()).flatten();
+            return (hex.len() == 6)
+                .then(|| u32::from_str_radix(hex, 16).ok())
+                .flatten();
         }
         NAMED_ACCENTS
             .iter()
@@ -76,7 +84,10 @@ pub mod theme {
 
     /// Replaces the palette's accent with `color`, or restores it with `None`.
     pub fn set_accent(color: Option<u32>) {
-        ACCENT.store(color.map_or(0, |color| ACCENT_SET | (color & 0xFF_FFFF)), Ordering::Relaxed);
+        ACCENT.store(
+            color.map_or(0, |color| ACCENT_SET | (color & 0xFF_FFFF)),
+            Ordering::Relaxed,
+        );
     }
 
     fn picked_accent() -> Option<u32> {
@@ -98,7 +109,11 @@ pub mod theme {
     fn luminance(color: u32) -> f32 {
         let linear = |shift: u32| {
             let c = ((color >> shift) & 0xFF) as f32 / 255.0;
-            if c <= 0.03928 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
         };
         0.2126 * linear(16) + 0.7152 * linear(8) + 0.0722 * linear(0)
     }
@@ -106,7 +121,11 @@ pub mod theme {
     // A picked accent, shaded for the palette in use the way the orange is:
     // darker on white so text on it still reads, lighter on the dark grays.
     fn shaded_accent(base: u32) -> u32 {
-        if is_dark() { mix(base, 0xFFFFFF, 0.12) } else { mix(base, 0x000000, 0.18) }
+        if is_dark() {
+            mix(base, 0xFFFFFF, 0.12)
+        } else {
+            mix(base, 0x000000, 0.18)
+        }
     }
 
     struct Palette {

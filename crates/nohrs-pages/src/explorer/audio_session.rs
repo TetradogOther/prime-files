@@ -63,7 +63,9 @@ impl Level {
         let mut parts = text.split_whitespace();
         let volume: f32 = parts.next()?.parse().ok()?;
         let muted = parts.next().is_some_and(|flag| flag == "1");
-        (0.0..=1.0).contains(&volume).then_some(Self { volume, muted })
+        (0.0..=1.0)
+            .contains(&volume)
+            .then_some(Self { volume, muted })
     }
 
     fn format(self) -> String {
@@ -82,22 +84,27 @@ mod platform {
     //! Core Audio has no safe binding.
 
     use super::{Level, POLL, QUICK, QUICK_FOR};
-    use std::sync::mpsc;
-    use std::time::Instant;
     use std::collections::HashSet;
     use std::path::PathBuf;
+    use std::sync::mpsc;
+    use std::time::Instant;
     use windows::Win32::Media::Audio::{
-        IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator,
-        eMultimedia, eRender,
+        IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator, ISimpleAudioVolume,
+        MMDeviceEnumerator, eMultimedia, eRender,
     };
-    use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree};
+    use windows::Win32::System::Com::{
+        CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
+    };
     use windows::core::Interface;
 
     pub fn run(path: PathBuf, nudges: mpsc::Receiver<()>) {
         if let Err(error) = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok() {
             tracing::debug!("CoInitializeEx: {error}");
         }
-        let mut saved = std::fs::read_to_string(&path).ok().as_deref().and_then(Level::parse);
+        let mut saved = std::fs::read_to_string(&path)
+            .ok()
+            .as_deref()
+            .and_then(Level::parse);
         let mut adopted: HashSet<String> = HashSet::new();
         let mut quick_until: Option<Instant> = None;
         loop {
@@ -123,7 +130,11 @@ mod platform {
                 }
                 Err(error) => tracing::debug!("audio sessions: {error}"),
             }
-            let wait = if quick_until.is_some_and(|until| Instant::now() < until) { QUICK } else { POLL };
+            let wait = if quick_until.is_some_and(|until| Instant::now() < until) {
+                QUICK
+            } else {
+                POLL
+            };
             match nudges.recv_timeout(wait) {
                 Ok(()) => quick_until = Some(Instant::now() + QUICK_FOR),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -144,17 +155,24 @@ mod platform {
         let pid = std::process::id();
         let mut found = Vec::new();
         unsafe {
-            let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+            let enumerator: IMMDeviceEnumerator =
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
             let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
             let manager: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None)?;
             let sessions = manager.GetSessionEnumerator()?;
             for index in 0..sessions.GetCount()? {
-                let Ok(control) = sessions.GetSession(index) else { continue };
-                let Ok(control) = control.cast::<IAudioSessionControl2>() else { continue };
+                let Ok(control) = sessions.GetSession(index) else {
+                    continue;
+                };
+                let Ok(control) = control.cast::<IAudioSessionControl2>() else {
+                    continue;
+                };
                 if control.GetProcessId().ok() != Some(pid) {
                     continue;
                 }
-                let Ok(raw) = control.GetSessionInstanceIdentifier() else { continue };
+                let Ok(raw) = control.GetSessionInstanceIdentifier() else {
+                    continue;
+                };
                 let id = raw.to_string().unwrap_or_default();
                 CoTaskMemFree(Some(raw.0 as *const _));
                 if let Ok(volume) = control.cast::<ISimpleAudioVolume>() {
@@ -167,7 +185,10 @@ mod platform {
 
     fn read(volume: &ISimpleAudioVolume) -> Option<Level> {
         unsafe {
-            Some(Level { volume: volume.GetMasterVolume().ok()?, muted: volume.GetMute().ok()?.as_bool() })
+            Some(Level {
+                volume: volume.GetMasterVolume().ok()?,
+                muted: volume.GetMute().ok()?.as_bool(),
+            })
         }
     }
 
@@ -194,11 +215,20 @@ mod tests {
 
     #[test]
     fn the_level_reads_back_what_it_wrote() {
-        let level = Level { volume: 0.3, muted: true };
+        let level = Level {
+            volume: 0.3,
+            muted: true,
+        };
         assert_eq!(Level::parse(&level.format()), Some(level));
         assert_eq!(Level::parse("1.5 0"), None);
         assert_eq!(Level::parse("lixo"), None);
-        assert!(!level.differs(Level { volume: 0.302, muted: true }));
-        assert!(level.differs(Level { volume: 0.3, muted: false }));
+        assert!(!level.differs(Level {
+            volume: 0.302,
+            muted: true
+        }));
+        assert!(level.differs(Level {
+            volume: 0.3,
+            muted: false
+        }));
     }
 }

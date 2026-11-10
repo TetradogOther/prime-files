@@ -166,7 +166,11 @@ async fn grouping_counts_headers_when_scrolling_to_an_entry(cx: &mut TestAppCont
                 file("a.png", "file", 1),
             ];
             page.set_group_by(super::grouping::GroupBy::Kind);
-            let names: Vec<&str> = page.filtered_entries.iter().map(|e| e.name.as_str()).collect();
+            let names: Vec<&str> = page
+                .filtered_entries
+                .iter()
+                .map(|e| e.name.as_str())
+                .collect();
             assert_eq!(names, ["docs", "a.png", "b.png"]);
             assert_eq!(page.groups().len(), 2);
             // List: column header, "Pastas", docs, "Imagens", a.png, b.png.
@@ -318,7 +322,10 @@ async fn the_preview_follows_the_arrow_keys_once_they_stop(cx: &mut TestAppConte
     cx.run_until_parked();
     window
         .update(cx, |pane, window, cx| {
-            assert_eq!(pane.preview_path, None, "nothing is read while the keys are moving");
+            assert_eq!(
+                pane.preview_path, None,
+                "nothing is read while the keys are moving"
+            );
             pane.move_active_following(1, false, window, cx);
         })
         .unwrap();
@@ -326,10 +333,14 @@ async fn the_preview_follows_the_arrow_keys_once_they_stop(cx: &mut TestAppConte
     cx.run_until_parked();
     window
         .read_with(cx, |pane, _cx| {
-            assert_eq!(pane.preview_path, None, "each key press starts the wait over");
+            assert_eq!(
+                pane.preview_path, None,
+                "each key press starts the wait over"
+            );
         })
         .unwrap();
-    cx.executor().advance_clock(super::preview::PREVIEW_FOLLOW_DELAY);
+    cx.executor()
+        .advance_clock(super::preview::PREVIEW_FOLLOW_DELAY);
     cx.run_until_parked();
     window
         .read_with(cx, |pane, _cx| {
@@ -355,20 +366,33 @@ async fn a_press_on_a_preview_item_becomes_a_drag_past_the_threshold(cx: &mut Te
         .update(cx, |pane, _window, _cx| {
             let photo = r"C:\pasta\foto.jpg";
             pane.press_preview_item(photo, gpui::point(gpui::px(100.0), gpui::px(100.0)));
-            assert!(pane.preview_drag_ready(&moved(103.0, 102.0, true)).is_none(), "a tremble is not a drag");
+            assert!(
+                pane.preview_drag_ready(&moved(103.0, 102.0, true))
+                    .is_none(),
+                "a tremble is not a drag"
+            );
             assert!(pane.preview_drag.is_some(), "and the press is still there");
-            let dragged = pane.preview_drag_ready(&moved(100.0, 110.0, true)).expect("past the threshold");
+            let dragged = pane
+                .preview_drag_ready(&moved(100.0, 110.0, true))
+                .expect("past the threshold");
             assert_eq!(dragged.path(), std::path::Path::new(photo));
             assert!(pane.preview_drag.is_none(), "a drag starts once");
 
             // The button came up somewhere the release was not seen.
             pane.press_preview_item(photo, gpui::point(gpui::px(100.0), gpui::px(100.0)));
-            assert!(pane.preview_drag_ready(&moved(130.0, 100.0, false)).is_none());
+            assert!(
+                pane.preview_drag_ready(&moved(130.0, 100.0, false))
+                    .is_none()
+            );
             assert!(pane.preview_drag.is_none());
 
             pane.press_preview_item(photo, gpui::point(gpui::px(100.0), gpui::px(100.0)));
             pane.release_preview_item();
-            assert!(pane.preview_drag_ready(&moved(130.0, 100.0, true)).is_none(), "released: a click");
+            assert!(
+                pane.preview_drag_ready(&moved(130.0, 100.0, true))
+                    .is_none(),
+                "released: a click"
+            );
         })
         .unwrap();
 }
@@ -385,7 +409,9 @@ async fn the_preview_listing_is_read_again_after_a_drag(cx: &mut TestAppContext)
     let folder_path = folder.to_string_lossy().into_owned();
     let window = new_explorer(cx);
     window
-        .update(cx, |pane, window, cx| pane.open_preview(folder_path.clone(), window, cx))
+        .update(cx, |pane, window, cx| {
+            pane.open_preview(folder_path.clone(), window, cx)
+        })
         .unwrap();
     cx.run_until_parked();
     let names = |pane: &ExplorerPane| -> Vec<String> {
@@ -407,7 +433,11 @@ async fn the_preview_listing_is_read_again_after_a_drag(cx: &mut TestAppContext)
     window
         .read_with(cx, |pane, _cx| {
             assert_eq!(names(pane), ["b.jpg"]);
-            assert_eq!(pane.preview_path.as_deref(), Some(folder_path.as_str()), "the same folder, still previewed");
+            assert_eq!(
+                pane.preview_path.as_deref(),
+                Some(folder_path.as_str()),
+                "the same folder, still previewed"
+            );
         })
         .unwrap();
 }
@@ -423,9 +453,15 @@ async fn a_fitted_image_is_not_decoded_whole(cx: &mut TestAppContext) {
     window
         .update(cx, |page, window, cx| {
             let photo = r"C:\nao-existe\foto.jpg";
-            assert!(fitted_picture(page, photo, window, cx).is_some(), "fitted: the Shell's picture");
+            assert!(
+                fitted_picture(page, photo, window, cx).is_some(),
+                "fitted: the Shell's picture"
+            );
             page.preview_zoom = 2.0;
-            assert!(fitted_picture(page, photo, window, cx).is_none(), "zoomed in: the whole file");
+            assert!(
+                fitted_picture(page, photo, window, cx).is_none(),
+                "zoomed in: the whole file"
+            );
             page.preview_zoom = 1.0;
             assert!(
                 fitted_picture(page, r"C:\nao-existe\anima.gif", window, cx).is_none(),
@@ -459,7 +495,8 @@ async fn a_hidden_preview_does_not_follow_the_arrow_keys(cx: &mut TestAppContext
             pane.move_active_following(1, false, window, cx);
         })
         .unwrap();
-    cx.executor().advance_clock(super::preview::PREVIEW_FOLLOW_DELAY * 2);
+    cx.executor()
+        .advance_clock(super::preview::PREVIEW_FOLLOW_DELAY * 2);
     cx.run_until_parked();
     window
         .read_with(cx, |pane, _cx| assert_eq!(pane.preview_path, None))
@@ -485,7 +522,8 @@ async fn a_click_during_the_wait_is_not_undone_by_it(cx: &mut TestAppContext) {
             pane.open_preview(a.clone(), window, cx);
         })
         .unwrap();
-    cx.executor().advance_clock(super::preview::PREVIEW_FOLLOW_DELAY * 2);
+    cx.executor()
+        .advance_clock(super::preview::PREVIEW_FOLLOW_DELAY * 2);
     cx.run_until_parked();
     window
         .read_with(cx, |pane, _cx| {
@@ -572,8 +610,8 @@ async fn activate_entry_routes_by_kind(cx: &mut TestAppContext) {
             page.activate_entry(doc.clone(), window, cx);
             // A file opens in its default program, as in Explorer; the preview
             // is for selection, not activation.
-            let opened = super::navigation::OPENED_WITH_DEFAULT_APP
-                .with(|opened| opened.borrow().clone());
+            let opened =
+                super::navigation::OPENED_WITH_DEFAULT_APP.with(|opened| opened.borrow().clone());
             assert_eq!(opened, vec![doc.path.clone()]);
             assert_eq!(page.cwd, folder.path, "activating a file does not navigate");
         })
@@ -936,7 +974,10 @@ async fn root_pane_shows_sidebar_but_split_pane_hides_it(cx: &mut TestAppContext
                 !page.pane(1).read(cx).preview_visible,
                 "and with its preview closed"
             );
-            assert!(page.pane(0).read(cx).preview_visible, "the original pane keeps its preview");
+            assert!(
+                page.pane(0).read(cx).preview_visible,
+                "the original pane keeps its preview"
+            );
             assert!(
                 page.pane(0).read(cx).sidebar_visible,
                 "splitting does not disturb the original pane's sidebar"
@@ -1030,7 +1071,10 @@ async fn new_tab_appends_and_activates(cx: &mut TestAppContext) {
             // A new tab defaults to home (§4).
             let home = super::page::home_dir();
             assert_eq!(page.tab_cwd(0, 1, cx).as_deref(), Some(home.as_str()));
-            assert!(std::path::Path::new(&home).is_dir(), "home is a real folder");
+            assert!(
+                std::path::Path::new(&home).is_dir(),
+                "home is a real folder"
+            );
 
             // Switching back to the first tab makes it active again.
             page.test_activate_tab(0, 0, window, cx);
@@ -2075,7 +2119,10 @@ async fn a_rename_runs_off_the_ui_thread(cx: &mut TestAppContext) {
             input.update(cx, |state, cx| state.set_value("b.txt", window, cx));
             pane.commit_rename(window, cx);
             // The test executor runs background work only when it is let to.
-            assert!(dir.path().join("a.txt").exists(), "nothing touched the disk on the UI thread");
+            assert!(
+                dir.path().join("a.txt").exists(),
+                "nothing touched the disk on the UI thread"
+            );
             assert!(pane.renaming.is_none(), "the field closes at once");
         })
         .unwrap();
@@ -2395,7 +2442,11 @@ async fn the_tree_view_splices_an_open_folder_under_it(cx: &mut TestAppContext) 
             );
             page.tree.expanded.insert(docs.clone());
             page.apply_filter();
-            let names: Vec<&str> = page.filtered_entries.iter().map(|e| e.name.as_str()).collect();
+            let names: Vec<&str> = page
+                .filtered_entries
+                .iter()
+                .map(|e| e.name.as_str())
+                .collect();
             assert_eq!(names, ["docs", "a.txt", "b.txt", "z.txt"]);
             assert_eq!(page.tree_depth(&page.filtered_entries[1].path.clone()), 1);
             assert_eq!(page.tree_depth(&docs), 0);
@@ -2448,16 +2499,27 @@ async fn path_field_shows_the_path_and_goes_where_it_is_told(cx: &mut TestAppCon
         .update(cx, |pane, window, cx| {
             pane.begin_path_edit(window, cx);
             let input = pane.path_edit.as_ref().unwrap().input.clone();
-            assert_eq!(input.read(cx).value().to_string(), pane.cwd, "the field starts with the folder's path");
+            assert_eq!(
+                input.read(cx).value().to_string(),
+                pane.cwd,
+                "the field starts with the folder's path"
+            );
 
             // A path that does not exist keeps the field open to fix it.
-            input.update(cx, |state, cx| state.set_value(r"Z:\nao\existe", window, cx));
+            input.update(cx, |state, cx| {
+                state.set_value(r"Z:\nao\existe", window, cx)
+            });
             pane.commit_path_edit(window, cx);
             assert!(pane.path_edit.is_some());
 
-            input.update(cx, |state, cx| state.set_value(sub.to_string_lossy().to_string(), window, cx));
+            input.update(cx, |state, cx| {
+                state.set_value(sub.to_string_lossy().to_string(), window, cx)
+            });
             pane.commit_path_edit(window, cx);
-            assert!(pane.path_edit.is_none(), "Enter on a real folder closes the field");
+            assert!(
+                pane.path_edit.is_none(),
+                "Enter on a real folder closes the field"
+            );
             assert_eq!(pane.cwd, sub.to_string_lossy());
 
             pane.begin_path_edit(window, cx);
@@ -2483,7 +2545,10 @@ async fn dropping_files_on_a_folder_moves_them_on_the_same_drive(cx: &mut TestAp
         .unwrap();
     cx.run_until_parked();
     assert_eq!(std::fs::read_to_string(target.join("a.txt")).unwrap(), "a");
-    assert!(!root.join("a.txt").exists(), "a drop on the same drive is a move");
+    assert!(
+        !root.join("a.txt").exists(),
+        "a drop on the same drive is a move"
+    );
 }
 
 #[gpui::test]
@@ -2526,7 +2591,10 @@ async fn a_slow_folder_is_read_in_the_background_and_an_overtaken_read_is_droppe
             pane.reload(cx);
             pane.cwd = second.path().to_string_lossy().into_owned();
             pane.reload(cx);
-            assert!(pane.listing_pending, "nothing waited, so the read must still be on its way");
+            assert!(
+                pane.listing_pending,
+                "nothing waited, so the read must still be on its way"
+            );
         })
         .unwrap();
 
@@ -2535,8 +2603,11 @@ async fn a_slow_folder_is_read_in_the_background_and_an_overtaken_read_is_droppe
         cx.run_until_parked();
         let (pending, listed) = window
             .update(cx, |pane, _window, _cx| {
-                let listed: Vec<String> =
-                    pane.filtered_entries.iter().map(|entry| entry.name.clone()).collect();
+                let listed: Vec<String> = pane
+                    .filtered_entries
+                    .iter()
+                    .map(|entry| entry.name.clone())
+                    .collect();
                 (pane.listing_pending, listed)
             })
             .unwrap();
@@ -2563,7 +2634,10 @@ async fn a_refresh_keeps_tree_folders_open_and_reads_them_again(cx: &mut TestApp
     std::fs::write(dir.path().join("z.txt"), "z").unwrap();
     let window = open_pane_at(cx, dir.path());
     let names = |pane: &ExplorerPane| -> Vec<String> {
-        pane.filtered_entries.iter().map(|entry| entry.name.clone()).collect()
+        pane.filtered_entries
+            .iter()
+            .map(|entry| entry.name.clone())
+            .collect()
     };
     window
         .update(cx, |pane, _window, cx| {
@@ -2584,7 +2658,11 @@ async fn a_refresh_keeps_tree_folders_open_and_reads_them_again(cx: &mut TestApp
     window
         .update(cx, |pane, _window, cx| {
             pane.reload(cx);
-            assert_eq!(names(pane), ["docs", "a.txt", "z.txt"], "still open, and read again");
+            assert_eq!(
+                names(pane),
+                ["docs", "a.txt", "z.txt"],
+                "still open, and read again"
+            );
         })
         .unwrap();
 
@@ -2626,7 +2704,10 @@ async fn a_refresh_forgets_the_picture_of_a_file_that_changed(cx: &mut TestAppCo
     window
         .update(cx, |pane, _window, cx| {
             pane.reload(cx);
-            assert!(!pane.thumbnails.holds(&changed_path), "changed: asked for again");
+            assert!(
+                !pane.thumbnails.holds(&changed_path),
+                "changed: asked for again"
+            );
             assert!(pane.thumbnails.holds(&kept_path), "unchanged: kept");
         })
         .unwrap();
@@ -2756,11 +2837,17 @@ async fn each_folder_opens_with_the_zoom_and_sort_it_was_left_with(cx: &mut Test
             page.set_zoom(0.6, cx);
             page.set_sort(SortKey::Size, true, cx);
             page.reload(cx);
-            assert!(page.sort_key == SortKey::Size && page.sort_asc, "a refresh keeps it");
+            assert!(
+                page.sort_key == SortKey::Size && page.sort_asc,
+                "a refresh keeps it"
+            );
 
             page.change_dir(music_path.clone(), window, cx);
             assert!(page.sort_key == SortKey::Name && !page.sort_asc);
-            assert_eq!(page.zoom, 0.6, "a folder never changed keeps the tab's zoom");
+            assert_eq!(
+                page.zoom, 0.6,
+                "a folder never changed keeps the tab's zoom"
+            );
             page.set_zoom(0.0, cx);
 
             page.change_dir(photos_path.clone(), window, cx);
@@ -2786,7 +2873,12 @@ async fn the_folder_on_screen_follows_what_other_programs_do(cx: &mut TestAppCon
     let window = open_pane_at(cx, dir.path());
     let names = |cx: &mut TestAppContext| -> Vec<String> {
         window
-            .read_with(cx, |pane, _cx| pane.filtered_entries.iter().map(|entry| entry.name.clone()).collect())
+            .read_with(cx, |pane, _cx| {
+                pane.filtered_entries
+                    .iter()
+                    .map(|entry| entry.name.clone())
+                    .collect()
+            })
             .unwrap()
     };
     let wait_for = |cx: &mut TestAppContext, wanted: &[&str]| {
@@ -2800,13 +2892,25 @@ async fn the_folder_on_screen_follows_what_other_programs_do(cx: &mut TestAppCon
         }
         false
     };
-    assert!(wait_for(cx, &["a.txt"]), "the first listing: {:?}", names(cx));
+    assert!(
+        wait_for(cx, &["a.txt"]),
+        "the first listing: {:?}",
+        names(cx)
+    );
 
     std::fs::write(dir.path().join("b.txt"), "saved by someone else").unwrap();
-    assert!(wait_for(cx, &["a.txt", "b.txt"]), "after a save elsewhere: {:?}", names(cx));
+    assert!(
+        wait_for(cx, &["a.txt", "b.txt"]),
+        "after a save elsewhere: {:?}",
+        names(cx)
+    );
 
     std::fs::remove_file(dir.path().join("a.txt")).unwrap();
-    assert!(wait_for(cx, &["b.txt"]), "after a delete elsewhere: {:?}", names(cx));
+    assert!(
+        wait_for(cx, &["b.txt"]),
+        "after a delete elsewhere: {:?}",
+        names(cx)
+    );
 }
 
 // Cut, paste in another folder, Ctrl+Z: the pasted files come out selected
@@ -2845,13 +2949,24 @@ async fn a_cut_paste_selects_what_arrived_and_undoes_back(cx: &mut TestAppContex
         .update(cx, |pane, _window, cx| {
             let a = dst.join("a.txt").to_string_lossy().to_string();
             let b = dst.join("b.txt").to_string_lossy().to_string();
-            let selected = |path: &str| pane.selection.iter().any(|held| super::same_path(held, path));
-            assert!(selected(&a) && selected(&b), "both pasted files selected: {:?}", pane.selection);
+            let selected = |path: &str| {
+                pane.selection
+                    .iter()
+                    .any(|held| super::same_path(held, path))
+            };
+            assert!(
+                selected(&a) && selected(&b),
+                "both pasted files selected: {:?}",
+                pane.selection
+            );
             assert!(
                 !selected(&dst.join("outro.txt").to_string_lossy()),
                 "what was there before is not"
             );
-            assert!(!super::file_ops::is_cut(&src.join("a.txt").to_string_lossy(), cx), "the paste ends the cut");
+            assert!(
+                !super::file_ops::is_cut(&src.join("a.txt").to_string_lossy(), cx),
+                "the paste ends the cut"
+            );
             assert!(pane.undo_is_move(), "Ctrl+Z would undo the move");
             pane.undo_trash(cx);
         })
@@ -2859,7 +2974,10 @@ async fn a_cut_paste_selects_what_arrived_and_undoes_back(cx: &mut TestAppContex
     cx.run_until_parked();
     assert_eq!(std::fs::read_to_string(src.join("a.txt")).unwrap(), "A");
     assert_eq!(std::fs::read_to_string(src.join("b.txt")).unwrap(), "B");
-    assert!(!dst.join("a.txt").exists() && !dst.join("b.txt").exists(), "nothing left at the destination");
+    assert!(
+        !dst.join("a.txt").exists() && !dst.join("b.txt").exists(),
+        "nothing left at the destination"
+    );
     assert!(dst.join("outro.txt").exists());
 }
 
@@ -2888,7 +3006,9 @@ async fn undoing_a_move_leaves_a_taken_name_alone(cx: &mut TestAppContext) {
         .unwrap();
     cx.run_until_parked();
     std::fs::write(src.join("a.txt"), "NOVO").unwrap();
-    window.update(cx, |pane, _window, cx| pane.undo_trash(cx)).unwrap();
+    window
+        .update(cx, |pane, _window, cx| pane.undo_trash(cx))
+        .unwrap();
     cx.run_until_parked();
     assert_eq!(std::fs::read_to_string(src.join("a.txt")).unwrap(), "NOVO");
     assert_eq!(std::fs::read_to_string(dst.join("a.txt")).unwrap(), "A");
@@ -2901,7 +3021,10 @@ async fn undoing_a_copy_paste_removes_only_the_copies(cx: &mut TestAppContext) {
     let (_dir, src, _dst) = paste_fixture();
     let empty = src.parent().unwrap().join("vazia");
     std::fs::create_dir(&empty).unwrap();
-    let originals: Vec<_> = std::fs::read_dir(&src).unwrap().map(|entry| entry.unwrap().file_name()).collect();
+    let originals: Vec<_> = std::fs::read_dir(&src)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
     assert!(!originals.is_empty());
     let window = new_explorer(cx);
     window
@@ -2910,7 +3033,10 @@ async fn undoing_a_copy_paste_removes_only_the_copies(cx: &mut TestAppContext) {
             pane.reload(cx);
             pane.select_all();
             pane.copy_selection(cx);
-            assert!(!super::file_ops::is_cut(&src.join("foo.txt").to_string_lossy(), cx));
+            assert!(!super::file_ops::is_cut(
+                &src.join("foo.txt").to_string_lossy(),
+                cx
+            ));
             pane.cwd = empty.to_string_lossy().to_string();
             pane.reload(cx);
             pane.prepare_paste(cx);
@@ -2923,7 +3049,10 @@ async fn undoing_a_copy_paste_removes_only_the_copies(cx: &mut TestAppContext) {
     }
     window
         .update(cx, |pane, _window, cx| {
-            assert!(pane.undo_is_copy() && !pane.undo_is_move(), "Ctrl+Z would undo the copy");
+            assert!(
+                pane.undo_is_copy() && !pane.undo_is_move(),
+                "Ctrl+Z would undo the copy"
+            );
             pane.undo_trash(cx);
         })
         .unwrap();
@@ -2933,7 +3062,9 @@ async fn undoing_a_copy_paste_removes_only_the_copies(cx: &mut TestAppContext) {
         assert!(src.join(name).exists(), "{name:?} original kept");
     }
     window
-        .update(cx, |pane, _window, _cx| assert!(!pane.can_undo_trash(), "the undo is used up"))
+        .update(cx, |pane, _window, _cx| {
+            assert!(!pane.can_undo_trash(), "the undo is used up")
+        })
         .unwrap();
 }
 
@@ -2964,7 +3095,10 @@ async fn a_rename_is_undone_and_redone(cx: &mut TestAppContext) {
             })
             .unwrap();
         cx.run_until_parked();
-        assert!(root.join("a.txt").exists() && !root.join("b.txt").exists(), "Ctrl+Z gives the old name back");
+        assert!(
+            root.join("a.txt").exists() && !root.join("b.txt").exists(),
+            "Ctrl+Z gives the old name back"
+        );
         window
             .update(cx, |pane, _window, cx| {
                 assert!(pane.can_redo() && !pane.can_undo_trash());
@@ -2972,7 +3106,10 @@ async fn a_rename_is_undone_and_redone(cx: &mut TestAppContext) {
             })
             .unwrap();
         cx.run_until_parked();
-        assert!(root.join("b.txt").exists() && !root.join("a.txt").exists(), "Ctrl+Y renames it again");
+        assert!(
+            root.join("b.txt").exists() && !root.join("a.txt").exists(),
+            "Ctrl+Y renames it again"
+        );
     }
     assert_eq!(std::fs::read_to_string(root.join("b.txt")).unwrap(), "A");
 }
@@ -2993,7 +3130,11 @@ async fn a_move_is_redone_and_a_new_operation_ends_the_redo(cx: &mut TestAppCont
         .update(cx, |pane, _window, cx| {
             pane.cwd = src.to_string_lossy().to_string();
             pane.reload(cx);
-            if let Some(ix) = pane.filtered_entries.iter().position(|entry| entry.name == "a.txt") {
+            if let Some(ix) = pane
+                .filtered_entries
+                .iter()
+                .position(|entry| entry.name == "a.txt")
+            {
                 pane.select_single(ix);
             }
             pane.cut_selection(cx);
@@ -3004,21 +3145,34 @@ async fn a_move_is_redone_and_a_new_operation_ends_the_redo(cx: &mut TestAppCont
         })
         .unwrap();
     cx.run_until_parked();
-    window.update(cx, |pane, _window, cx| pane.undo_trash(cx)).unwrap();
+    window
+        .update(cx, |pane, _window, cx| pane.undo_trash(cx))
+        .unwrap();
     cx.run_until_parked();
     assert!(src.join("a.txt").exists() && !dst.join("a.txt").exists());
-    window.update(cx, |pane, _window, cx| pane.redo(cx)).unwrap();
+    window
+        .update(cx, |pane, _window, cx| pane.redo(cx))
+        .unwrap();
     cx.run_until_parked();
-    assert!(dst.join("a.txt").exists() && !src.join("a.txt").exists(), "Ctrl+Y moves it again");
+    assert!(
+        dst.join("a.txt").exists() && !src.join("a.txt").exists(),
+        "Ctrl+Y moves it again"
+    );
 
-    window.update(cx, |pane, _window, cx| pane.undo_trash(cx)).unwrap();
+    window
+        .update(cx, |pane, _window, cx| pane.undo_trash(cx))
+        .unwrap();
     cx.run_until_parked();
     window
         .update(cx, |pane, window, cx| {
             assert!(pane.can_redo());
             pane.cwd = src.to_string_lossy().to_string();
             pane.reload(cx);
-            let ix = pane.filtered_entries.iter().position(|entry| entry.name == "c.txt").unwrap();
+            let ix = pane
+                .filtered_entries
+                .iter()
+                .position(|entry| entry.name == "c.txt")
+                .unwrap();
             pane.begin_rename(ix, window, cx);
             let input = pane.renaming.as_ref().unwrap().input.clone();
             input.update(cx, |state, cx| state.set_value("d.txt", window, cx));
@@ -3055,7 +3209,12 @@ async fn a_new_folder_and_its_name_are_one_undo(cx: &mut TestAppContext) {
         .update(cx, |_root, window, cx| {
             pane.update(cx, |pane, cx| {
                 pane.take_rename_when_listed(window, cx);
-                let input = pane.renaming.as_ref().expect("the new folder is being named").input.clone();
+                let input = pane
+                    .renaming
+                    .as_ref()
+                    .expect("the new folder is being named")
+                    .input
+                    .clone();
                 input.update(cx, |state, cx| state.set_value("Fotos", window, cx));
                 pane.commit_rename(window, cx);
             });
@@ -3068,11 +3227,17 @@ async fn a_new_folder_and_its_name_are_one_undo(cx: &mut TestAppContext) {
         pane.undo_trash(cx);
     });
     cx.run_until_parked();
-    assert!(!root.join("Fotos").exists(), "Ctrl+Z takes the named folder away");
+    assert!(
+        !root.join("Fotos").exists(),
+        "Ctrl+Z takes the named folder away"
+    );
     pane.update(cx, |pane, cx| {
         assert!(!pane.can_undo_trash(), "one step, not two");
         pane.redo(cx);
     });
     cx.run_until_parked();
-    assert!(root.join("Fotos").is_dir(), "Ctrl+Y brings it back from the Recycle Bin");
+    assert!(
+        root.join("Fotos").is_dir(),
+        "Ctrl+Y brings it back from the Recycle Bin"
+    );
 }

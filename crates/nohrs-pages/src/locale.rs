@@ -12,7 +12,11 @@ use nohrs_core::i18n::Lang;
 /// Finds the language on this machine and records it for "auto".
 pub fn detect_and_record() -> Lang {
     let system = system_locale();
-    let lang = choose(system.locale.as_deref(), system.country.as_deref(), system.ui_language.as_deref());
+    let lang = choose(
+        system.locale.as_deref(),
+        system.country.as_deref(),
+        system.ui_language.as_deref(),
+    );
     tracing::info!(
         locale = ?system.locale,
         country = ?system.country,
@@ -29,7 +33,11 @@ fn choose(locale: Option<&str>, country: Option<&str>, ui_language: Option<&str>
         .and_then(Lang::parse)
         .or_else(|| country.and_then(Lang::for_country))
         // The region part of the format names the country too (`fr-MX`).
-        .or_else(|| locale.and_then(|name| name.split(['-', '_']).nth(1)).and_then(Lang::for_country))
+        .or_else(|| {
+            locale
+                .and_then(|name| name.split(['-', '_']).nth(1))
+                .and_then(Lang::for_country)
+        })
         .or_else(|| ui_language.and_then(Lang::parse))
         .unwrap_or(Lang::En)
 }
@@ -79,16 +87,24 @@ fn system_locale() -> SystemLocale {
     // session's (`LANG`) and the list of languages the user prefers
     // (`LANGUAGE`, a colon-separated list, the first one first).
     let read = |name: &str| {
-        std::env::var(name).ok().map(|value| value.split('.').next().unwrap_or_default().to_string())
+        std::env::var(name)
+            .ok()
+            .map(|value| value.split('.').next().unwrap_or_default().to_string())
     };
-    let locale = read("LC_ALL").or_else(|| read("LC_MESSAGES")).or_else(|| read("LANG"));
+    let locale = read("LC_ALL")
+        .or_else(|| read("LC_MESSAGES"))
+        .or_else(|| read("LANG"));
     let ui_language = std::env::var("LANGUAGE").ok().and_then(|value| {
         value
             .split(':')
             .map(|language| language.split('.').next().unwrap_or_default().to_string())
             .find(|language| !language.is_empty())
     });
-    SystemLocale { locale, country: None, ui_language }
+    SystemLocale {
+        locale,
+        country: None,
+        ui_language,
+    }
 }
 
 #[cfg(test)]

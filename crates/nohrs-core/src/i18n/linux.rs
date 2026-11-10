@@ -102,12 +102,7 @@ pub(super) static LINUX: &[(&str, &str, &str, &str)] = &[
         "Abrir la carpeta en una terminal",
         "Obre la carpeta en una terminal",
     ),
-    (
-        "Prompt de Comando",
-        "Terminal",
-        "Terminal",
-        "Terminal",
-    ),
+    ("Prompt de Comando", "Terminal", "Terminal", "Terminal"),
     (
         "Explorador do Windows",
         "File manager",

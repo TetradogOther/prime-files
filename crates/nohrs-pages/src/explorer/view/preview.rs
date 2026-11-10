@@ -1,10 +1,10 @@
-use nohrs_core::{k, t, tf};
-use nohrs_core::i18n;
 use crate::explorer::ExplorerPane;
 use gpui::prelude::*;
 use gpui::*;
 use gpui_component::text::TextView;
 use gpui_component::{Icon, IconName};
+use nohrs_core::i18n;
+use nohrs_core::{k, t, tf};
 use nohrs_ui::theme::theme;
 
 /// Edge of the system thumbnail asked for when the pane has no richer preview.
@@ -54,14 +54,22 @@ pub(crate) fn fitted_picture(
     } else {
         super::panels::preview_width()
     };
-    let edge = fitted_edge(width, f32::from(window.viewport_size().height), window.scale_factor());
+    let edge = fitted_edge(
+        width,
+        f32::from(window.viewport_size().height),
+        window.scale_factor(),
+    );
     // The file decoded at this size, sharp; the Shell's picture (or the grid
     // tile) only while that is being made, or if it cannot be.
     // A file Windows' decoder could not read (a WebP or HEIC without its
     // codec, say) is decoded whole, as a zoom past 100% does: the Shell's
     // picture alone left a small tile stretched to the pane, blurred until
     // the zoom went past 100%.
-    if page.preview_sharp.as_ref().is_some_and(|sharp| sharp.path == image_path && sharp.failed) {
+    if page
+        .preview_sharp
+        .as_ref()
+        .is_some_and(|sharp| sharp.path == image_path && sharp.failed)
+    {
         return None;
     }
     if let Some(sharp) = sharp_picture(page, image_path, edge, cx) {
@@ -129,12 +137,17 @@ fn sharp_picture(
     let task = cx.spawn(async move |this: gpui::WeakEntity<ExplorerPane>, cx| {
         let decoded = decode.await;
         this.update(cx, |pane, cx| {
-            let Some(sharp) = pane.preview_sharp.as_mut().filter(|sharp| sharp.path == wanted && sharp.edge == edge) else {
+            let Some(sharp) = pane
+                .preview_sharp
+                .as_mut()
+                .filter(|sharp| sharp.path == wanted && sharp.edge == edge)
+            else {
                 return;
             };
             match decoded {
                 Ok((width, height, pixels)) => {
-                    sharp.image = crate::explorer::thumbnails::render_image(width, height, pixels).map(std::sync::Arc::new);
+                    sharp.image = crate::explorer::thumbnails::render_image(width, height, pixels)
+                        .map(std::sync::Arc::new);
                 }
                 Err(error) => {
                     tracing::debug!("could not decode {wanted} for the preview: {error}");
@@ -207,7 +220,9 @@ pub fn render_quick_look(
                     .bg(rgb(theme::bg()))
                     .shadow_lg()
                     // Clicks inside are the preview's, not the backdrop's.
-                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| cx.stop_propagation())
+                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+                        cx.stop_propagation()
+                    })
                     .child(content),
             )
             .into_any_element(),
@@ -224,13 +239,21 @@ pub fn render_quick_look(
 /// small in the middle of empty bars.
 fn quick_look_insets(page: &ExplorerPane, window: &Window) -> (f32, f32, f32, f32) {
     let measured = page.quick_look_bounds.get().size;
-    let room = if measured.width > px(0.0) && measured.height > px(0.0) { measured } else { window.viewport_size() };
+    let room = if measured.width > px(0.0) && measured.height > px(0.0) {
+        measured
+    } else {
+        window.viewport_size()
+    };
     let (width, height) = (f32::from(room.width), f32::from(room.height));
     let inset_x = (width * 0.07).clamp(16.0, 120.0);
     let inset_y = (height * 0.06).clamp(16.0, 80.0);
     let fixed = (inset_x, inset_y, inset_x, inset_y);
 
-    let Some(frame) = page.preview_media.as_ref().and_then(|media| media.frame.as_ref()) else {
+    let Some(frame) = page
+        .preview_media
+        .as_ref()
+        .and_then(|media| media.frame.as_ref())
+    else {
         return fixed;
     };
     let frame = frame.size(0);
@@ -326,8 +349,16 @@ pub fn render(
     } else if let Some(listing) = page.preview_listing.clone() {
         render_listing(page, listing, window, cx)
     } else if let Some(picture) = page.preview_picture.clone() {
-        let picture = img(ImageSource::Render(picture)).size_full().object_fit(gpui::ObjectFit::Contain);
-        zoom_frame(page, "preview-picture-frame", picture.into_any_element(), true, cx)
+        let picture = img(ImageSource::Render(picture))
+            .size_full()
+            .object_fit(gpui::ObjectFit::Contain);
+        zoom_frame(
+            page,
+            "preview-picture-frame",
+            picture.into_any_element(),
+            true,
+            cx,
+        )
     } else if let Some(image_path) = page.preview_image_path.clone()
         && let Some(fitted) = fitted_picture(page, &image_path, window, cx)
     {
@@ -343,7 +374,13 @@ pub fn render(
             .id(SharedString::from(format!("preview-image-{image_path}")))
             .size_full()
             .object_fit(gpui::ObjectFit::Contain);
-        zoom_frame(page, "preview-image-frame", image.into_any_element(), true, cx)
+        zoom_frame(
+            page,
+            "preview-image-frame",
+            image.into_any_element(),
+            true,
+            cx,
+        )
     } else if let Some(msg) = &page.preview_message {
         // No text and no image the pane can draw itself (a video, a program, an
         // archive): the system thumbnail still says what the file is, often a
@@ -422,15 +459,18 @@ pub fn render(
                 .items_center()
                 .gap_1()
                 .flex_shrink_0()
-                .pl(px(if page.preview_back.is_empty() { 16.0 } else { 6.0 }))
+                .pl(px(if page.preview_back.is_empty() {
+                    16.0
+                } else {
+                    6.0
+                }))
                 .pr(px(6.0))
                 .border_b_1()
                 .border_color(rgb(theme::border()))
                 .when(!page.preview_back.is_empty(), |header| {
-                    header.child(
-                        header_button("preview-back", "\u{e72b}")
-                            .on_click(cx.listener(|this, _, window, cx| this.preview_go_back(window, cx))),
-                    )
+                    header.child(header_button("preview-back", "\u{e72b}").on_click(
+                        cx.listener(|this, _, window, cx| this.preview_go_back(window, cx)),
+                    ))
                 })
                 .child(
                     div()
@@ -455,27 +495,40 @@ pub fn render(
                     )
                 })
                 // A Markdown file: its source to edit, and back to the view.
-                .when(page.preview_saveable && (page.preview_markdown.is_some() || page.preview_editing), |header| {
-                    let (glyph, tip) = if page.preview_editing {
-                        ("\u{e890}", t!("Ver formatado"))
-                    } else {
-                        ("\u{e70f}", t!("Editar"))
-                    };
-                    header.child(
-                        header_button("preview-edit", glyph)
-                            .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip).build(window, cx))
-                            .on_click(cx.listener(|this, _, window, cx| this.toggle_preview_editing(window, cx))),
-                    )
-                })
+                .when(
+                    page.preview_saveable
+                        && (page.preview_markdown.is_some() || page.preview_editing),
+                    |header| {
+                        let (glyph, tip) = if page.preview_editing {
+                            ("\u{e890}", t!("Ver formatado"))
+                        } else {
+                            ("\u{e70f}", t!("Editar"))
+                        };
+                        header.child(
+                            header_button("preview-edit", glyph)
+                                .tooltip(move |window, cx| {
+                                    gpui_component::tooltip::Tooltip::new(tip).build(window, cx)
+                                })
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.toggle_preview_editing(window, cx)
+                                })),
+                        )
+                    },
+                )
                 .when(page.preview_dirty, |header| {
                     header.child(
                         header_button("preview-save", "\u{e74e}")
                             .text_color(rgb(theme::accent()))
-                            .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new(t!("Salvar (Ctrl+S)")).build(window, cx))
+                            .tooltip(|window, cx| {
+                                gpui_component::tooltip::Tooltip::new(t!("Salvar (Ctrl+S)"))
+                                    .build(window, cx)
+                            })
                             .on_click(cx.listener(|this, _, _window, cx| this.save_preview(cx))),
                     )
                 })
-                .when(zoomable(page), |header| header.child(render_zoom_controls(page, cx))),
+                .when(zoomable(page), |header| {
+                    header.child(render_zoom_controls(page, cx))
+                }),
         )
         .child(with_preview_wheel(content, cx))
 }
@@ -599,7 +652,9 @@ fn with_preview_wheel(content: AnyElement, cx: &mut Context<ExplorerPane>) -> An
                         };
                         if notches != 0.0 {
                             let anchor = event.position;
-                            entity.update(cx, |page, cx| page.step_preview_zoom(notches, Some(anchor), cx));
+                            entity.update(cx, |page, cx| {
+                                page.step_preview_zoom(notches, Some(anchor), cx)
+                            });
                         }
                         cx.stop_propagation();
                     });
@@ -617,7 +672,11 @@ const ZOOM_STEP: f32 = 1.2;
 impl ExplorerPane {
     /// The zoom of what the preview shows: the listing keeps its own.
     pub(crate) fn current_preview_zoom(&self) -> f32 {
-        if self.preview_listing.is_some() { self.preview_listing_zoom } else { self.preview_zoom }
+        if self.preview_listing.is_some() {
+            self.preview_listing_zoom
+        } else {
+            self.preview_zoom
+        }
     }
 
     /// Zooms by `steps` steps, in (positive) or out, keeping still the point
@@ -639,7 +698,12 @@ impl ExplorerPane {
         self.set_preview_zoom_at(zoom, None, cx);
     }
 
-    fn set_preview_zoom_at(&mut self, zoom: f32, anchor: Option<Point<Pixels>>, cx: &mut Context<Self>) {
+    fn set_preview_zoom_at(
+        &mut self,
+        zoom: f32,
+        anchor: Option<Point<Pixels>>,
+        cx: &mut Context<Self>,
+    ) {
         if self.preview_listing.is_some() {
             self.preview_listing_zoom = zoom.clamp(LISTING_ZOOM.0, LISTING_ZOOM.1);
         } else {
@@ -647,20 +711,26 @@ impl ExplorerPane {
             // A waveform only grows (it already spans the view at 1): below
             // it the number went down to 25% with nothing on screen changing,
             // and the way back took as many notches doing nothing.
-            let least = if self.preview_is_waveform() { 1.0 } else { 0.25 };
+            let least = if self.preview_is_waveform() {
+                1.0
+            } else {
+                0.25
+            };
             let zoom = zoom.clamp(least, 12.0);
             self.preview_zoom = zoom;
             let bounds = self.preview_scroll.bounds();
             // Where the anchor sits in the view; outside it (the buttons
             // below the frame) the middle stands in.
-            let local = anchor
-                .filter(|anchor| bounds.contains(anchor))
-                .map_or(point(bounds.size.width / 2.0, bounds.size.height / 2.0), |anchor| {
-                    anchor - bounds.origin
-                });
+            let local = anchor.filter(|anchor| bounds.contains(anchor)).map_or(
+                point(bounds.size.width / 2.0, bounds.size.height / 2.0),
+                |anchor| anchor - bounds.origin,
+            );
             // What scrolls now, as laid out at the old zoom, and how it grows.
             let reach = self.preview_scroll.max_offset();
-            let content = size(bounds.size.width + reach.width, bounds.size.height + reach.height);
+            let content = size(
+                bounds.size.width + reach.width,
+                bounds.size.height + reach.height,
+            );
             let grows = zoom.max(1.0) / old.max(1.0);
             let growth = if self.preview_pdf.is_some() {
                 // The pages are as wide as the zoom says, below 1 too.
@@ -734,7 +804,12 @@ fn anchored_offset_in(
     growth: (f32, f32),
 ) -> Point<Pixels> {
     let axis = |offset: Pixels, view: Pixels, content: Pixels, anchor: Pixels, factor: f32| {
-        let (offset, view, content, anchor) = (f32::from(offset), f32::from(view), f32::from(content), f32::from(anchor));
+        let (offset, view, content, anchor) = (
+            f32::from(offset),
+            f32::from(view),
+            f32::from(content),
+            f32::from(anchor),
+        );
         let under = anchor - offset;
         let most = (content * factor - view).max(0.0);
         px((anchor - under * factor).clamp(-most, 0.0))
@@ -788,7 +863,9 @@ fn zoom_frame(
                 )
                 .on_mouse_up(
                     MouseButton::Left,
-                    cx.listener(|this, _event: &MouseUpEvent, _window, _cx| this.preview_pan = None),
+                    cx.listener(|this, _event: &MouseUpEvent, _window, _cx| {
+                        this.preview_pan = None
+                    }),
                 )
         })
         .when(zoom > 1.0, |frame| {
@@ -803,20 +880,24 @@ fn zoom_frame(
                 )
                 .on_mouse_up(
                     MouseButton::Middle,
-                    cx.listener(|this, _event: &MouseUpEvent, _window, _cx| this.preview_pan = None),
+                    cx.listener(|this, _event: &MouseUpEvent, _window, _cx| {
+                        this.preview_pan = None
+                    }),
                 )
-                .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _window, cx| {
-                    let dragging = match event.pressed_button {
-                        Some(MouseButton::Middle) => true,
-                        Some(MouseButton::Left) => pan,
-                        _ => false,
-                    };
-                    if dragging {
-                        this.pan_preview(event.position, cx);
-                    } else {
-                        this.preview_pan = None;
-                    }
-                }))
+                .on_mouse_move(
+                    cx.listener(move |this, event: &MouseMoveEvent, _window, cx| {
+                        let dragging = match event.pressed_button {
+                            Some(MouseButton::Middle) => true,
+                            Some(MouseButton::Left) => pan,
+                            _ => false,
+                        };
+                        if dragging {
+                            this.pan_preview(event.position, cx);
+                        } else {
+                            this.preview_pan = None;
+                        }
+                    }),
+                )
         })
         .child(
             div()
@@ -825,7 +906,12 @@ fn zoom_frame(
                 .flex()
                 .items_center()
                 .justify_center()
-                .child(div().w(relative(zoom.min(1.0))).h(relative(zoom.min(1.0))).child(child)),
+                .child(
+                    div()
+                        .w(relative(zoom.min(1.0)))
+                        .h(relative(zoom.min(1.0)))
+                        .child(child),
+                ),
         );
     div()
         .relative()
@@ -838,7 +924,11 @@ fn zoom_frame(
 
 // The model, turned by dragging, zoomed by the wheel; a double click puts
 // it back as it opened.
-fn render_model(page: &mut ExplorerPane, window: &mut Window, cx: &mut Context<ExplorerPane>) -> AnyElement {
+fn render_model(
+    page: &mut ExplorerPane,
+    window: &mut Window,
+    cx: &mut Context<ExplorerPane>,
+) -> AnyElement {
     let Some(model) = page.preview_model.as_ref() else {
         return div().into_any_element();
     };
@@ -890,7 +980,9 @@ fn render_model(page: &mut ExplorerPane, window: &mut Window, cx: &mut Context<E
                 )
                 .on_mouse_up(
                     MouseButton::Left,
-                    cx.listener(|this, _event: &MouseUpEvent, _window, _cx| this.preview_pan = None),
+                    cx.listener(|this, _event: &MouseUpEvent, _window, _cx| {
+                        this.preview_pan = None
+                    }),
                 )
                 .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _window, cx| {
                     if event.pressed_button != Some(MouseButton::Left) {
@@ -903,7 +995,11 @@ fn render_model(page: &mut ExplorerPane, window: &mut Window, cx: &mut Context<E
                     }
                 }))
                 .when_some(image, |area, image| {
-                    area.child(img(ImageSource::Render(image)).size_full().object_fit(gpui::ObjectFit::Fill))
+                    area.child(
+                        img(ImageSource::Render(image))
+                            .size_full()
+                            .object_fit(gpui::ObjectFit::Fill),
+                    )
                 })
                 .child(
                     canvas(
@@ -934,7 +1030,11 @@ fn render_pdf(page: &ExplorerPane) -> AnyElement {
         (Some(error), _) => tf!("Não foi possível abrir o PDF: {error}", error = error),
         (None, None) => t!("Abrindo…").to_string(),
         (None, Some(total)) if (pdf.pages.len() as u32) < total.min(40) => {
-            tf!("{loaded} de {total} páginas…", loaded = pdf.pages.len(), total = total)
+            tf!(
+                "{loaded} de {total} páginas…",
+                loaded = pdf.pages.len(),
+                total = total
+            )
         }
         (None, Some(total)) if total > 40 => tf!("Primeiras 40 de {total} páginas", total = total),
         (None, Some(total)) => i18n::plural(total as usize, k!("{n} página"), k!("{n} páginas")),
@@ -1012,7 +1112,11 @@ fn render_media(page: &ExplorerPane, cx: &mut Context<ExplorerPane>) -> AnyEleme
             .text_color(rgb(theme::fg()))
             .child(text)
     };
-    let fraction = if media.duration > 0.0 { (media.position / media.duration).clamp(0.0, 1.0) } else { 0.0 };
+    let fraction = if media.duration > 0.0 {
+        (media.position / media.duration).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
     let track = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
     let track_for_click = track.clone();
     let screen = div()
@@ -1149,7 +1253,11 @@ fn render_media(page: &ExplorerPane, cx: &mut Context<ExplorerPane>) -> AnyEleme
                 .cursor_pointer()
                 .hover(|style| style.bg(rgb(theme::bg_hover())))
                 .on_click(cx.listener(|this, _event, _window, cx| this.toggle_media(cx)))
-                .child(glyph(if media.playing { "\u{e769}" } else { "\u{e768}" })),
+                .child(glyph(if media.playing {
+                    "\u{e769}"
+                } else {
+                    "\u{e768}"
+                })),
         )
         .child(
             div()
@@ -1224,7 +1332,11 @@ fn render_volume(
     glyph: impl Fn(&'static str) -> Div,
     cx: &mut Context<ExplorerPane>,
 ) -> AnyElement {
-    let level = if page.media_muted() { 0.0 } else { page.media_volume() as f32 };
+    let level = if page.media_muted() {
+        0.0
+    } else {
+        page.media_volume() as f32
+    };
     // Segoe Fluent's speaker with no, one, two or three waves.
     let speaker = match level {
         0.0 => "\u{e74f}",
@@ -1241,7 +1353,11 @@ fn render_volume(
     let wheel = cx.listener(|this, event: &ScrollWheelEvent, window, cx| {
         let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
         if delta != 0.0 {
-            let current = if this.media_muted() { 0.0 } else { this.media_volume() };
+            let current = if this.media_muted() {
+                0.0
+            } else {
+                this.media_volume()
+            };
             this.set_media_volume(current + 0.05 * f64::from(delta.signum()), cx);
             cx.stop_propagation();
         }
@@ -1283,20 +1399,28 @@ fn render_volume(
                         }
                     }),
                 )
-                .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _window, cx| {
-                    if event.pressed_button == Some(MouseButton::Left)
-                        && let Some(volume) = set_from(track_move.get(), event.position.x)
-                    {
-                        this.set_media_volume(volume, cx);
-                    }
-                }))
+                .on_mouse_move(
+                    cx.listener(move |this, event: &MouseMoveEvent, _window, cx| {
+                        if event.pressed_button == Some(MouseButton::Left)
+                            && let Some(volume) = set_from(track_move.get(), event.position.x)
+                        {
+                            this.set_media_volume(volume, cx);
+                        }
+                    }),
+                )
                 .child(
                     div()
                         .w_full()
                         .h(px(4.0))
                         .rounded_full()
                         .bg(rgb(theme::border()))
-                        .child(div().h_full().rounded_full().bg(rgb(theme::accent())).w(relative(level))),
+                        .child(
+                            div()
+                                .h_full()
+                                .rounded_full()
+                                .bg(rgb(theme::accent()))
+                                .w(relative(level)),
+                        ),
                 )
                 .child(
                     // The knob, centred on the fill's end.
@@ -1318,13 +1442,20 @@ fn render_volume(
 
 // An audio file's waveform across the player, the part already played in the
 // accent colour. Click or drag on it to seek; it fills in as the file is read.
-fn render_waveform(media: &crate::explorer::media::MediaPreview, cx: &mut Context<ExplorerPane>) -> AnyElement {
+fn render_waveform(
+    media: &crate::explorer::media::MediaPreview,
+    cx: &mut Context<ExplorerPane>,
+) -> AnyElement {
     // Bar and gap, in logical pixels.
     const BAR: f32 = 2.0;
     const GAP: f32 = 1.0;
     let peaks = media.peaks.clone();
     let (peak_max, duration) = (media.peak_max, media.duration);
-    let played = if duration > 0.0 { (media.position / duration).clamp(0.0, 1.0) as f32 } else { 0.0 };
+    let played = if duration > 0.0 {
+        (media.position / duration).clamp(0.0, 1.0) as f32
+    } else {
+        0.0
+    };
     let (played_color, rest_color) = (rgb(theme::accent()), rgb(theme::gray_400()));
     let area = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
     let (area_down, area_move) = (area.clone(), area.clone());
@@ -1346,13 +1477,15 @@ fn render_waveform(media: &crate::explorer::media::MediaPreview, cx: &mut Contex
                 }
             }),
         )
-        .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _window, cx| {
-            if event.pressed_button == Some(MouseButton::Left)
-                && let Some(fraction) = fraction_at(area_move.get(), event.position.x)
-            {
-                this.seek_media(fraction, cx);
-            }
-        }))
+        .on_mouse_move(
+            cx.listener(move |this, event: &MouseMoveEvent, _window, cx| {
+                if event.pressed_button == Some(MouseButton::Left)
+                    && let Some(fraction) = fraction_at(area_move.get(), event.position.x)
+                {
+                    this.seek_media(fraction, cx);
+                }
+            }),
+        )
         .child(
             canvas(
                 move |bounds, _, _| area.set(bounds),
@@ -1360,16 +1493,24 @@ fn render_waveform(media: &crate::explorer::media::MediaPreview, cx: &mut Contex
                     let width = f32::from(bounds.size.width);
                     let height = f32::from(bounds.size.height);
                     let count = (width / (BAR + GAP)).floor() as usize;
-                    let bars = crate::explorer::media::waveform_bars(&peaks, peak_max, duration, count);
+                    let bars =
+                        crate::explorer::media::waveform_bars(&peaks, peak_max, duration, count);
                     for (index, bar) in bars.into_iter().enumerate() {
                         let Some(level) = bar else { continue };
                         let x = index as f32 * (BAR + GAP);
                         // At least a hairline, so silence still shows as a line.
                         let bar_height = (level * height).max(1.0);
-                        let color = if x / width < played { played_color } else { rest_color };
+                        let color = if x / width < played {
+                            played_color
+                        } else {
+                            rest_color
+                        };
                         window.paint_quad(fill(
                             Bounds::new(
-                                point(bounds.origin.x + px(x), bounds.origin.y + px((height - bar_height) / 2.0)),
+                                point(
+                                    bounds.origin.x + px(x),
+                                    bounds.origin.y + px((height - bar_height) / 2.0),
+                                ),
                                 size(px(BAR), px(bar_height)),
                             ),
                             color,
@@ -1439,7 +1580,11 @@ fn render_listing(
                 .text_color(rgb(theme::muted()))
                 .child(match listing.hidden {
                     0 => listing.summary.clone(),
-                    hidden => tf!("{summary} · mais {hidden} não listados", summary = listing.summary, hidden = hidden),
+                    hidden => tf!(
+                        "{summary} · mais {hidden} não listados",
+                        summary = listing.summary,
+                        hidden = hidden
+                    ),
                 }),
         )
         .child(
@@ -1480,17 +1625,27 @@ fn listing_press(
     if archive_member.is_none() && path.is_none() {
         return None;
     }
-    Some(cx.listener(move |this, event: &MouseDownEvent, _window, _cx| {
-        if let Some((archive, member)) = &archive_member {
-            this.press_preview_archive_item(archive.clone(), member.clone(), item_is_dir, event.position);
-        } else if let Some(path) = &path {
-            this.press_preview_item(path, event.position);
-        }
-    }))
+    Some(
+        cx.listener(move |this, event: &MouseDownEvent, _window, _cx| {
+            if let Some((archive, member)) = &archive_member {
+                this.press_preview_archive_item(
+                    archive.clone(),
+                    member.clone(),
+                    item_is_dir,
+                    event.position,
+                );
+            } else if let Some(path) = &path {
+                this.press_preview_item(path, event.position);
+            }
+        }),
+    )
 }
 
 // Whether `item` is the archive entry a drag out is still extracting.
-fn extracting_entry(page: &ExplorerPane, item: &crate::explorer::preview_listing::ListingItem) -> bool {
+fn extracting_entry(
+    page: &ExplorerPane,
+    item: &crate::explorer::preview_listing::ListingItem,
+) -> bool {
     page.archive_extracting.is_some() && page.archive_extracting == item.archive_member
 }
 
@@ -1600,7 +1755,9 @@ fn render_listing_rows(
                         div()
                             .id(("preview-listing-row", ix))
                             .when(picked, |row| row.bg(rgb(theme::accent_subtle())))
-                            .when_some(press, |row, press| row.on_mouse_down(MouseButton::Left, press))
+                            .when_some(press, |row, press| {
+                                row.on_mouse_down(MouseButton::Left, press)
+                            })
                             .h(px(row))
                             .w_full()
                             .flex()
@@ -1634,7 +1791,9 @@ fn render_listing_rows(
                                 )
                             })
                             .when(extracting, |row| {
-                                row.relative().child(extracting_label(ix)).child(extracting_bar(ix))
+                                row.relative()
+                                    .child(extracting_label(ix))
+                                    .child(extracting_bar(ix))
                             })
                             .into_any_element(),
                     )
@@ -1681,22 +1840,30 @@ fn render_listing_grid(
                         // the type's icon until the waveform arrives.
                         let waveform_wanted = page.audio_waveforms
                             && !item.is_dir
-                            && item.path.as_deref().is_some_and(crate::explorer::waveforms::is_audio);
+                            && item
+                                .path
+                                .as_deref()
+                                .is_some_and(crate::explorer::waveforms::is_audio);
                         let waveform = match (&item.path, waveform_wanted) {
                             (Some(path), true) => {
-                                page.waveforms.get(path, item.size.unwrap_or(0), item.modified, cx)
+                                page.waveforms
+                                    .get(path, item.size.unwrap_or(0), item.modified, cx)
                             }
                             _ => None,
                         };
-                        let image = item.path.as_deref().filter(|_| waveform.is_none()).and_then(|path| {
-                            if item.is_dir {
-                                page.thumbnails.icon(path, true, thumb_px, cx)
-                            } else if waveform_wanted {
-                                page.thumbnails.icon(path, false, thumb_px, cx)
-                            } else {
-                                page.thumbnails.get(path, thumb_px, cx)
-                            }
-                        });
+                        let image = item
+                            .path
+                            .as_deref()
+                            .filter(|_| waveform.is_none())
+                            .and_then(|path| {
+                                if item.is_dir {
+                                    page.thumbnails.icon(path, true, thumb_px, cx)
+                                } else if waveform_wanted {
+                                    page.thumbnails.icon(path, false, thumb_px, cx)
+                                } else {
+                                    page.thumbnails.get(path, thumb_px, cx)
+                                }
+                            });
                         let extracting = extracting_entry(page, &item);
                         let click = listing_click(&rows, &item, ix, cx);
                         let press = listing_press(&item, cx);
@@ -1705,7 +1872,9 @@ fn render_listing_grid(
                             div()
                                 .id(("preview-listing-cell", ix))
                                 .when(picked, |cell| cell.bg(rgb(theme::accent_subtle())))
-                                .when_some(press, |cell, press| cell.on_mouse_down(MouseButton::Left, press))
+                                .when_some(press, |cell, press| {
+                                    cell.on_mouse_down(MouseButton::Left, press)
+                                })
                                 .w(px(cell_w))
                                 .h(px(cell_h))
                                 .flex_shrink_0()
@@ -1718,7 +1887,9 @@ fn render_listing_grid(
                                 .hover(|style| style.bg(rgb(theme::bg_hover())))
                                 .when(item.archive_member.is_some(), |cell| cell.cursor_pointer())
                                 .when(extracting, |cell| cell.relative().child(extracting_bar(ix)))
-                                .when_some(click, |cell, click| cell.cursor_pointer().on_click(click))
+                                .when_some(click, |cell, click| {
+                                    cell.cursor_pointer().on_click(click)
+                                })
                                 .child(
                                     div()
                                         .size(px(tile))
@@ -1727,7 +1898,9 @@ fn render_listing_grid(
                                         .items_center()
                                         .justify_center()
                                         .child(match (waveform, image) {
-                                            (Some(bars), _) => crate::explorer::waveforms::canvas(bars, tile, false, None),
+                                            (Some(bars), _) => crate::explorer::waveforms::canvas(
+                                                bars, tile, false, None,
+                                            ),
                                             (None, Some(image)) => img(ImageSource::Render(image))
                                                 .size_full()
                                                 .object_fit(gpui::ObjectFit::Contain)
@@ -1770,12 +1943,23 @@ fn listing_icon(
     edge: f32,
 ) -> AnyElement {
     match shell_icon {
-        Some(image) => img(ImageSource::Render(image)).size(px(edge)).flex_shrink_0().into_any_element(),
-        None => Icon::new(if item.is_dir { IconName::Folder } else { IconName::File })
+        Some(image) => img(ImageSource::Render(image))
             .size(px(edge))
             .flex_shrink_0()
-            .text_color(rgb(if item.is_dir { 0xE8B339 } else { theme::gray_500() }))
             .into_any_element(),
+        None => Icon::new(if item.is_dir {
+            IconName::Folder
+        } else {
+            IconName::File
+        })
+        .size(px(edge))
+        .flex_shrink_0()
+        .text_color(rgb(if item.is_dir {
+            0xE8B339
+        } else {
+            theme::gray_500()
+        }))
+        .into_any_element(),
     }
 }
 
@@ -1799,12 +1983,29 @@ mod zoom_anchor_tests {
     fn the_point_under_the_mouse_stays_under_it() {
         let view = size(px(400.0), px(300.0));
         for (offset, anchor, old, new) in [
-            (point(px(0.0), px(0.0)), point(px(100.0), px(50.0)), 1.0, 2.0),
-            (point(px(-120.0), px(-40.0)), point(px(300.0), px(200.0)), 2.0, 3.0),
-            (point(px(-500.0), px(-300.0)), point(px(10.0), px(290.0)), 3.0, 2.4),
+            (
+                point(px(0.0), px(0.0)),
+                point(px(100.0), px(50.0)),
+                1.0,
+                2.0,
+            ),
+            (
+                point(px(-120.0), px(-40.0)),
+                point(px(300.0), px(200.0)),
+                2.0,
+                3.0,
+            ),
+            (
+                point(px(-500.0), px(-300.0)),
+                point(px(10.0), px(290.0)),
+                3.0,
+                2.4,
+            ),
         ] {
             let after = anchored_offset(offset, view, anchor, old, new);
-            for (offset, after, anchor) in [(offset.x, after.x, anchor.x), (offset.y, after.y, anchor.y)] {
+            for (offset, after, anchor) in
+                [(offset.x, after.x, anchor.x), (offset.y, after.y, anchor.y)]
+            {
                 let before = (f32::from(anchor) - f32::from(offset)) / old;
                 let now = (f32::from(anchor) - f32::from(after)) / new;
                 assert!((before - now).abs() < 0.01, "{before} against {now}");
@@ -1817,9 +2018,21 @@ mod zoom_anchor_tests {
     #[test]
     fn the_offset_stays_inside_the_content() {
         let view = size(px(400.0), px(300.0));
-        let corner = anchored_offset(point(px(0.0), px(0.0)), view, point(px(400.0), px(300.0)), 1.0, 2.0);
+        let corner = anchored_offset(
+            point(px(0.0), px(0.0)),
+            view,
+            point(px(400.0), px(300.0)),
+            1.0,
+            2.0,
+        );
         assert_eq!(corner, point(px(-400.0), px(-300.0)));
-        let back = anchored_offset(point(px(-400.0), px(-300.0)), view, point(px(0.0), px(0.0)), 2.0, 1.0);
+        let back = anchored_offset(
+            point(px(-400.0), px(-300.0)),
+            view,
+            point(px(0.0), px(0.0)),
+            2.0,
+            1.0,
+        );
         assert_eq!(back, point(px(0.0), px(0.0)));
     }
 
@@ -1835,7 +2048,10 @@ mod zoom_anchor_tests {
         let after = anchored_offset_in(offset, view, content, anchor, (1.2, 1.2));
         let line_before = 150.0 + 1500.0;
         let line_after = (150.0 - f32::from(after.y)) / 1.2;
-        assert!((line_before - line_after).abs() < 0.5, "{line_before} against {line_after}");
+        assert!(
+            (line_before - line_after).abs() < 0.5,
+            "{line_before} against {line_after}"
+        );
         assert!(f32::from(after.y) < -1500.0, "still far down: {after:?}");
     }
 }

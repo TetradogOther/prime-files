@@ -1,6 +1,3 @@
-use nohrs_core::{k, t};
-use nohrs_core::i18n;
-use std::time::Duration;
 use super::super::types::ViewMode;
 use crate::explorer::ExplorerPane;
 use gpui::prelude::*;
@@ -9,7 +6,10 @@ use gpui_component::Sizable;
 use gpui_component::input::Input;
 use gpui_component::list::ListItem;
 use gpui_component::{Icon, IconName};
+use nohrs_core::i18n;
+use nohrs_core::{k, t};
 use nohrs_ui::theme::theme;
+use std::time::Duration;
 
 /// Renders the explorer header with navigation buttons, the breadcrumb path
 /// bar, and view-mode controls.
@@ -26,12 +26,24 @@ pub fn render(
     }
     // The crumbs run to the deepest folder of the trail; the ones past the
     // folder on screen are dimmed, and clicking one goes back down there.
-    let parts = if location.is_some() { Vec::new() } else { path_parts(&page.crumb_trail) };
-    let current_ix = if location.is_some() { 0 } else { path_parts(&page.cwd).len().saturating_sub(1) };
+    let parts = if location.is_some() {
+        Vec::new()
+    } else {
+        path_parts(&page.crumb_trail)
+    };
+    let current_ix = if location.is_some() {
+        0
+    } else {
+        path_parts(&page.cwd).len().saturating_sub(1)
+    };
     let under_this_pc = location.is_none() && starts_with_drive(&page.cwd);
 
     // Five crumbs at most, always including the folder on screen.
-    let start_idx = if parts.len() > 5 { (parts.len() - 5).min(current_ix) } else { 0 };
+    let start_idx = if parts.len() > 5 {
+        (parts.len() - 5).min(current_ix)
+    } else {
+        0
+    };
     let display_parts = parts[start_idx..].to_vec();
     let is_truncated = start_idx > 0;
 
@@ -56,7 +68,16 @@ pub fn render(
         );
     }
     if let Some(name) = location {
-        push_crumb(&mut crumbs, page, &mut crumb_id, name, theme::fg_secondary(), None, None, cx);
+        push_crumb(
+            &mut crumbs,
+            page,
+            &mut crumb_id,
+            name,
+            theme::fg_secondary(),
+            None,
+            None,
+            cx,
+        );
     } else if under_this_pc {
         // A computer, as the Explorer draws it there: the name took a
         // crumb's worth of room on every path of every drive.
@@ -107,7 +128,11 @@ pub fn render(
             String::from("/")
         } else if actual_i == 0 && unc_server.is_some() {
             // `\\nas\edicao\`: the server has its crumb already.
-            p.trim_end_matches('\\').rsplit('\\').next().unwrap_or(p).to_string()
+            p.trim_end_matches('\\')
+                .rsplit('\\')
+                .next()
+                .unwrap_or(p)
+                .to_string()
         } else {
             p.clone()
         };
@@ -317,7 +342,8 @@ pub fn render(
         )
 }
 
-type CrumbAction = Box<dyn Fn(&mut ExplorerPane, &ClickEvent, &mut Window, &mut Context<ExplorerPane>)>;
+type CrumbAction =
+    Box<dyn Fn(&mut ExplorerPane, &ClickEvent, &mut Window, &mut Context<ExplorerPane>)>;
 
 fn push_crumb(
     crumbs: &mut Vec<AnyElement>,
@@ -406,11 +432,15 @@ fn path_crumb(
     let tint = theme::accent_subtle();
     let accent = theme::accent();
     item.with_animation(
-        (ElementId::from(("path-crumb-hover", id)), generation.to_string()),
+        (
+            ElementId::from(("path-crumb-hover", id)),
+            generation.to_string(),
+        ),
         Animation::new(Duration::from_millis(160)).with_easing(ease_out_quint()),
         move |item, progress| {
             let alpha = (progress.clamp(0.0, 1.0) * 255.0).round() as u32;
-            item.bg(rgba((tint << 8) | alpha)).text_color(rgb(mix_rgb(color, accent, progress)))
+            item.bg(rgba((tint << 8) | alpha))
+                .text_color(rgb(mix_rgb(color, accent, progress)))
         },
     )
     .into_any_element()
@@ -471,18 +501,41 @@ fn mix_rgb(from: u32, to: u32, amount: f32) -> u32 {
 // "Open in": the folder on screen in the Command Prompt, PowerShell,
 // Windows Terminal (when installed) or Windows' own Explorer, each with the
 // shortcut it was given in Settings › Shortcuts.
-fn render_open_in(page: &mut ExplorerPane, cx: &mut Context<ExplorerPane>) -> impl IntoElement + use<> {
+fn render_open_in(
+    page: &mut ExplorerPane,
+    cx: &mut Context<ExplorerPane>,
+) -> impl IntoElement + use<> {
     use crate::explorer::commands::{OpenIn, has_windows_terminal};
     use nohrs_core::shortcuts::{Action, display};
     let open = page.open_in_menu;
     let mut items: Vec<(OpenIn, &'static str, &'static str, Option<String>)> = vec![
-        (OpenIn::CommandPrompt, "icons/square-terminal.svg", t!("Prompt de Comando"), display(Action::OpenCommandPrompt)),
-        (OpenIn::PowerShell, "icons/square-terminal.svg", "PowerShell", display(Action::OpenPowerShell)),
+        (
+            OpenIn::CommandPrompt,
+            "icons/square-terminal.svg",
+            t!("Prompt de Comando"),
+            display(Action::OpenCommandPrompt),
+        ),
+        (
+            OpenIn::PowerShell,
+            "icons/square-terminal.svg",
+            "PowerShell",
+            display(Action::OpenPowerShell),
+        ),
     ];
     if has_windows_terminal() {
-        items.push((OpenIn::WindowsTerminal, "icons/app-terminal.svg", "Windows Terminal", None));
+        items.push((
+            OpenIn::WindowsTerminal,
+            "icons/app-terminal.svg",
+            "Windows Terminal",
+            None,
+        ));
     }
-    items.push((OpenIn::FileExplorer, "icons/folder-open.svg", t!("Explorador do Windows"), display(Action::OpenFileExplorer)));
+    items.push((
+        OpenIn::FileExplorer,
+        "icons/folder-open.svg",
+        t!("Explorador do Windows"),
+        display(Action::OpenFileExplorer),
+    ));
     div()
         .relative()
         .flex_shrink_0()
@@ -496,7 +549,8 @@ fn render_open_in(page: &mut ExplorerPane, cx: &mut Context<ExplorerPane>) -> im
                 .hover(|style| style.bg(rgb(theme::bg_hover())))
                 .when(open, |style| style.bg(rgb(theme::bg_hover())))
                 .tooltip(|window, cx| {
-                    gpui_component::tooltip::Tooltip::new(t!("Abrir a pasta em outro programa")).build(window, cx)
+                    gpui_component::tooltip::Tooltip::new(t!("Abrir a pasta em outro programa"))
+                        .build(window, cx)
                 })
                 .on_click(cx.listener(|page, _, _, cx| {
                     page.open_in_menu = !page.open_in_menu;
@@ -506,7 +560,11 @@ fn render_open_in(page: &mut ExplorerPane, cx: &mut Context<ExplorerPane>) -> im
                     Icon::new(Icon::empty())
                         .path("icons/external-link.svg")
                         .size_4()
-                        .text_color(rgb(if open { theme::accent() } else { theme::gray_600() })),
+                        .text_color(rgb(if open {
+                            theme::accent()
+                        } else {
+                            theme::gray_600()
+                        })),
                 ),
         )
         .when(open, |this| {
@@ -554,9 +612,16 @@ fn render_open_in(page: &mut ExplorerPane, cx: &mut Context<ExplorerPane>) -> im
                             .text_color(rgb(theme::fg()))
                             .hover(|style| style.bg(rgb(theme::bg_hover())))
                             .on_click(cx.listener(move |page, _, _, cx| page.open_in(program, cx)))
-                            .child(Icon::new(Icon::empty()).path(icon).size_4().text_color(rgb(theme::fg_secondary())))
+                            .child(
+                                Icon::new(Icon::empty())
+                                    .path(icon)
+                                    .size_4()
+                                    .text_color(rgb(theme::fg_secondary())),
+                            )
                             .child(div().flex_1().child(label))
-                            .children(keys.map(|keys| div().text_xs().text_color(rgb(theme::muted())).child(keys)))
+                            .children(keys.map(|keys| {
+                                div().text_xs().text_color(rgb(theme::muted())).child(keys)
+                            }))
                     })),
             ))
         })
@@ -649,7 +714,9 @@ fn continues_below(trail: &str, cwd: &str) -> bool {
     let cwd = cwd.to_lowercase();
     let cwd = cwd.trim_end_matches(['\\', '/']);
     trail.trim_end_matches(['\\', '/']) == cwd
-        || trail.strip_prefix(cwd).is_some_and(|rest| rest.starts_with(['\\', '/']))
+        || trail
+            .strip_prefix(cwd)
+            .is_some_and(|rest| rest.starts_with(['\\', '/']))
 }
 
 fn starts_with_drive(path: &str) -> bool {
@@ -710,7 +777,10 @@ mod tests {
     fn up_goes_to_the_parent_and_from_a_drive_to_this_pc() {
         use crate::explorer::navigation::parent_location;
         use crate::explorer::places::THIS_PC;
-        assert_eq!(parent_location(r"C:\Users\ada").as_deref(), Some(r"C:\Users"));
+        assert_eq!(
+            parent_location(r"C:\Users\ada").as_deref(),
+            Some(r"C:\Users")
+        );
         assert_eq!(parent_location(r"C:\Users").as_deref(), Some(r"C:\"));
         assert_eq!(parent_location(r"C:\").as_deref(), Some(THIS_PC));
         assert_eq!(parent_location(r"d:").as_deref(), Some(THIS_PC));

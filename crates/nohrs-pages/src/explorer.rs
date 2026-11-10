@@ -1,7 +1,6 @@
 mod audio_session;
 mod batch_rename;
 pub(crate) mod commands;
-pub(crate) mod palette;
 pub(crate) mod context_menu;
 mod creative;
 mod documents;
@@ -9,39 +8,40 @@ mod drag;
 pub(crate) mod drives;
 mod entries;
 pub(crate) mod everything;
-pub(crate) mod folder_watch;
 pub(crate) mod file_ops;
 mod filter;
 mod folder_views;
+pub(crate) mod folder_watch;
 mod grouping;
 pub(crate) mod hover_audio;
 mod list_setup;
 mod marquee;
-mod navigation;
-pub(crate) mod network;
 /// The split-view container that owns one or more panes (`docs/explorer-essentials.md` §3).
 mod media;
 mod model3d;
-mod smooth_scroll;
+mod navigation;
+pub(crate) mod network;
 mod page;
+pub(crate) mod palette;
+mod path_edit;
 mod pdf;
 mod picture;
-mod path_edit;
 pub(crate) mod places;
 mod preview;
 pub(crate) mod preview_listing;
 mod quick_search;
 pub(crate) mod recycle_bin;
 mod search;
+mod smooth_scroll;
 mod state;
-pub(crate) mod thumbnails;
-pub(crate) mod waveforms;
 pub(crate) mod tags;
-pub(crate) mod video_proxy;
+pub(crate) mod thumbnails;
 mod tree;
 mod types;
+pub(crate) mod video_proxy;
 /// Rendering of a single explorer pane: header, sidebar, listing, and preview.
 pub mod view;
+pub(crate) mod waveforms;
 mod zoom;
 
 #[cfg(test)]
@@ -52,12 +52,12 @@ pub use page::{ExplorerPage, rebind_shortcuts};
 pub use state::ExplorerPane;
 // Part of `status_for_footer`'s signature, so it has to travel with it. The rest
 // of `types` stays internal.
-pub use types::StatusLevel;
 pub(crate) use navigation::open_with_default;
-/// The name the footer shows for a listing zoom value.
-pub use zoom::label as zoom_label;
+pub use types::StatusLevel;
 /// The footer zoom menu's views.
 pub use zoom::PRESETS as ZOOM_PRESETS;
+/// The name the footer shows for a listing zoom value.
+pub use zoom::label as zoom_label;
 
 use gpui::{Context, IntoElement, Render, Window};
 

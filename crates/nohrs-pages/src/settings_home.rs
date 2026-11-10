@@ -33,8 +33,18 @@ struct Mini {
     line: u32,
 }
 
-const DARK: Mini = Mini { window: 0x1B1C1F, bar: 0x26272B, side: 0x222327, line: 0x3A3B40 };
-const LIGHT: Mini = Mini { window: 0xF7F7F8, bar: 0xE9E9EC, side: 0xEFEFF2, line: 0xCFCFD5 };
+const DARK: Mini = Mini {
+    window: 0x1B1C1F,
+    bar: 0x26272B,
+    side: 0x222327,
+    line: 0x3A3B40,
+};
+const LIGHT: Mini = Mini {
+    window: 0xF7F7F8,
+    bar: 0xE9E9EC,
+    side: 0xEFEFF2,
+    line: 0xCFCFD5,
+};
 
 impl SettingsPage {
     /// The first section's top.
@@ -51,11 +61,22 @@ impl SettingsPage {
             // measured over and over each frame, about 5 ms of a scroll
             // frame that has 16 (07/11/2026).
             .child({
-                let cards = [self.theme_card(cx), self.accent_card(cx), self.explorer_card(cx)];
+                let cards = [
+                    self.theme_card(cx),
+                    self.accent_card(cx),
+                    self.explorer_card(cx),
+                ];
                 if self.home_wide() {
-                    div().flex().gap(px(12.0)).children(cards.map(|card| card.flex_1().min_w(px(0.0))))
+                    div()
+                        .flex()
+                        .gap(px(12.0))
+                        .children(cards.map(|card| card.flex_1().min_w(px(0.0))))
                 } else {
-                    div().flex().flex_col().gap(px(12.0)).children(cards.map(|card| card.w_full()))
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(12.0))
+                        .children(cards.map(|card| card.w_full()))
                 }
             })
     }
@@ -65,12 +86,18 @@ impl SettingsPage {
         use crate::updater::Status;
         let status = self.updater_status(cx);
         let (pill, tone) = match &status {
-            Status::NotInstalled => (Some(t!("Cópia portátil").to_string()), theme::fg_secondary()),
+            Status::NotInstalled => (
+                Some(t!("Cópia portátil").to_string()),
+                theme::fg_secondary(),
+            ),
             Status::Idle => (None, theme::fg_secondary()),
             Status::Checking => (Some(t!("Procurando…").to_string()), theme::fg_secondary()),
             // Green on either theme: the palette has no colour for "fine".
             Status::UpToDate => (Some(t!("Atualizado").to_string()), 0x46A758),
-            Status::Downloading(version) => (Some(tf!("Baixando a versão {version}…", version = version)), theme::accent()),
+            Status::Downloading(version) => (
+                Some(tf!("Baixando a versão {version}…", version = version)),
+                theme::accent(),
+            ),
             Status::Ready { .. } => (Some(t!("Atualização pronta").to_string()), theme::accent()),
             Status::Failed(_) => (Some(t!("Falha ao atualizar").to_string()), theme::danger()),
         };
@@ -136,14 +163,19 @@ impl SettingsPage {
                     .flex_shrink_0()
                     .gap(px(8.0))
                     .when(ready, |this| {
-                        this.child(primary_button("home-install-update", t!("Atualizar agora")).on_click(cx.listener(
-                            |page, _event, _window, cx| page.install_update(cx),
-                        )))
+                        this.child(
+                            primary_button("home-install-update", t!("Atualizar agora")).on_click(
+                                cx.listener(|page, _event, _window, cx| page.install_update(cx)),
+                            ),
+                        )
                     })
                     .when(can_check && !ready, |this| {
-                        this.child(secondary_button("home-check-updates", t!("Procurar atualizações")).on_click(
-                            cx.listener(|page, _event, _window, cx| page.check_updates(cx)),
-                        ))
+                        this.child(
+                            secondary_button("home-check-updates", t!("Procurar atualizações"))
+                                .on_click(
+                                    cx.listener(|page, _event, _window, cx| page.check_updates(cx)),
+                                ),
+                        )
                     }),
             )
     }
@@ -157,7 +189,13 @@ impl SettingsPage {
                 .gap(px(10.0))
                 .child(self.theme_tile("home-theme-dark", t!("Escuro"), ThemeMode::Dark, mode, cx))
                 .child(self.theme_tile("home-theme-light", t!("Claro"), ThemeMode::Light, mode, cx))
-                .child(self.theme_tile("home-theme-system", t!("Igual ao Windows"), ThemeMode::System, mode, cx)),
+                .child(self.theme_tile(
+                    "home-theme-system",
+                    t!("Igual ao Windows"),
+                    ThemeMode::System,
+                    mode,
+                    cx,
+                )),
         )
     }
 
@@ -192,7 +230,15 @@ impl SettingsPage {
                         .w(relative(0.5))
                         .h_full()
                         .overflow_hidden()
-                        .child(div().absolute().top_0().right_0().w(relative(2.0)).h_full().child(mini_window(&LIGHT))),
+                        .child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .right_0()
+                                .w(relative(2.0))
+                                .h_full()
+                                .child(mini_window(&LIGHT)),
+                        ),
                 )
                 .into_any_element(),
         };
@@ -204,7 +250,9 @@ impl SettingsPage {
             .flex_col()
             .gap(px(6.0))
             .cursor_pointer()
-            .on_click(cx.listener(move |page, _event, _window, cx| page.write_config("theme", "mode", value, cx)))
+            .on_click(cx.listener(move |page, _event, _window, cx| {
+                page.write_config("theme", "mode", value, cx)
+            }))
             .child(
                 div()
                     .h(px(64.0))
@@ -212,7 +260,11 @@ impl SettingsPage {
                     .rounded(px(8.0))
                     .overflow_hidden()
                     .border_2()
-                    .border_color(rgb(if selected { theme::accent() } else { theme::border() }))
+                    .border_color(rgb(if selected {
+                        theme::accent()
+                    } else {
+                        theme::border()
+                    }))
                     .hover(|style| style.border_color(rgb(theme::accent())))
                     .child(picture),
             )
@@ -220,7 +272,11 @@ impl SettingsPage {
                 div()
                     .text_xs()
                     .text_center()
-                    .text_color(rgb(if selected { theme::fg() } else { theme::fg_secondary() }))
+                    .text_color(rgb(if selected {
+                        theme::fg()
+                    } else {
+                        theme::fg_secondary()
+                    }))
                     .when(selected, |this| this.font_weight(FontWeight::MEDIUM))
                     .child(label),
             )
@@ -229,28 +285,51 @@ impl SettingsPage {
     // The accent, as dots: the selected one ringed.
     fn accent_card(&self, cx: &mut Context<Self>) -> Div {
         let accent = self.config().theme.accent.trim().to_string();
-        let dots = theme::NAMED_ACCENTS.iter().zip(ACCENT_LABELS).map(|(&(name, color), &label)| {
-            let selected = accent.eq_ignore_ascii_case(name);
-            let swatch = color.unwrap_or_else(theme::palette_accent);
-            let tip: SharedString = tr(label).into();
+        let dots =
+            theme::NAMED_ACCENTS
+                .iter()
+                .zip(ACCENT_LABELS)
+                .map(|(&(name, color), &label)| {
+                    let selected = accent.eq_ignore_ascii_case(name);
+                    let swatch = color.unwrap_or_else(theme::palette_accent);
+                    let tip: SharedString = tr(label).into();
+                    div()
+                        .id(ElementId::Name(SharedString::from(format!(
+                            "home-accent-{name}"
+                        ))))
+                        .size(px(30.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_full()
+                        .border_2()
+                        .border_color(rgb(if selected {
+                            theme::fg()
+                        } else {
+                            theme::bg_secondary()
+                        }))
+                        .cursor_pointer()
+                        .tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+                        })
+                        .on_click(cx.listener(move |page, _event, _window, cx| {
+                            page.write_config("theme", "accent", &format!("\"{name}\""), cx);
+                        }))
+                        .child(div().size(px(22.0)).rounded_full().bg(rgb(swatch)))
+                });
+        card(
+            t!("Cor de destaque"),
+            Some(t!("Seleção, abas ativas e botões.")),
+        )
+        .child(
             div()
-                .id(ElementId::Name(SharedString::from(format!("home-accent-{name}"))))
-                .size(px(30.0))
                 .flex()
+                .flex_wrap()
                 .items_center()
-                .justify_center()
-                .rounded_full()
-                .border_2()
-                .border_color(rgb(if selected { theme::fg() } else { theme::bg_secondary() }))
-                .cursor_pointer()
-                .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
-                .on_click(cx.listener(move |page, _event, _window, cx| {
-                    page.write_config("theme", "accent", &format!("\"{name}\""), cx);
-                }))
-                .child(div().size(px(22.0)).rounded_full().bg(rgb(swatch)))
-        });
-        card(t!("Cor de destaque"), Some(t!("Seleção, abas ativas e botões.")))
-            .child(div().flex().flex_wrap().items_center().gap(px(6.0)).children(dots).child(self.custom_accent(true, cx)))
+                .gap(px(6.0))
+                .children(dots)
+                .child(self.custom_accent(true, cx)),
+        )
     }
 
     // Taking folders over from Windows' Explorer, the one switch most
@@ -258,9 +337,16 @@ impl SettingsPage {
     fn explorer_card(&self, cx: &mut Context<Self>) -> Div {
         card(
             t!("Explorador padrão"),
-            Some(t!("Pastas, Win+E e o ícone do Explorador na barra de tarefas abrem no Prime Files.")),
+            Some(t!(
+                "Pastas, Win+E e o ícone do Explorador na barra de tarefas abrem no Prime Files."
+            )),
         )
-        .child(div().flex().justify_end().child(self.default_explorer_switch(cx)))
+        .child(
+            div()
+                .flex()
+                .justify_end()
+                .child(self.default_explorer_switch(cx)),
+        )
     }
 }
 
@@ -291,9 +377,21 @@ fn card(title: &'static str, hint: Option<&'static str>) -> Div {
                 .flex()
                 .flex_col()
                 .gap(px(3.0))
-                .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(theme::fg())).child(title))
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(rgb(theme::fg()))
+                        .child(title),
+                )
                 .when_some(hint, |this, hint| {
-                    this.child(div().text_xs().line_height(px(17.0)).text_color(rgb(theme::fg_secondary())).child(hint))
+                    this.child(
+                        div()
+                            .text_xs()
+                            .line_height(px(17.0))
+                            .text_color(rgb(theme::fg_secondary()))
+                            .child(hint),
+                    )
                 }),
         )
 }
@@ -363,4 +461,3 @@ fn secondary_button(id: &'static str, label: &'static str) -> Stateful<Div> {
         .hover(|style| style.bg(rgb(theme::bg_hover())))
         .child(label)
 }
-

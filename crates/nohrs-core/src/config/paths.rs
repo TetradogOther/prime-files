@@ -112,7 +112,10 @@ pub fn documents_dir() -> PathBuf {
     if !named.is_dir()
         && let Err(error) = std::fs::create_dir_all(&named)
     {
-        tracing::warn!("could not create the documents folder {}: {error}", named.display());
+        tracing::warn!(
+            "could not create the documents folder {}: {error}",
+            named.display()
+        );
     }
     named
 }

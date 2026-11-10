@@ -2,6 +2,12 @@
 
 Explorador de arquivos para Windows, rápido, escrito em Rust.
 
+### Linux / Debian
+
+Esta versão traz também a porta para Linux, com a mesma interface: abas, divisão em dois painéis, visualizador, terminal embutido, busca e modo compacto. O pacote Debian (`prime-files_<versão>_amd64.deb`) instala o programa, o ícone e a entrada do menu.
+
+No Linux a interface fala **espanhol** e **catalán**, como as outras dez línguas do programa, e o texto que fala do ambiente gráfico em vez do Windows: o gerenciador de arquivos do desktop, a pasta de documentos que o desktop nomeou, o cache de miniaturas do freedesktop e o tema de ícones.
+
 ### Novidades da 0.3.9
 
 - **Desfazer e refazer tudo**: Ctrl+Z agora também desfaz renomear e criar pasta, além de excluir, mover e copiar. Ctrl+Y (ou Ctrl+Shift+Z) refaz o que foi desfeito, quantas vezes quiser. O botão direito mostra "Desfazer…" com o nome da ação e "Refazer".

@@ -108,7 +108,12 @@ fn strip_overflows(handle: &ScrollHandle) -> bool {
 // An arrow at one end of a tab strip that does not fit: slides the strip by
 // `TAB_SCROLL_STEP` towards `direction` (-1 left, 1 right). Dimmed at its end.
 // Only the view slides: the active tab stays the active tab.
-fn tab_scroll_arrow(id: (&'static str, usize), handle: &ScrollHandle, direction: f32, at_end: bool) -> Stateful<Div> {
+fn tab_scroll_arrow(
+    id: (&'static str, usize),
+    handle: &ScrollHandle,
+    direction: f32,
+    at_end: bool,
+) -> Stateful<Div> {
     let handle = handle.clone();
     div()
         .id(id)
@@ -121,7 +126,8 @@ fn tab_scroll_arrow(id: (&'static str, usize), handle: &ScrollHandle, direction:
         .mb(px(2.0))
         .rounded(px(6.0))
         .when(!at_end, |this| {
-            this.cursor_pointer().hover(|style| style.bg(rgb(theme::toolbar_hover())))
+            this.cursor_pointer()
+                .hover(|style| style.bg(rgb(theme::toolbar_hover())))
         })
         .when(at_end, |this| this.opacity(0.35))
         // The pane-wide `on_mouse_down` would also take the press.
@@ -135,9 +141,13 @@ fn tab_scroll_arrow(id: (&'static str, usize), handle: &ScrollHandle, direction:
             window.refresh();
         })
         .child(
-            Icon::new(if direction < 0.0 { IconName::ChevronLeft } else { IconName::ChevronRight })
-                .size_4()
-                .text_color(rgb(theme::muted())),
+            Icon::new(if direction < 0.0 {
+                IconName::ChevronLeft
+            } else {
+                IconName::ChevronRight
+            })
+            .size_4()
+            .text_color(rgb(theme::muted())),
         )
 }
 
@@ -351,7 +361,12 @@ impl<T: PaneItem> PaneGroup<T> {
     /// [`Self::add_pane`] at `index` (0 puts it before the open one, for a
     /// pane dragged out of the left or top edge). The active pane keeps
     /// pointing at the same pane.
-    pub fn add_pane_at(&mut self, index: usize, window: &mut Window, cx: &mut App) -> Option<(usize, Entity<T>)> {
+    pub fn add_pane_at(
+        &mut self,
+        index: usize,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<(usize, Entity<T>)> {
         if self.panes.len() >= MAX_PANES {
             return None;
         }
@@ -426,10 +441,17 @@ impl<T: PaneItem> PaneGroup<T> {
                 self.drag = Some(GroupDrag::Divider { collapsing });
                 true
             }
-            Some(GroupDrag::TabColumn { start_x, start_width }) => {
+            Some(GroupDrag::TabColumn {
+                start_x,
+                start_width,
+            }) => {
                 let width = start_width + f32::from(pointer.x) - start_x;
                 // Under the labels' minimum the column snaps to its icons.
-                let width = if width < TAB_COLUMN_LABELS_MIN { TAB_COLUMN_ICONS } else { width.min(TAB_COLUMN_MAX) };
+                let width = if width < TAB_COLUMN_LABELS_MIN {
+                    TAB_COLUMN_ICONS
+                } else {
+                    width.min(TAB_COLUMN_MAX)
+                };
                 TAB_COLUMN_WIDTH.set(width);
                 true
             }
@@ -441,7 +463,9 @@ impl<T: PaneItem> PaneGroup<T> {
     /// for the embedder to close (it owns the per-tab state to drop).
     pub fn finish_drag(&mut self) -> Option<usize> {
         match self.drag.take() {
-            Some(GroupDrag::Divider { collapsing: Some(index) }) => {
+            Some(GroupDrag::Divider {
+                collapsing: Some(index),
+            }) => {
                 self.ratio = 0.5;
                 Some(index)
             }
@@ -719,7 +743,12 @@ impl<T: PaneItem> PaneGroup<T> {
     /// Renders the split. The `callbacks` route every interaction (pane/tab
     /// activate, close, new tab, reorder) back to the embedding view `V` so it
     /// can keep its own state in sync.
-    pub fn render<V>(&self, window: &Window, cx: &mut Context<V>, callbacks: &PaneGroupCallbacks<V>) -> AnyElement
+    pub fn render<V>(
+        &self,
+        window: &Window,
+        cx: &mut Context<V>,
+        callbacks: &PaneGroupCallbacks<V>,
+    ) -> AnyElement
     where
         V: 'static,
     {
@@ -735,7 +764,11 @@ impl<T: PaneItem> PaneGroup<T> {
         };
         let held = matches!(self.drag, Some(GroupDrag::Divider { .. }));
         let bounds = self.bounds.get();
-        let length = f32::from(if across { bounds.size.width } else { bounds.size.height });
+        let length = f32::from(if across {
+            bounds.size.width
+        } else {
+            bounds.size.height
+        });
         // A pane about to close fades, so letting go is no surprise.
         let fade = |index: usize, element: AnyElement| {
             div()
@@ -744,12 +777,20 @@ impl<T: PaneItem> PaneGroup<T> {
                 .child(element)
         };
         let on_group_drag = callbacks.on_group_drag.clone();
-        let side = if across { nohrs_core::config::DockSide::Left } else { nohrs_core::config::DockSide::Top };
+        let side = if across {
+            nohrs_core::config::DockSide::Left
+        } else {
+            nohrs_core::config::DockSide::Top
+        };
         let at = length * self.ratio - DIVIDER_GRIP / 2.0;
         let divider = crate::dock::strip("pane-divider", side, held)
             .absolute()
-            .when(across, |this| this.top_0().bottom_0().w(px(DIVIDER_GRIP)).left(px(at)))
-            .when(!across, |this| this.left_0().right_0().h(px(DIVIDER_GRIP)).top(px(at)))
+            .when(across, |this| {
+                this.top_0().bottom_0().w(px(DIVIDER_GRIP)).left(px(at))
+            })
+            .when(!across, |this| {
+                this.left_0().right_0().h(px(DIVIDER_GRIP)).top(px(at))
+            })
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &MouseDownEvent, window, cx| {
@@ -772,8 +813,12 @@ impl<T: PaneItem> PaneGroup<T> {
                 div()
                     .flex_shrink_0()
                     .overflow_hidden()
-                    .when(across, |this| this.w(relative(self.ratio)).h_full().border_r_1())
-                    .when(!across, |this| this.h(relative(self.ratio)).w_full().border_b_1())
+                    .when(across, |this| {
+                        this.w(relative(self.ratio)).h_full().border_r_1()
+                    })
+                    .when(!across, |this| {
+                        this.h(relative(self.ratio)).w_full().border_b_1()
+                    })
                     .border_color(rgb(theme::border()))
                     .child(fade(0, first)),
             )
@@ -823,7 +868,10 @@ impl<T: PaneItem> PaneGroup<T> {
             // sidebar's to slide from.
             let reveal = self.panes[pane_index].reveal.clone();
             reveal.set_inset(0.0);
-            let compact = Compact { hide_tabs: false, ..self.compact.clone() };
+            let compact = Compact {
+                hide_tabs: false,
+                ..self.compact.clone()
+            };
             content.update(cx, |item, _| item.attach_compact(&compact, &reveal));
             let column = self.render_tab_column(pane_index, split, cx, callbacks);
             return div()
@@ -832,14 +880,27 @@ impl<T: PaneItem> PaneGroup<T> {
                 .size_full()
                 .min_w(px(0.0))
                 .min_h(px(0.0))
-                .when(is_active, |this| this.border_t_2().border_color(rgb(theme::accent())))
-                .when(split && !is_active, |this| this.border_t_2().border_color(rgb(theme::bg())))
+                .when(is_active, |this| {
+                    this.border_t_2().border_color(rgb(theme::accent()))
+                })
+                .when(split && !is_active, |this| {
+                    this.border_t_2().border_color(rgb(theme::bg()))
+                })
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(move |this, _event, window, cx| on_activate_pane(this, pane_index, window, cx)),
+                    cx.listener(move |this, _event, window, cx| {
+                        on_activate_pane(this, pane_index, window, cx)
+                    }),
                 )
                 .child(column)
-                .child(div().flex_1().min_w(px(0.0)).h_full().overflow_hidden().child(content))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.0))
+                        .h_full()
+                        .overflow_hidden()
+                        .child(content),
+                )
                 .into_any_element();
         }
         let tab_bar = self
@@ -913,15 +974,27 @@ impl<T: PaneItem> PaneGroup<T> {
         let overlay = self.compact.overlay;
         reveal.set_inset(if overlay { shown_height } else { 0.0 });
 
-        let sliding = compact::slider(Edge::Top, 0.0, bar_height, amount, None, div().h(px(bar_height)).child(tab_bar))
-            // Floating, it takes the mouse from what lies behind: a click on
-            // a tab, or on the window's buttons, must not reach the files
-            // under it (they would claim the press, and gpui then drops the
-            // minimize/maximize/close it was meant for).
-            .when(overlay, |this| this.absolute().top_0().left_0().right_0().occlude())
-            // With a frame the row is the frame's colour already and reads as
-            // part of it, as the explorer's bars do; a shadow would lift it off.
-            .when(overlay && amount > 0.0 && self.compact.frame_px == 0, |this| this.shadow_md());
+        let sliding = compact::slider(
+            Edge::Top,
+            0.0,
+            bar_height,
+            amount,
+            None,
+            div().h(px(bar_height)).child(tab_bar),
+        )
+        // Floating, it takes the mouse from what lies behind: a click on
+        // a tab, or on the window's buttons, must not reach the files
+        // under it (they would claim the press, and gpui then drops the
+        // minimize/maximize/close it was meant for).
+        .when(overlay, |this| {
+            this.absolute().top_0().left_0().right_0().occlude()
+        })
+        // With a frame the row is the frame's colour already and reads as
+        // part of it, as the explorer's bars do; a shadow would lift it off.
+        .when(
+            overlay && amount > 0.0 && self.compact.frame_px == 0,
+            |this| this.shadow_md(),
+        );
         // Out of the frame, a line along the row's foot from one side of the
         // card to the other carries on the card's outline, which the row
         // covers while it is out.
@@ -950,9 +1023,15 @@ impl<T: PaneItem> PaneGroup<T> {
             cx.entity_id(),
         );
         if overlay {
-            (None, vec![sliding.into_any_element(), strip.into_any_element()])
+            (
+                None,
+                vec![sliding.into_any_element(), strip.into_any_element()],
+            )
         } else {
-            (Some(sliding.into_any_element()), vec![strip.into_any_element()])
+            (
+                Some(sliding.into_any_element()),
+                vec![strip.into_any_element()],
+            )
         }
     }
 
@@ -1033,7 +1112,12 @@ impl<T: PaneItem> PaneGroup<T> {
             // own they kept their minimum width and ran on under the window's
             // buttons (issue #3).
             .when(overflowing, |this| {
-                this.child(tab_scroll_arrow(("tab-scroll-left", pane_index), &pane.tab_scroll, -1.0, at_start))
+                this.child(tab_scroll_arrow(
+                    ("tab-scroll-left", pane_index),
+                    &pane.tab_scroll,
+                    -1.0,
+                    at_start,
+                ))
             })
             .child(
                 div()
@@ -1050,7 +1134,12 @@ impl<T: PaneItem> PaneGroup<T> {
             )
             .child(strip_watch(pane.tab_scroll.clone(), overflowing))
             .when(overflowing, |this| {
-                this.child(tab_scroll_arrow(("tab-scroll-right", pane_index), &pane.tab_scroll, 1.0, at_end))
+                this.child(tab_scroll_arrow(
+                    ("tab-scroll-right", pane_index),
+                    &pane.tab_scroll,
+                    1.0,
+                    at_end,
+                ))
             })
             // New-tab affordance (`Cmd/Ctrl+T`, §4 / §6).
             .child(
@@ -1121,14 +1210,9 @@ impl<T: PaneItem> PaneGroup<T> {
                 // themselves, pinned to the top right corner.
                 this.relative()
                     .child(div().flex_shrink_0().w(px(TITLE_CONTROLS_WIDTH)))
-                    .child(
-                        div()
-                            .absolute()
-                            .top_0()
-                            .right_0()
-                            .h(px(40.0))
-                            .child(nohrs_ui::components::layout::unified_toolbar::title_bar_controls(window)),
-                    )
+                    .child(div().absolute().top_0().right_0().h(px(40.0)).child(
+                        nohrs_ui::components::layout::unified_toolbar::title_bar_controls(window),
+                    ))
             })
     }
 
@@ -1223,7 +1307,11 @@ impl<T: PaneItem> PaneGroup<T> {
                         Icon::new(icon.unwrap_or(IconName::Folder))
                             .size_4()
                             .flex_shrink_0()
-                            .text_color(rgb(if is_active { theme::accent() } else { theme::muted() })),
+                            .text_color(rgb(if is_active {
+                                theme::accent()
+                            } else {
+                                theme::muted()
+                            })),
                     )
                     .when(labels, |this| {
                         this.child(
@@ -1240,7 +1328,9 @@ impl<T: PaneItem> PaneGroup<T> {
                     .when(labels && show_close, |this| {
                         this.child(
                             div()
-                                .id(SharedString::from(format!("vtab-close-{pane_index}-{tab_index}")))
+                                .id(SharedString::from(format!(
+                                    "vtab-close-{pane_index}-{tab_index}"
+                                )))
                                 .flex()
                                 .flex_shrink_0()
                                 .items_center()
@@ -1248,13 +1338,18 @@ impl<T: PaneItem> PaneGroup<T> {
                                 .size(px(20.0))
                                 .rounded(px(4.0))
                                 .when(!is_active, |this| {
-                                    this.opacity(0.0).group_hover(group.clone(), |style| style.opacity(1.0))
+                                    this.opacity(0.0)
+                                        .group_hover(group.clone(), |style| style.opacity(1.0))
                                 })
                                 .text_color(rgb(theme::muted()))
                                 .hover(|style| {
-                                    style.bg(rgb(theme::toolbar_hover())).text_color(rgb(theme::fg()))
+                                    style
+                                        .bg(rgb(theme::toolbar_hover()))
+                                        .text_color(rgb(theme::fg()))
                                 })
-                                .on_mouse_down(MouseButton::Left, |_, _window, cx| cx.stop_propagation())
+                                .on_mouse_down(MouseButton::Left, |_, _window, cx| {
+                                    cx.stop_propagation()
+                                })
                                 .on_click(cx.listener(move |this, _event, window, cx| {
                                     on_close_tab(this, pane_index, tab_index, window, cx)
                                 }))
@@ -1267,24 +1362,29 @@ impl<T: PaneItem> PaneGroup<T> {
         let on_new_tab = callbacks.on_new_tab.clone();
         let on_close_pane = callbacks.on_close_pane.clone();
         let on_group_drag = callbacks.on_group_drag.clone();
-        let new_tab = div()
-            .id(SharedString::from(format!("vtab-new-{pane_index}")))
-            .flex()
-            .flex_shrink_0()
-            .items_center()
-            .gap(px(8.0))
-            .h(px(32.0))
-            .px(px(if labels { 10.0 } else { 0.0 }))
-            .when(!labels, |this| this.justify_center())
-            .rounded(px(8.0))
-            .text_sm()
-            .text_color(rgb(theme::muted()))
-            .cursor_pointer()
-            .hover(|style| style.bg(rgb(theme::toolbar_hover())))
-            .on_mouse_down(MouseButton::Left, |_, _window, cx| cx.stop_propagation())
-            .on_click(cx.listener(move |this, _event, window, cx| on_new_tab(this, pane_index, window, cx)))
-            .child(Icon::new(IconName::Plus).size_4().flex_shrink_0())
-            .when(labels, |this| this.child(nohrs_core::t!("Nova aba").to_string()));
+        let new_tab =
+            div()
+                .id(SharedString::from(format!("vtab-new-{pane_index}")))
+                .flex()
+                .flex_shrink_0()
+                .items_center()
+                .gap(px(8.0))
+                .h(px(32.0))
+                .px(px(if labels { 10.0 } else { 0.0 }))
+                .when(!labels, |this| this.justify_center())
+                .rounded(px(8.0))
+                .text_sm()
+                .text_color(rgb(theme::muted()))
+                .cursor_pointer()
+                .hover(|style| style.bg(rgb(theme::toolbar_hover())))
+                .on_mouse_down(MouseButton::Left, |_, _window, cx| cx.stop_propagation())
+                .on_click(cx.listener(move |this, _event, window, cx| {
+                    on_new_tab(this, pane_index, window, cx)
+                }))
+                .child(Icon::new(IconName::Plus).size_4().flex_shrink_0())
+                .when(labels, |this| {
+                    this.child(nohrs_core::t!("Nova aba").to_string())
+                });
         div()
             .relative()
             .flex_shrink_0()
@@ -1331,7 +1431,11 @@ impl<T: PaneItem> PaneGroup<T> {
             )
             .child(
                 crate::dock::place_on_inner_edge(
-                    crate::dock::strip(("vtab-edge", pane_index), nohrs_core::config::DockSide::Left, false),
+                    crate::dock::strip(
+                        ("vtab-edge", pane_index),
+                        nohrs_core::config::DockSide::Left,
+                        false,
+                    ),
                     nohrs_core::config::DockSide::Left,
                 )
                 .on_mouse_down(
@@ -1487,7 +1591,8 @@ impl<T: PaneItem> PaneGroup<T> {
                         // Only on the active tab and the one under the
                         // pointer, so a row of tabs is not a row of crosses.
                         .when(!is_active, |this| {
-                            this.opacity(0.0).group_hover(group.clone(), |style| style.opacity(1.0))
+                            this.opacity(0.0)
+                                .group_hover(group.clone(), |style| style.opacity(1.0))
                         })
                         .text_color(rgb(theme::muted()))
                         .hover(|style| {
@@ -1507,4 +1612,3 @@ impl<T: PaneItem> PaneGroup<T> {
             .into_any_element()
     }
 }
-

@@ -30,7 +30,8 @@ fn enabled() -> bool {
 
 // Until when Explorer windows are left alone because Prime Files opened them
 // itself ("Open in File Explorer", a place only the Explorer shows).
-static LEAVE_EXPLORER_UNTIL: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+static LEAVE_EXPLORER_UNTIL: std::sync::Mutex<Option<std::time::Instant>> =
+    std::sync::Mutex::new(None);
 
 /// Lets the next Explorer window (within a few seconds) stay the
 /// Explorer's: called right before Prime Files starts explorer.exe itself.
@@ -59,20 +60,27 @@ pub fn watch(_window: &mut Window, cx: &mut Context<RootView>) {
         return;
     }
     // Shown in the window used last (`crate::windows`).
-    cx.spawn(async move |_this: WeakEntity<RootView>, cx: &mut gpui::AsyncApp| {
-        while let Ok(path) = receiver.recv().await {
-            if crate::windows::with_target(cx, |root, window, cx| root.reveal_from_elsewhere(&path, window, cx)).is_none() {
-                tracing::debug!("no explorer window to show {path} in");
+    cx.spawn(
+        async move |_this: WeakEntity<RootView>, cx: &mut gpui::AsyncApp| {
+            while let Ok(path) = receiver.recv().await {
+                if crate::windows::with_target(cx, |root, window, cx| {
+                    root.reveal_from_elsewhere(&path, window, cx)
+                })
+                .is_none()
+                {
+                    tracing::debug!("no explorer window to show {path} in");
+                }
             }
-        }
-    })
+        },
+    )
     .detach();
 }
 
 impl RootView {
     // The file another program asked Explorer to show, shown here instead.
     fn reveal_from_elsewhere(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((folder, select)) = crate::ipc::folder_and_selection(std::path::Path::new(path)) else {
+        let Some((folder, select)) = crate::ipc::folder_and_selection(std::path::Path::new(path))
+        else {
             return;
         };
         self.show_explorer(cx);
@@ -190,7 +198,9 @@ mod platform {
     }
 
     fn watch_window(hwnd: isize) {
-        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.ok().ok();
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }
+            .ok()
+            .ok();
         let deadline = Instant::now() + SETTLE;
         // Polls since the folder's items were first listed.
         let mut listed_for = None;
@@ -222,7 +232,11 @@ mod platform {
                     // Files is the default explorer.
                     let polls = listed_for.get_or_insert(0);
                     *polls += 1;
-                    let grace = if super::takes_folders() { TAKEN_SELECTION_GRACE } else { SELECTION_GRACE };
+                    let grace = if super::takes_folders() {
+                        TAKEN_SELECTION_GRACE
+                    } else {
+                        SELECTION_GRACE
+                    };
                     if *polls > grace {
                         take_folder(&browser, folder);
                         break;
@@ -265,23 +279,34 @@ mod platform {
 
     // What the Explorer window `hwnd` shows, once it has listed its folder.
     fn read_window(hwnd: isize) -> Option<(IWebBrowser2, View)> {
-        let windows: IShellWindows = unsafe { CoCreateInstance(&ShellWindows, None, CLSCTX_ALL) }.ok()?;
+        let windows: IShellWindows =
+            unsafe { CoCreateInstance(&ShellWindows, None, CLSCTX_ALL) }.ok()?;
         let count = unsafe { windows.Count() }.ok()?;
         for index in 0..count {
-            let Ok(item) = (unsafe { windows.Item(&VARIANT::from(index)) }) else { continue };
-            let Ok(browser) = item.cast::<IWebBrowser2>() else { continue };
+            let Ok(item) = (unsafe { windows.Item(&VARIANT::from(index)) }) else {
+                continue;
+            };
+            let Ok(browser) = item.cast::<IWebBrowser2>() else {
+                continue;
+            };
             if !unsafe { browser.HWND() }.is_ok_and(|handle| handle.0 as isize == hwnd) {
                 continue;
             }
             let provider: IServiceProvider = browser.cast().ok()?;
-            let shell_browser: IShellBrowser = unsafe { provider.QueryService(&SID_STopLevelBrowser) }.ok()?;
-            let view: IFolderView2 = unsafe { shell_browser.QueryActiveShellView() }.ok()?.cast().ok()?;
-            let folder = unsafe { view.GetFolder::<IShellItem>() }.ok().and_then(|folder| {
-                let name = unsafe { folder.GetDisplayName(SIGDN_FILESYSPATH) }.ok()?;
-                let path = unsafe { name.to_string() }.ok();
-                unsafe { CoTaskMemFree(Some(name.0 as _)) };
-                path
-            });
+            let shell_browser: IShellBrowser =
+                unsafe { provider.QueryService(&SID_STopLevelBrowser) }.ok()?;
+            let view: IFolderView2 = unsafe { shell_browser.QueryActiveShellView() }
+                .ok()?
+                .cast()
+                .ok()?;
+            let folder = unsafe { view.GetFolder::<IShellItem>() }
+                .ok()
+                .and_then(|folder| {
+                    let name = unsafe { folder.GetDisplayName(SIGDN_FILESYSPATH) }.ok()?;
+                    let path = unsafe { name.to_string() }.ok();
+                    unsafe { CoTaskMemFree(Some(name.0 as _)) };
+                    path
+                });
             if unsafe { view.ItemCount(SVGIO_ALLVIEW) }.ok()? == 0 {
                 return Some((browser, View::Empty(folder)));
             }

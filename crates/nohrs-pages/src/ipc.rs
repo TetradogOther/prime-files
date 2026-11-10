@@ -203,13 +203,17 @@ pub fn serve(window: &mut Window, cx: &mut Context<RootView>) {
     // Each request goes to the window used last, not the one that opened the
     // channel: "open this folder" from Listary or a second nohrs.exe lands
     // as a tab where the person is working.
-    cx.spawn(async move |_this: WeakEntity<RootView>, cx: &mut gpui::AsyncApp| {
-        while let Ok((request, reply)) = receiver.recv().await {
-            let answer = crate::windows::with_target(cx, |root, window, cx| root.handle_ipc(request, window, cx))
+    cx.spawn(
+        async move |_this: WeakEntity<RootView>, cx: &mut gpui::AsyncApp| {
+            while let Ok((request, reply)) = receiver.recv().await {
+                let answer = crate::windows::with_target(cx, |root, window, cx| {
+                    root.handle_ipc(request, window, cx)
+                })
                 .unwrap_or_else(|| json!({ "ok": false, "error": "window closed" }));
-            reply.try_send(answer).ok();
-        }
-    })
+                reply.try_send(answer).ok();
+            }
+        },
+    )
     .detach();
 }
 
@@ -239,7 +243,10 @@ fn answer(
     let reply = match serde_json::from_str::<Envelope>(&line) {
         Ok(envelope) if envelope.token == token => {
             let (reply_sender, reply) = async_channel::bounded(1);
-            if sender.send_blocking((envelope.request, reply_sender)).is_err() {
+            if sender
+                .send_blocking((envelope.request, reply_sender))
+                .is_err()
+            {
                 json!({ "ok": false, "error": "shutting down" })
             } else {
                 reply
@@ -287,11 +294,22 @@ impl RootView {
 
     /// Opens `path` in a window opened just for it: in its one tab, not in a
     /// second one beside the default folder.
-    pub fn open_path_in_new_window(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_path_in_new_window(
+        &mut self,
+        path: &Path,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.open_start_path(path, true, window, cx);
     }
 
-    fn open_start_path(&mut self, path: &Path, in_place: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_start_path(
+        &mut self,
+        path: &Path,
+        in_place: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         match folder_and_selection(path) {
             Some((folder, select)) => {
                 let explorer = self.explorer_entity();
@@ -307,7 +325,12 @@ impl RootView {
         }
     }
 
-    fn handle_ipc(&mut self, request: Request, window: &mut Window, cx: &mut Context<Self>) -> Value {
+    fn handle_ipc(
+        &mut self,
+        request: Request,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Value {
         let explorer = self.explorer_entity();
         match request {
             Request::Ping => json!({ "ok": true }),
@@ -334,11 +357,14 @@ impl RootView {
                         }
                         OpenFromOtherApps::CurrentTab => {
                             self.show_explorer(cx);
-                            explorer.update(cx, |page, cx| page.open_path_in_place(folder, select, window, cx));
+                            explorer.update(cx, |page, cx| {
+                                page.open_path_in_place(folder, select, window, cx)
+                            });
                         }
                         OpenFromOtherApps::NewTab => {
                             self.show_explorer(cx);
-                            explorer.update(cx, |page, cx| page.open_path(folder, select, window, cx));
+                            explorer
+                                .update(cx, |page, cx| page.open_path(folder, select, window, cx));
                         }
                     }
                     window.activate_window();
@@ -348,8 +374,9 @@ impl RootView {
             },
             Request::Navigate { tab, path } => match folder_and_selection(Path::new(&path)) {
                 Some((folder, select)) => {
-                    let found = explorer
-                        .update(cx, |page, cx| page.navigate_tab(tab, folder, select, window, cx));
+                    let found = explorer.update(cx, |page, cx| {
+                        page.navigate_tab(tab, folder, select, window, cx)
+                    });
                     json!({ "ok": found })
                 }
                 None => json!({ "ok": false, "error": "no such path" }),
@@ -418,7 +445,8 @@ mod tests {
         assert_eq!(envelope.token, "t");
         assert!(matches!(envelope.request, Request::Open { path } if path == r"C:\x"));
         let envelope: Envelope =
-            serde_json::from_str(r#"{"token":"t","cmd":"navigate","tab":7,"path":"D:\\"}"#).unwrap();
+            serde_json::from_str(r#"{"token":"t","cmd":"navigate","tab":7,"path":"D:\\"}"#)
+                .unwrap();
         assert!(matches!(envelope.request, Request::Navigate { tab: 7, .. }));
         assert!(serde_json::from_str::<Envelope>(r#"{"token":"t","cmd":"format_c"}"#).is_err());
     }
@@ -430,7 +458,10 @@ mod tests {
         std::fs::write(&file, "x").unwrap();
         let (folder, select) = folder_and_selection(&file).unwrap();
         assert!(!folder.starts_with(r"\\?\"));
-        assert!(crate::explorer::same_path(&folder, &strip_verbatim(&std::fs::canonicalize(dir.path()).unwrap()).to_string_lossy()));
+        assert!(crate::explorer::same_path(
+            &folder,
+            &strip_verbatim(&std::fs::canonicalize(dir.path()).unwrap()).to_string_lossy()
+        ));
         assert!(select.unwrap().to_lowercase().ends_with("a.txt"));
         let (folder, select) = folder_and_selection(dir.path()).unwrap();
         assert!(select.is_none());

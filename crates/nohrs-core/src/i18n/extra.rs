@@ -127,14 +127,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Ligada",
-        [
-            "Activée",
-            "Ein",
-            "Attivata",
-            "Включена",
-            "オン",
-            "开",
-        ],
+        ["Activée", "Ein", "Attivata", "Включена", "オン", "开"],
     ),
     (
         "Aguardando a permissão do Windows…",
@@ -281,14 +274,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Abas",
-        [
-            "Onglets",
-            "Tabs",
-            "Schede",
-            "Вкладки",
-            "タブ",
-            "标签页",
-        ],
+        ["Onglets", "Tabs", "Schede", "Вкладки", "タブ", "标签页"],
     ),
     (
         "Abas e painéis",
@@ -567,14 +553,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Arquivo",
-        [
-            "Fichier",
-            "Datei",
-            "File",
-            "Файл",
-            "ファイル",
-            "文件",
-        ],
+        ["Fichier", "Datei", "File", "Файл", "ファイル", "文件"],
     ),
     (
         "Arquivo de configuração",
@@ -589,14 +568,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Arquivos",
-        [
-            "Fichiers",
-            "Dateien",
-            "File",
-            "Файлы",
-            "ファイル",
-            "文件",
-        ],
+        ["Fichiers", "Dateien", "File", "Файлы", "ファイル", "文件"],
     ),
     (
         "Arquivos e pastas",
@@ -774,17 +746,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "“自动”跟随 Windows 区域格式；在这台电脑上为 {language}。",
         ],
     ),
-    (
-        "Azul",
-        [
-            "Bleu",
-            "Blau",
-            "Blu",
-            "Синий",
-            "青",
-            "蓝色",
-        ],
-    ),
+    ("Azul", ["Bleu", "Blau", "Blu", "Синий", "青", "蓝色"]),
     (
         "Baixando a versão {version}…",
         [
@@ -842,14 +804,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Barras",
-        [
-            "Barres",
-            "Leisten",
-            "Barre",
-            "Панели",
-            "バー",
-            "栏",
-        ],
+        ["Barres", "Leisten", "Barre", "Панели", "バー", "栏"],
     ),
     (
         "Bem-vindo ao Prime Files",
@@ -864,14 +819,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Busca",
-        [
-            "Recherche",
-            "Suche",
-            "Ricerca",
-            "Поиск",
-            "検索",
-            "搜索",
-        ],
+        ["Recherche", "Suche", "Ricerca", "Поиск", "検索", "搜索"],
     ),
     (
         "Buscando… {n}",
@@ -886,14 +834,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Buscar",
-        [
-            "Rechercher",
-            "Suchen",
-            "Cerca",
-            "Найти",
-            "検索",
-            "搜索",
-        ],
+        ["Rechercher", "Suchen", "Cerca", "Найти", "検索", "搜索"],
     ),
     (
         "Buscar em todo o computador",
@@ -985,14 +926,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Claro",
-        [
-            "Clair",
-            "Hell",
-            "Chiaro",
-            "Светлая",
-            "ライト",
-            "浅色",
-        ],
+        ["Clair", "Hell", "Chiaro", "Светлая", "ライト", "浅色"],
     ),
     (
         "Classificar por",
@@ -1205,14 +1139,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Cores",
-        [
-            "Couleurs",
-            "Farben",
-            "Colori",
-            "Цвета",
-            "色",
-            "颜色",
-        ],
+        ["Couleurs", "Farben", "Colori", "Цвета", "色", "颜色"],
     ),
     (
         "Crescente",
@@ -1249,14 +1176,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Curta",
-        [
-            "Courte",
-            "Kurz",
-            "Breve",
-            "Короткая",
-            "短い",
-            "短",
-        ],
+        ["Courte", "Kurz", "Breve", "Короткая", "短い", "短"],
     ),
     (
         "Curto toca enquanto você passa pela lista; longo só toca o arquivo em que você parou.",
@@ -1315,14 +1235,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Desligado",
-        [
-            "Désactivé",
-            "Aus",
-            "Disattivato",
-            "Выключено",
-            "オフ",
-            "关",
-        ],
+        ["Désactivé", "Aus", "Disattivato", "Выключено", "オフ", "关"],
     ),
     (
         "Detalhes",
@@ -1425,14 +1338,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Dura",
-        [
-            "Ferme",
-            "Straff",
-            "Rigida",
-            "Жёсткая",
-            "かため",
-            "干脆",
-        ],
+        ["Ferme", "Straff", "Rigida", "Жёсткая", "かため", "干脆"],
     ),
     (
         "Duração do deslizar. Desligada, as barras aparecem e somem de uma vez.",
@@ -1546,14 +1452,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Escuro",
-        [
-            "Sombre",
-            "Dunkel",
-            "Scuro",
-            "Тёмная",
-            "ダーク",
-            "深色",
-        ],
+        ["Sombre", "Dunkel", "Scuro", "Тёмная", "ダーク", "深色"],
     ),
     (
         "Espera para aparecer",
@@ -1634,14 +1533,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Excluir",
-        [
-            "Supprimer",
-            "Löschen",
-            "Elimina",
-            "Удалить",
-            "削除",
-            "删除",
-        ],
+        ["Supprimer", "Löschen", "Elimina", "Удалить", "削除", "删除"],
     ),
     (
         "Excluir para sempre",
@@ -1678,14 +1570,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Exibir",
-        [
-            "Affichage",
-            "Ansicht",
-            "Visualizza",
-            "Вид",
-            "表示",
-            "查看",
-        ],
+        ["Affichage", "Ansicht", "Visualizza", "Вид", "表示", "查看"],
     ),
     (
         "Exibição",
@@ -1777,25 +1662,11 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Fina",
-        [
-            "Fine",
-            "Schmal",
-            "Sottile",
-            "Тонкая",
-            "細い",
-            "细",
-        ],
+        ["Fine", "Schmal", "Sottile", "Тонкая", "細い", "细"],
     ),
     (
         "Fixos",
-        [
-            "Fixes",
-            "Fest",
-            "Fissi",
-            "Неизменяемые",
-            "固定",
-            "固定",
-        ],
+        ["Fixes", "Fest", "Fissi", "Неизменяемые", "固定", "固定"],
     ),
     (
         "Forma de onda nos ícones",
@@ -1810,14 +1681,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Geral",
-        [
-            "Général",
-            "Allgemein",
-            "Generale",
-            "Общие",
-            "全般",
-            "常规",
-        ],
+        ["Général", "Allgemein", "Generale", "Общие", "全般", "常规"],
     ),
     (
         "Gigantes (mais de 4 GB)",
@@ -1832,14 +1696,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Grade",
-        [
-            "Grille",
-            "Raster",
-            "Griglia",
-            "Сетка",
-            "グリッド",
-            "网格",
-        ],
+        ["Grille", "Raster", "Griglia", "Сетка", "グリッド", "网格"],
     ),
     (
         "Grandes (128 MB a 1 GB)",
@@ -1854,25 +1711,11 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Hoje",
-        [
-            "Aujourd'hui",
-            "Heute",
-            "Oggi",
-            "Сегодня",
-            "今日",
-            "今天",
-        ],
+        ["Aujourd'hui", "Heute", "Oggi", "Сегодня", "今日", "今天"],
     ),
     (
         "Idioma",
-        [
-            "Langue",
-            "Sprache",
-            "Lingua",
-            "Язык",
-            "言語",
-            "语言",
-        ],
+        ["Langue", "Sprache", "Lingua", "Язык", "言語", "语言"],
     ),
     (
         "Idioma, abas e painéis.",
@@ -2041,14 +1884,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Larga",
-        [
-            "Large",
-            "Breit",
-            "Larga",
-            "Широкая",
-            "太い",
-            "宽",
-        ],
+        ["Large", "Breit", "Larga", "Широкая", "太い", "宽"],
     ),
     (
         "Largura da faixa em cada borda que chama a barra.",
@@ -2074,14 +1910,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Lenta",
-        [
-            "Lente",
-            "Langsam",
-            "Lenta",
-            "Медленная",
-            "遅い",
-            "慢",
-        ],
+        ["Lente", "Langsam", "Lenta", "Медленная", "遅い", "慢"],
     ),
     (
         "Letras, números e símbolos precisam de Ctrl ou Alt: sozinhos, eles digitam no filtro.",
@@ -2096,14 +1925,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Ligado",
-        [
-            "Activé",
-            "An",
-            "Attivato",
-            "Включено",
-            "オン",
-            "开",
-        ],
+        ["Activé", "An", "Attivato", "Включено", "オン", "开"],
     ),
     (
         "Limpar a seleção ou o filtro",
@@ -2129,25 +1951,11 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Lista",
-        [
-            "Liste",
-            "Liste",
-            "Elenco",
-            "Список",
-            "一覧",
-            "列表",
-        ],
+        ["Liste", "Liste", "Elenco", "Список", "一覧", "列表"],
     ),
     (
         "Longa",
-        [
-            "Longue",
-            "Lang",
-            "Lunga",
-            "Длинная",
-            "長い",
-            "长",
-        ],
+        ["Longue", "Lang", "Lunga", "Длинная", "長い", "长"],
     ),
     (
         "Mais antigos",
@@ -2206,14 +2014,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Moldura",
-        [
-            "Cadre",
-            "Rahmen",
-            "Cornice",
-            "Рамка",
-            "枠",
-            "边框",
-        ],
+        ["Cadre", "Rahmen", "Cornice", "Рамка", "枠", "边框"],
     ),
     (
         "Mostrar itens ocultos",
@@ -2305,14 +2106,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Média",
-        [
-            "Moyenne",
-            "Mittel",
-            "Media",
-            "Средняя",
-            "中",
-            "中",
-        ],
+        ["Moyenne", "Mittel", "Media", "Средняя", "中", "中"],
     ),
     (
         "Médios (1 a 128 MB)",
@@ -2338,14 +2132,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Na hora",
-        [
-            "Immédiatement",
-            "Sofort",
-            "Subito",
-            "Сразу",
-            "すぐ",
-            "立即",
-        ],
+        ["Immédiatement", "Sofort", "Subito", "Сразу", "すぐ", "立即"],
     ),
     (
         "Navegar num painel leva o outro para a mesma pasta.",
@@ -2358,17 +2145,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "在一个窗格中浏览时，另一个窗格会跳到同一文件夹。",
         ],
     ),
-    (
-        "Nenhum",
-        [
-            "Aucun",
-            "Keine",
-            "Nessuno",
-            "Нет",
-            "なし",
-            "无",
-        ],
-    ),
+    ("Nenhum", ["Aucun", "Keine", "Nessuno", "Нет", "なし", "无"]),
     (
         "Nenhum arquivo selecionado",
         [
@@ -2382,14 +2159,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Nenhuma",
-        [
-            "Aucune",
-            "Keine",
-            "Nessuna",
-            "Нет",
-            "なし",
-            "无",
-        ],
+        ["Aucune", "Keine", "Nessuna", "Нет", "なし", "无"],
     ),
     (
         "Nenhuma configuração com \"{query}\".",
@@ -2413,17 +2183,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "在图标视图中，音频文件显示波形而不是图标。",
         ],
     ),
-    (
-        "Nome",
-        [
-            "Nom",
-            "Name",
-            "Nome",
-            "Имя",
-            "名前",
-            "名称",
-        ],
-    ),
+    ("Nome", ["Nom", "Name", "Nome", "Имя", "名前", "名称"]),
     (
         "Nova aba",
         [
@@ -2635,14 +2395,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Enviar",
-        [
-            "Envoyer",
-            "Senden",
-            "Invia",
-            "Отправить",
-            "送信",
-            "发送",
-        ],
+        ["Envoyer", "Senden", "Invia", "Отправить", "送信", "发送"],
     ),
     (
         "Buscar no computador…",
@@ -3062,27 +2815,10 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "索引会在第一次搜索时创建。",
         ],
     ),
-    (
-        "Onde:",
-        [
-            "Où :",
-            "Wo:",
-            "Dove:",
-            "Где:",
-            "場所:",
-            "范围：",
-        ],
-    ),
+    ("Onde:", ["Où :", "Wo:", "Dove:", "Где:", "場所:", "范围："]),
     (
         "Ontem",
-        [
-            "Hier",
-            "Gestern",
-            "Ieri",
-            "Вчера",
-            "昨日",
-            "昨天",
-        ],
+        ["Hier", "Gestern", "Ieri", "Вчера", "昨日", "昨天"],
     ),
     (
         "Ordenação padrão",
@@ -3141,14 +2877,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Outros",
-        [
-            "Autres",
-            "Sonstige",
-            "Altro",
-            "Другое",
-            "その他",
-            "其他",
-        ],
+        ["Autres", "Sonstige", "Altro", "Другое", "その他", "其他"],
     ),
     (
         "Ouvir passando o mouse",
@@ -3339,14 +3068,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Por cima",
-        [
-            "Par-dessus",
-            "Darüber",
-            "Sopra",
-            "Поверх",
-            "重ねる",
-            "覆盖",
-        ],
+        ["Par-dessus", "Darüber", "Sopra", "Поверх", "重ねる", "覆盖"],
     ),
     (
         "Preferences.json do Listary não é um objeto",
@@ -3460,14 +3182,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Próximo",
-        [
-            "Suivant",
-            "Weiter",
-            "Avanti",
-            "Далее",
-            "次へ",
-            "下一步",
-        ],
+        ["Suivant", "Weiter", "Avanti", "Далее", "次へ", "下一步"],
     ),
     (
         "Próximo painel",
@@ -3537,14 +3252,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Raiz",
-        [
-            "Racine",
-            "Stamm",
-            "Radice",
-            "Корень",
-            "ルート",
-            "根目录",
-        ],
+        ["Racine", "Stamm", "Radice", "Корень", "ルート", "根目录"],
     ),
     (
         "Reabrir as abas ao iniciar",
@@ -3647,36 +3355,15 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Rosa",
-        [
-            "Rose",
-            "Rosa",
-            "Rosa",
-            "Розовый",
-            "ピンク",
-            "粉色",
-        ],
+        ["Rose", "Rosa", "Rosa", "Розовый", "ピンク", "粉色"],
     ),
     (
         "Roxo",
-        [
-            "Violet",
-            "Lila",
-            "Viola",
-            "Фиолетовый",
-            "紫",
-            "紫色",
-        ],
+        ["Violet", "Lila", "Viola", "Фиолетовый", "紫", "紫色"],
     ),
     (
         "Rápida",
-        [
-            "Rapide",
-            "Schnell",
-            "Veloce",
-            "Быстрая",
-            "速い",
-            "快",
-        ],
+        ["Rapide", "Schnell", "Veloce", "Быстрая", "速い", "快"],
     ),
     (
         "Selecionar tudo",
@@ -3711,17 +3398,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "选中项、活动标签页和按钮。",
         ],
     ),
-    (
-        "Sem",
-        [
-            "Aucun",
-            "Ohne",
-            "Nessuna",
-            "Без",
-            "なし",
-            "无",
-        ],
-    ),
+    ("Sem", ["Aucun", "Ohne", "Nessuna", "Без", "なし", "无"]),
     (
         "Sem data",
         [
@@ -3757,14 +3434,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Suave",
-        [
-            "Fluide",
-            "Weich",
-            "Fluida",
-            "Плавная",
-            "なめらか",
-            "平滑",
-        ],
+        ["Fluide", "Weich", "Fluida", "Плавная", "なめらか", "平滑"],
     ),
     (
         "Subir para a pasta de cima",
@@ -3801,14 +3471,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Tamanho",
-        [
-            "Taille",
-            "Größe",
-            "Dimensione",
-            "Размер",
-            "サイズ",
-            "大小",
-        ],
+        ["Taille", "Größe", "Dimensione", "Размер", "サイズ", "大小"],
     ),
     (
         "Tela de boas-vindas",
@@ -3823,14 +3486,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Tema",
-        [
-            "Thème",
-            "Design",
-            "Tema",
-            "Тема",
-            "テーマ",
-            "主题",
-        ],
+        ["Thème", "Design", "Tema", "Тема", "テーマ", "主题"],
     ),
     (
         "Tema, cores e como a lista se move.",
@@ -3845,14 +3501,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Temas",
-        [
-            "Thèmes",
-            "Designs",
-            "Temi",
-            "Темы",
-            "テーマ",
-            "主题",
-        ],
+        ["Thèmes", "Designs", "Temi", "Темы", "テーマ", "主题"],
     ),
     (
         "Tempo e movimento",
@@ -3887,27 +3536,10 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "终端已退出 — 按 Enter 打开新的",
         ],
     ),
-    (
-        "Tipo",
-        [
-            "Type",
-            "Typ",
-            "Tipo",
-            "Тип",
-            "種類",
-            "类型",
-        ],
-    ),
+    ("Tipo", ["Type", "Typ", "Tipo", "Тип", "種類", "类型"]),
     (
         "Tipo:",
-        [
-            "Type :",
-            "Typ:",
-            "Tipo:",
-            "Тип:",
-            "種類:",
-            "类型：",
-        ],
+        ["Type :", "Typ:", "Tipo:", "Тип:", "種類:", "类型："],
     ),
     (
         "Tirado de: {commands}.",
@@ -3964,17 +3596,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "用默认文件替换当前文件；当前文件会保存在旁边。",
         ],
     ),
-    (
-        "Tudo",
-        [
-            "Tout",
-            "Alle",
-            "Tutto",
-            "Все",
-            "すべて",
-            "全部",
-        ],
-    ),
+    ("Tudo", ["Tout", "Alle", "Tutto", "Все", "すべて", "全部"]),
     (
         "Tudo desta página fica nele, e editá-lo à mão vale na hora.",
         [
@@ -4041,28 +3663,8 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "将 Prime Files 设为默认文件管理器",
         ],
     ),
-    (
-        "Vazios",
-        [
-            "Vides",
-            "Leer",
-            "Vuoti",
-            "Пустые",
-            "空",
-            "空",
-        ],
-    ),
-    (
-        "Verde",
-        [
-            "Vert",
-            "Grün",
-            "Verde",
-            "Зелёный",
-            "緑",
-            "绿色",
-        ],
-    ),
+    ("Vazios", ["Vides", "Leer", "Vuoti", "Пустые", "空", "空"]),
+    ("Verde", ["Vert", "Grün", "Verde", "Зелёный", "緑", "绿色"]),
     (
         "Verde-água",
         [
@@ -4087,14 +3689,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Vermelho",
-        [
-            "Rouge",
-            "Rot",
-            "Rosso",
-            "Красный",
-            "赤",
-            "红色",
-        ],
+        ["Rouge", "Rot", "Rosso", "Красный", "赤", "红色"],
     ),
     (
         "Versão",
@@ -4186,14 +3781,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Voltar",
-        [
-            "Retour",
-            "Zurück",
-            "Indietro",
-            "Назад",
-            "戻る",
-            "返回",
-        ],
+        ["Retour", "Zurück", "Indietro", "Назад", "戻る", "返回"],
     ),
     (
         "Voltar ao padrão",
@@ -4230,14 +3818,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Vídeos",
-        [
-            "Vidéos",
-            "Videos",
-            "Video",
-            "Видео",
-            "ビデオ",
-            "视频",
-        ],
+        ["Vidéos", "Videos", "Video", "Видео", "ビデオ", "视频"],
     ),
     (
         "Vídeos e sons começam a tocar assim que o visualizador os abre.",
@@ -4868,25 +4449,11 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Árvore",
-        [
-            "Arborescence",
-            "Baum",
-            "Albero",
-            "Дерево",
-            "ツリー",
-            "树",
-        ],
+        ["Arborescence", "Baum", "Albero", "Дерево", "ツリー", "树"],
     ),
     (
         "Áudio",
-        [
-            "Audio",
-            "Audio",
-            "Audio",
-            "Аудио",
-            "オーディオ",
-            "音频",
-        ],
+        ["Audio", "Audio", "Audio", "Аудио", "オーディオ", "音频"],
     ),
     (
         "Áudio e vídeo: ouvir passando o mouse, tocar no visualizador e ver a forma de onda.",
@@ -4901,14 +4468,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Ícones",
-        [
-            "Icônes",
-            "Symbole",
-            "Icone",
-            "Значки",
-            "アイコン",
-            "图标",
-        ],
+        ["Icônes", "Symbole", "Icone", "Значки", "アイコン", "图标"],
     ),
     (
         "Ícones G",
@@ -5022,14 +4582,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Amarelo",
-        [
-            "Jaune",
-            "Gelb",
-            "Giallo",
-            "Жёлтый",
-            "黄",
-            "黄色",
-        ],
+        ["Jaune", "Gelb", "Giallo", "Жёлтый", "黄", "黄色"],
     ),
     (
         "As abas numa coluna à esquerda, como no Zen. Estreita, mostra só os ícones.",
@@ -5053,27 +4606,10 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
             "合成",
         ],
     ),
-    (
-        "Cor",
-        [
-            "Couleur",
-            "Farbe",
-            "Colore",
-            "Цвет",
-            "色",
-            "颜色",
-        ],
-    ),
+    ("Cor", ["Couleur", "Farbe", "Colore", "Цвет", "色", "颜色"]),
     (
         "Direita",
-        [
-            "Droite",
-            "Rechts",
-            "Destra",
-            "Справа",
-            "右",
-            "右侧",
-        ],
+        ["Droite", "Rechts", "Destra", "Справа", "右", "右侧"],
     ),
     (
         "Editar",
@@ -5088,36 +4624,15 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Em cima",
-        [
-            "En haut",
-            "Oben",
-            "In alto",
-            "Сверху",
-            "上",
-            "顶部",
-        ],
+        ["En haut", "Oben", "In alto", "Сверху", "上", "顶部"],
     ),
     (
         "Embaixo",
-        [
-            "En bas",
-            "Unten",
-            "In basso",
-            "Снизу",
-            "下",
-            "底部",
-        ],
+        ["En bas", "Unten", "In basso", "Снизу", "下", "底部"],
     ),
     (
         "Esquerda",
-        [
-            "Gauche",
-            "Links",
-            "Sinistra",
-            "Слева",
-            "左",
-            "左侧",
-        ],
+        ["Gauche", "Links", "Sinistra", "Слева", "左", "左侧"],
     ),
     (
         "Excluir tag",
@@ -5209,14 +4724,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Pessoal",
-        [
-            "Personnel",
-            "Privat",
-            "Personale",
-            "Личное",
-            "個人",
-            "个人",
-        ],
+        ["Personnel", "Privat", "Personale", "Личное", "個人", "个人"],
     ),
     (
         "Projeto do After Effects",
@@ -5253,14 +4761,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Rede",
-        [
-            "Réseau",
-            "Netzwerk",
-            "Rete",
-            "Сеть",
-            "ネットワーク",
-            "网络",
-        ],
+        ["Réseau", "Netzwerk", "Rete", "Сеть", "ネットワーク", "网络"],
     ),
     (
         "Remover dos locais de rede",
@@ -5308,14 +4809,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Tags",
-        [
-            "Étiquettes",
-            "Tags",
-            "Tag",
-            "Теги",
-            "タグ",
-            "标签",
-        ],
+        ["Étiquettes", "Tags", "Tag", "Теги", "タグ", "标签"],
     ),
     (
         "Terminal",
@@ -5330,14 +4824,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Trabalho",
-        [
-            "Travail",
-            "Arbeit",
-            "Lavoro",
-            "Работа",
-            "仕事",
-            "工作",
-        ],
+        ["Travail", "Arbeit", "Lavoro", "Работа", "仕事", "工作"],
     ),
     (
         "Turquesa",
@@ -5649,14 +5136,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Itens",
-        [
-            "Éléments",
-            "Einträge",
-            "Voci",
-            "Пункты",
-            "項目",
-            "项目",
-        ],
+        ["Éléments", "Einträge", "Voci", "Пункты", "項目", "项目"],
     ),
     (
         "Itens do Windows",
@@ -5693,14 +5173,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Locais",
-        [
-            "Emplacements",
-            "Orte",
-            "Posizioni",
-            "Места",
-            "場所",
-            "位置",
-        ],
+        ["Emplacements", "Orte", "Posizioni", "Места", "場所", "位置"],
     ),
     (
         "Menu do botão direito",
@@ -6254,25 +5727,11 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Escolher",
-        [
-            "Choisir",
-            "Auswählen",
-            "Scegli",
-            "Выбрать",
-            "選択",
-            "选择",
-        ],
+        ["Choisir", "Auswählen", "Scegli", "Выбрать", "選択", "选择"],
     ),
     (
         "Fechar",
-        [
-            "Fermer",
-            "Schließen",
-            "Chiudi",
-            "Закрыть",
-            "閉じる",
-            "关闭",
-        ],
+        ["Fermer", "Schließen", "Chiudi", "Закрыть", "閉じる", "关闭"],
     ),
     (
         "Arraste para levar o arquivo",
@@ -6672,14 +6131,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Ciano",
-        [
-            "Cyan",
-            "Cyan",
-            "Ciano",
-            "Голубой",
-            "シアン",
-            "天青色",
-        ],
+        ["Cyan", "Cyan", "Ciano", "Голубой", "シアン", "天青色"],
     ),
     (
         "Índigo",
@@ -6716,14 +6168,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Cinza",
-        [
-            "Gris",
-            "Grau",
-            "Grigio",
-            "Серый",
-            "グレー",
-            "灰色",
-        ],
+        ["Gris", "Grau", "Grigio", "Серый", "グレー", "灰色"],
     ),
     (
         "Personalizada",
@@ -6760,14 +6205,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Abrir",
-        [
-            "Ouvrir",
-            "Öffnen",
-            "Apri",
-            "Открыть",
-            "開く",
-            "打开",
-        ],
+        ["Ouvrir", "Öffnen", "Apri", "Открыть", "開く", "打开"],
     ),
     (
         "Abrir com",
@@ -7035,14 +6473,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Pronto",
-        [
-            "Terminé",
-            "Fertig",
-            "Fatto",
-            "Готово",
-            "完了",
-            "完成",
-        ],
+        ["Terminé", "Fertig", "Fatto", "Готово", "完了", "完成"],
     ),
     (
         "Como a janela se organiza",
@@ -7266,14 +6697,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Alterar",
-        [
-            "Modifier",
-            "Ändern",
-            "Modifica",
-            "Изменить",
-            "変更",
-            "更改",
-        ],
+        ["Modifier", "Ändern", "Modifica", "Изменить", "変更", "更改"],
     ),
     (
         "Ligado, depois de {time}",
@@ -7409,14 +6833,7 @@ pub(super) static EXTRA: &[(&str, [&str; 6])] = &[
     ),
     (
         "Procurar",
-        [
-            "Rechercher",
-            "Suchen",
-            "Trova",
-            "Найти",
-            "検索",
-            "查找",
-        ],
+        ["Rechercher", "Suchen", "Trova", "Найти", "検索", "查找"],
     ),
     (
         "Refazer",

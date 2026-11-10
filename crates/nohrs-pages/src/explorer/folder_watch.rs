@@ -53,7 +53,11 @@ impl ExplorerPane {
             .collect();
         folders.sort();
         folders.dedup();
-        if self.folder_watch.as_ref().is_some_and(|watch| watch.folders == folders) {
+        if self
+            .folder_watch
+            .as_ref()
+            .is_some_and(|watch| watch.folders == folders)
+        {
             return;
         }
         self.folder_watch = None;
@@ -122,7 +126,12 @@ impl ExplorerPane {
                 last = Some(Instant::now());
             }
         });
-        self.folder_watch = Some(FolderWatch { folders, _watcher: watcher, _task: task, _poll: poll });
+        self.folder_watch = Some(FolderWatch {
+            folders,
+            _watcher: watcher,
+            _task: task,
+            _poll: poll,
+        });
     }
 
     /// Reads the folder again because the disk changed. Put off (false)
@@ -141,13 +150,19 @@ impl ExplorerPane {
 // Looks at `folders` every [`POLL`] and signals when what a listing would show
 // of them (names, sizes, dates, attributes) changed. The reading runs off the
 // UI thread; the first look only records the starting point.
-fn poll(folders: Vec<String>, changed: async_channel::Sender<()>, cx: &mut Context<ExplorerPane>) -> Task<()> {
+fn poll(
+    folders: Vec<String>,
+    changed: async_channel::Sender<()>,
+    cx: &mut Context<ExplorerPane>,
+) -> Task<()> {
     let executor = cx.background_executor().clone();
     cx.background_executor().spawn(async move {
         let mut last: Option<u64> = None;
         loop {
             executor.timer(POLL).await;
-            let now = folders.iter().fold(0u64, |sum, folder| sum.wrapping_add(fingerprint(Path::new(folder))));
+            let now = folders.iter().fold(0u64, |sum, folder| {
+                sum.wrapping_add(fingerprint(Path::new(folder)))
+            });
             if last.is_some_and(|last| last != now) && changed.send(()).await.is_err() {
                 return;
             }
@@ -191,12 +206,24 @@ fn notifies(folder: &Path) -> bool {
         return true;
     }
     let mut file_system = [0u16; 64];
-    if unsafe { GetVolumeInformationW(PCWSTR(root.as_ptr()), None, None, None, None, Some(&mut file_system)) }
-        .is_err()
+    if unsafe {
+        GetVolumeInformationW(
+            PCWSTR(root.as_ptr()),
+            None,
+            None,
+            None,
+            None,
+            Some(&mut file_system),
+        )
+    }
+    .is_err()
     {
         return true;
     }
-    let length = file_system.iter().position(|&unit| unit == 0).unwrap_or(file_system.len());
+    let length = file_system
+        .iter()
+        .position(|&unit| unit == 0)
+        .unwrap_or(file_system.len());
     let name = String::from_utf16_lossy(&file_system[..length]);
     matches!(name.as_str(), "NTFS" | "ReFS")
 }

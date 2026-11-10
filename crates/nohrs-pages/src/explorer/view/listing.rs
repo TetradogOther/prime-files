@@ -50,7 +50,14 @@ pub fn render(
             .child(cards)
             // Flex itself: the listing grows with `flex_1`, which in a
             // plain block came out zero tall.
-            .child(div().flex_1().min_h(px(0.0)).flex().flex_col().child(file_list))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h(px(0.0))
+                    .flex()
+                    .flex_col()
+                    .child(file_list),
+            )
             .into_any_element(),
         None => file_list,
     };
@@ -99,20 +106,30 @@ fn drive_cards(page: &mut ExplorerPane, cx: &mut Context<ExplorerPane>) -> Optio
             .bg(rgb(theme::bg_secondary()))
             .cursor_pointer()
             .hover(|this| this.bg(rgb(theme::bg_hover())))
-            .on_click(cx.listener(move |pane, _, window, cx| pane.change_dir(opened.clone(), window, cx)))
+            .on_click(
+                cx.listener(move |pane, _, window, cx| pane.change_dir(opened.clone(), window, cx)),
+            )
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(move |pane, event: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
-                    if let Some(ix) = pane.filtered_entries.iter().position(|entry| entry.path == menu_path) {
+                    if let Some(ix) = pane
+                        .filtered_entries
+                        .iter()
+                        .position(|entry| entry.path == menu_path)
+                    {
                         pane.select_single(ix);
                         pane.open_context_menu(Some(ix), event.modifiers.shift, window, cx);
                     }
                 }),
             )
             .child(match icon {
-                Some(image) => img(ImageSource::Render(image)).size(px(32.0)).flex_shrink_0().into_any_element(),
-                None => gpui_component::Icon::new(gpui_component::Icon::empty()).path("icons/database.svg")
+                Some(image) => img(ImageSource::Render(image))
+                    .size(px(32.0))
+                    .flex_shrink_0()
+                    .into_any_element(),
+                None => gpui_component::Icon::new(gpui_component::Icon::empty())
+                    .path("icons/database.svg")
                     .size(px(28.0))
                     .text_color(rgb(theme::gray_500()))
                     .into_any_element(),
@@ -172,7 +189,11 @@ pub(crate) fn usage_bar(space: Option<crate::explorer::drives::Space>, height: f
     let (fraction, color) = match space {
         Some(space) => (
             space.used_fraction().clamp(0.0, 1.0),
-            if space.nearly_full() { theme::danger() } else { theme::accent() },
+            if space.nearly_full() {
+                theme::danger()
+            } else {
+                theme::accent()
+            },
         ),
         None => (0.0, theme::accent()),
     };
@@ -382,7 +403,11 @@ pub(crate) fn extent(sizes: &[Size<Pixels>], horizontal: bool) -> Size<Pixels> {
         .iter()
         .map(|item| f32::from(if horizontal { item.height } else { item.width }))
         .fold(0.0, f32::max);
-    if horizontal { size(px(along), px(across)) } else { size(px(across), px(along)) }
+    if horizontal {
+        size(px(along), px(across))
+    } else {
+        size(px(across), px(along))
+    }
 }
 
 // The listing's scrollbar, always shown, as Explorer's. Drawn over the

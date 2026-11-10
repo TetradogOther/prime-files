@@ -111,7 +111,9 @@ mod platform {
         // exactly that and took the app down).
         let joined = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok();
         if let Err(error) = pages(path, sender) {
-            sender.send_blocking(Update::Failed(error.message().to_string())).ok();
+            sender
+                .send_blocking(Update::Failed(error.message().to_string()))
+                .ok();
         }
         if joined {
             unsafe { CoUninitialize() };
@@ -130,7 +132,8 @@ mod platform {
             let options = PdfPageRenderOptions::new()?;
             options.SetDestinationWidth(PAGE_WIDTH)?;
             let stream = InMemoryRandomAccessStream::new()?;
-            page.RenderWithOptionsToStreamAsync(&stream, &options)?.get()?;
+            page.RenderWithOptionsToStreamAsync(&stream, &options)?
+                .get()?;
             let length = u32::try_from(stream.Size()?).unwrap_or(u32::MAX);
             let reader = DataReader::CreateDataReader(&stream.GetInputStreamAt(0)?)?;
             reader.LoadAsync(length)?.get()?;
@@ -234,7 +237,12 @@ mod platform {
         };
         let mut pages: Vec<(u32, Option<Vec<u8>>)> = read
             .filter_map(Result::ok)
-            .filter(|entry| entry.path().extension().is_some_and(|extension| extension == "png"))
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "png")
+            })
             .filter_map(|entry| {
                 let number = entry
                     .file_name()
@@ -286,7 +294,9 @@ mod platform {
                 Some(points)
             });
         match width {
-            Some(points) if points > 0.0 => format!("{:.0}", (PAGE_WIDTH as f64 * 72.0 / points).round()),
+            Some(points) if points > 0.0 => {
+                format!("{:.0}", (PAGE_WIDTH as f64 * 72.0 / points).round())
+            }
             _ => "72".to_string(),
         }
     }

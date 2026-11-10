@@ -18,16 +18,18 @@
 //! view. Picking a section there glides the column to it.
 
 use gpui::{
-    AnyElement, Context, Div, ElementId, Entity, FocusHandle, KeyDownEvent, Render, SharedString, Stateful, Window,
-    div, prelude::*, px, rgb,
+    AnyElement, Context, Div, ElementId, Entity, FocusHandle, KeyDownEvent, Render, SharedString,
+    Stateful, Window, div, prelude::*, px, rgb,
 };
 use gpui_component::color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState};
 use gpui_component::input::{Input, InputState};
 use gpui_component::{Icon, Sizable as _};
-use nohrs_core::config::{self, Config, DockSide, OpenFromOtherApps, SortOrder, SplitDirection, ThemeMode};
+use nohrs_core::config::{
+    self, Config, DockSide, OpenFromOtherApps, SortOrder, SplitDirection, ThemeMode,
+};
 use nohrs_core::i18n::{self, Lang, tr};
-use nohrs_core::telemetry::LogErr;
 use nohrs_core::shortcuts::{self, Action, Chord};
+use nohrs_core::telemetry::LogErr;
 use nohrs_core::{k, t, tf};
 use nohrs_ui::theme::theme;
 
@@ -96,10 +98,16 @@ impl SettingsSection {
             Self::Appearance => t!("Tema, cores e como a lista se move."),
             Self::Compact => t!("Esconda as barras e deixe só os arquivos na tela."),
             Self::Files => t!("O que aparece em cada pasta e em que ordem."),
-            Self::Menu => t!("Escolha o que aparece ao clicar com o botão direito num arquivo, e em que ordem."),
-            Self::Media => t!("Áudio e vídeo: ouvir passando o mouse, tocar no visualizador e ver a forma de onda."),
+            Self::Menu => t!(
+                "Escolha o que aparece ao clicar com o botão direito num arquivo, e em que ordem."
+            ),
+            Self::Media => t!(
+                "Áudio e vídeo: ouvir passando o mouse, tocar no visualizador e ver a forma de onda."
+            ),
             Self::Search => t!("Encontrar qualquer arquivo do computador pelo nome."),
-            Self::Integrations => t!("Abrir no Prime Files as pastas do Windows e de outros programas."),
+            Self::Integrations => {
+                t!("Abrir no Prime Files as pastas do Windows e de outros programas.")
+            }
             Self::Shortcuts => t!("Mude as teclas de cada comando do explorador."),
             Self::About => t!("Versão, atualizações e o arquivo de configuração."),
         }
@@ -196,7 +204,14 @@ struct Row {
 
 impl Row {
     fn new(label: &'static str, hint: Option<SharedString>, control: impl IntoElement) -> Self {
-        Self { label, hint, control: control.into_any_element(), reset: None, wide: false, more: None }
+        Self {
+            label,
+            hint,
+            control: control.into_any_element(),
+            reset: None,
+            wide: false,
+            more: None,
+        }
     }
 
     fn hint(label: &'static str, hint: impl Into<SharedString>, control: impl IntoElement) -> Self {
@@ -215,7 +230,12 @@ impl Row {
 
     // A reset to `default` (TOML) for `[section] key`, offered when `current`
     // is not already it.
-    fn reset(mut self, (section, key): (&'static str, &'static str), is_default: bool, default: &'static str) -> Self {
+    fn reset(
+        mut self,
+        (section, key): (&'static str, &'static str),
+        is_default: bool,
+        default: &'static str,
+    ) -> Self {
         if !is_default {
             self.reset = Some(Pick::Config(section, key, SharedString::from(default)));
         }
@@ -237,12 +257,21 @@ fn more_mark(label: &'static str, text: SharedString) -> Stateful<Div> {
         .border_color(rgb(theme::border()))
         .text_size(px(10.0))
         .text_color(rgb(theme::muted()))
-        .hover(|style| style.text_color(rgb(theme::fg())).border_color(rgb(theme::fg_secondary())))
+        .hover(|style| {
+            style
+                .text_color(rgb(theme::fg()))
+                .border_color(rgb(theme::fg_secondary()))
+        })
         .child("?")
         .tooltip(move |window, cx| {
             let text = text.clone();
             gpui_component::tooltip::Tooltip::element(move |_, _| {
-                div().max_w(px(340.0)).py(px(4.0)).text_xs().line_height(px(17.0)).child(text.clone())
+                div()
+                    .max_w(px(340.0))
+                    .py(px(4.0))
+                    .text_xs()
+                    .line_height(px(17.0))
+                    .child(text.clone())
             })
             .build(window, cx)
         })
@@ -260,7 +289,10 @@ impl Group {
     }
 
     fn titled(title: &'static str, rows: Vec<Row>) -> Self {
-        Self { title: Some(title), rows }
+        Self {
+            title: Some(title),
+            rows,
+        }
     }
 }
 
@@ -362,9 +394,11 @@ impl SettingsPage {
     /// Creates a new settings page on its first section.
     pub fn new(cx: &mut Context<Self>) -> Self {
         let updater = crate::updater::updater(cx);
-        cx.observe(&updater, |_page, _updater, cx| cx.notify()).detach();
+        cx.observe(&updater, |_page, _updater, cx| cx.notify())
+            .detach();
         // The search section shows the index's count while it is walked.
-        cx.observe_global::<crate::explorer::everything::Everything>(|_page, cx| cx.notify()).detach();
+        cx.observe_global::<crate::explorer::everything::Everything>(|_page, cx| cx.notify())
+            .detach();
         let mut page = Self {
             section: SettingsSection::General,
             config: Config::default(),
@@ -406,7 +440,10 @@ impl SettingsPage {
             if let Err(error) = crate::default_explorer::repair() {
                 tracing::warn!("could not take over the taskbar's File Explorer: {error}");
             }
-            (crate::default_explorer::is_default(), crate::default_explorer::starts_with_windows())
+            (
+                crate::default_explorer::is_default(),
+                crate::default_explorer::starts_with_windows(),
+            )
         });
         cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
             let (is_default, starts) = query.await;
@@ -425,7 +462,13 @@ impl SettingsPage {
         let exe = match std::env::current_exe() {
             Ok(exe) => exe,
             Err(error) => {
-                self.status = Some((tf!("Não foi possível achar o executável do Prime Files: {error}", error = error), true));
+                self.status = Some((
+                    tf!(
+                        "Não foi possível achar o executável do Prime Files: {error}",
+                        error = error
+                    ),
+                    true,
+                ));
                 cx.notify();
                 return;
             }
@@ -441,9 +484,18 @@ impl SettingsPage {
             let outcome = change.await;
             this.update(cx, |page, cx| {
                 page.status = Some(match outcome {
-                    Ok(()) if enable => (t!("Pastas, drives e Win+E agora abrem no Prime Files.").to_string(), false),
-                    Ok(()) => (t!("Pastas voltaram a abrir no Explorador do Windows.").to_string(), false),
-                    Err(error) => (tf!("Não foi possível mudar o registro: {error}", error = error), true),
+                    Ok(()) if enable => (
+                        t!("Pastas, drives e Win+E agora abrem no Prime Files.").to_string(),
+                        false,
+                    ),
+                    Ok(()) => (
+                        t!("Pastas voltaram a abrir no Explorador do Windows.").to_string(),
+                        false,
+                    ),
+                    Err(error) => (
+                        tf!("Não foi possível mudar o registro: {error}", error = error),
+                        true,
+                    ),
                 });
                 page.refresh_default_explorer(cx);
             })
@@ -456,17 +508,28 @@ impl SettingsPage {
         let exe = match std::env::current_exe() {
             Ok(exe) => exe,
             Err(error) => {
-                self.status = Some((tf!("Não foi possível achar o executável do Prime Files: {error}", error = error), true));
+                self.status = Some((
+                    tf!(
+                        "Não foi possível achar o executável do Prime Files: {error}",
+                        error = error
+                    ),
+                    true,
+                ));
                 cx.notify();
                 return;
             }
         };
-        let change = cx.background_spawn(async move { crate::default_explorer::set_starts_with_windows(&exe, enable) });
+        let change = cx.background_spawn(async move {
+            crate::default_explorer::set_starts_with_windows(&exe, enable)
+        });
         cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
             let outcome = change.await;
             this.update(cx, |page, cx| {
                 if let Err(error) = outcome {
-                    page.status = Some((tf!("Não foi possível mudar o registro: {error}", error = error), true));
+                    page.status = Some((
+                        tf!("Não foi possível mudar o registro: {error}", error = error),
+                        true,
+                    ));
                 }
                 page.refresh_default_explorer(cx);
             })
@@ -492,7 +555,13 @@ impl SettingsPage {
         let exe = match std::env::current_exe() {
             Ok(exe) => exe,
             Err(error) => {
-                self.status = Some((tf!("Não foi possível achar o executável do Prime Files: {error}", error = error), true));
+                self.status = Some((
+                    tf!(
+                        "Não foi possível achar o executável do Prime Files: {error}",
+                        error = error
+                    ),
+                    true,
+                ));
                 cx.notify();
                 return;
             }
@@ -511,9 +580,18 @@ impl SettingsPage {
             let outcome = change.await;
             this.update(cx, |page, cx| {
                 page.status = Some(match outcome {
-                    Ok(()) if enable => (t!("O Listary agora abre pastas no Prime Files.").to_string(), false),
-                    Ok(()) => (t!("O Listary voltou a abrir pastas no Explorador.").to_string(), false),
-                    Err(error) => (tf!("Não foi possível mudar o Listary: {error}", error = error), true),
+                    Ok(()) if enable => (
+                        t!("O Listary agora abre pastas no Prime Files.").to_string(),
+                        false,
+                    ),
+                    Ok(()) => (
+                        t!("O Listary voltou a abrir pastas no Explorador.").to_string(),
+                        false,
+                    ),
+                    Err(error) => (
+                        tf!("Não foi possível mudar o Listary: {error}", error = error),
+                        true,
+                    ),
                 });
                 page.refresh_listary(cx);
             })
@@ -528,7 +606,11 @@ impl SettingsPage {
             Pick::DefaultExplorer(enable) => self.set_default_explorer(enable, cx),
             Pick::Listary(enable) => self.set_listary(enable, cx),
             Pick::RecordShortcut(action) => {
-                self.recording = if self.recording == Some(action) { None } else { Some(action) };
+                self.recording = if self.recording == Some(action) {
+                    None
+                } else {
+                    Some(action)
+                };
                 self.recording_quick = false;
                 cx.notify();
             }
@@ -539,7 +621,11 @@ impl SettingsPage {
             }
             Pick::ClearShortcut(action) => {
                 self.recording = None;
-                self.edit_keybindings(vec![(shortcuts::info_of(action).id, Some(String::new()))], None, cx);
+                self.edit_keybindings(
+                    vec![(shortcuts::info_of(action).id, Some(String::new()))],
+                    None,
+                    cx,
+                );
             }
             Pick::ResetShortcut(action) => {
                 self.recording = None;
@@ -558,7 +644,15 @@ impl SettingsPage {
                 cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
                     if let Err(error) = write.await {
                         this.update(cx, |page, cx| {
-                            page.status = Some((tf!("Não foi possível salvar {section}.{key}: {error}", section = "menu", key = "items", error = error), true));
+                            page.status = Some((
+                                tf!(
+                                    "Não foi possível salvar {section}.{key}: {error}",
+                                    section = "menu",
+                                    key = "items",
+                                    error = error
+                                ),
+                                true,
+                            ));
                             cx.notify();
                         })
                         .log_err();
@@ -568,8 +662,15 @@ impl SettingsPage {
             }
             Pick::ResetAllShortcuts => {
                 self.recording = None;
-                let edits = shortcuts::ACTIONS.iter().map(|info| (info.id, None)).collect();
-                self.edit_keybindings(edits, Some(t!("Todos os atalhos voltaram ao padrão.").to_string()), cx);
+                let edits = shortcuts::ACTIONS
+                    .iter()
+                    .map(|info| (info.id, None))
+                    .collect();
+                self.edit_keybindings(
+                    edits,
+                    Some(t!("Todos os atalhos voltaram ao padrão.").to_string()),
+                    cx,
+                );
             }
         }
     }
@@ -589,7 +690,8 @@ impl SettingsPage {
                 match value {
                     // A TOML string: `ctrl-\` needs its backslash escaped.
                     Some(keys) => {
-                        let quoted = format!("\"{}\"", keys.replace('\\', "\\\\").replace('"', "\\\""));
+                        let quoted =
+                            format!("\"{}\"", keys.replace('\\', "\\\\").replace('"', "\\\""));
                         config::set_value(&path, "keybindings", id, &quoted)?
                     }
                     None => config::remove_value(&path, "keybindings", id)?,
@@ -607,7 +709,10 @@ impl SettingsPage {
                         }
                     }
                     Err(error) => {
-                        page.status = Some((tf!("Não foi possível salvar os atalhos: {error}", error = error), true));
+                        page.status = Some((
+                            tf!("Não foi possível salvar os atalhos: {error}", error = error),
+                            true,
+                        ));
                     }
                 }
                 cx.notify();
@@ -652,8 +757,10 @@ impl SettingsPage {
         }
         self.recording = None;
         let taken = shortcuts::conflicts(&self.config.keybindings.bindings, &chord, action);
-        let mut edits: Vec<(&'static str, Option<String>)> =
-            taken.iter().map(|other| (shortcuts::info_of(*other).id, Some(String::new()))).collect();
+        let mut edits: Vec<(&'static str, Option<String>)> = taken
+            .iter()
+            .map(|other| (shortcuts::info_of(*other).id, Some(String::new())))
+            .collect();
         edits.push((shortcuts::info_of(action).id, Some(chord.to_config())));
         let mut message = tf!(
             "{keys} agora: {command}.",
@@ -661,7 +768,10 @@ impl SettingsPage {
             command = tr(shortcuts::info_of(action).label)
         );
         if !taken.is_empty() {
-            let others: Vec<&str> = taken.iter().map(|other| tr(shortcuts::info_of(*other).label)).collect();
+            let others: Vec<&str> = taken
+                .iter()
+                .map(|other| tr(shortcuts::info_of(*other).label))
+                .collect();
             message.push(' ');
             message.push_str(&tf!("Tirado de: {commands}.", commands = others.join(", ")));
         }
@@ -672,7 +782,12 @@ impl SettingsPage {
     /// the menu entries that lead to one directly.
     pub fn show_section(&mut self, section: SettingsSection, cx: &mut Context<Self>) {
         self.section = section;
-        self.glide = Some(Glide { section: Some(section), target: px(0.0), last_set: None, last_tick: None });
+        self.glide = Some(Glide {
+            section: Some(section),
+            target: px(0.0),
+            last_set: None,
+            last_tick: None,
+        });
         self.confirm_reset = false;
         cx.notify();
     }
@@ -694,15 +809,22 @@ impl SettingsPage {
         };
         let max = self.scroll.max_offset().height;
         let target = (from + delta).clamp(-max, px(0.0));
-        self.glide = Some(Glide { section: None, target, last_set: Some(current), last_tick });
+        self.glide = Some(Glide {
+            section: None,
+            target,
+            last_set: Some(current),
+            last_tick,
+        });
         cx.notify();
         true
     }
 
     // Moves the column one frame along the glide; called on every render.
     fn tick_glide(&mut self, window: &mut Window) {
-        let Some((section, wheel_target, last_set, last_tick)) =
-            self.glide.as_ref().map(|glide| (glide.section, glide.target, glide.last_set, glide.last_tick))
+        let Some((section, wheel_target, last_set, last_tick)) = self
+            .glide
+            .as_ref()
+            .map(|glide| (glide.section, glide.target, glide.last_set, glide.last_tick))
         else {
             return;
         };
@@ -736,13 +858,19 @@ impl SettingsPage {
             }
         };
         let now = std::time::Instant::now();
-        let dt = last_tick.map_or(1.0 / 60.0, |last| (now - last).as_secs_f32()).min(0.1);
+        let dt = last_tick
+            .map_or(1.0 / 60.0, |last| (now - last).as_secs_f32())
+            .min(0.1);
         let tau = glide_time(self.config.ui.scroll_smoothness);
         let y = if tau <= 0.0 {
             target
         } else {
             let y = offset.y + (target - offset.y) * (1.0 - (-dt / tau).exp());
-            if (target - y).abs() < px(0.5) { target } else { y }
+            if (target - y).abs() < px(0.5) {
+                target
+            } else {
+                y
+            }
         };
         self.scroll.set_offset(gpui::point(offset.x, y));
         if let Some(glide) = self.glide.as_mut() {
@@ -795,7 +923,9 @@ impl SettingsPage {
         let margin = view.size.height * 0.5;
         let (from, to) = (top - margin, top + view.size.height + margin);
         for (ix, kept) in kept.iter_mut().enumerate() {
-            let Some(bounds) = self.scroll.bounds_for_item(ix + 1) else { return vec![None; count] };
+            let Some(bounds) = self.scroll.bounds_for_item(ix + 1) else {
+                return vec![None; count];
+            };
             if bounds.bottom() < from || bounds.top() > to {
                 *kept = Some(bounds.size.height);
             }
@@ -814,7 +944,10 @@ impl SettingsPage {
         let view_top = self.scroll.bounds().top() - self.scroll.offset().y + px(CURRENT_MARGIN);
         let mut current = self.section;
         for section in SettingsSection::ALL {
-            match self.section_child(section).and_then(|ix| self.scroll.bounds_for_item(ix)) {
+            match self
+                .section_child(section)
+                .and_then(|ix| self.scroll.bounds_for_item(ix))
+            {
                 Some(bounds) if bounds.top() <= view_top => current = section,
                 Some(_) => break,
                 // Bounds of another layout (search results): keep the last.
@@ -831,13 +964,28 @@ impl SettingsPage {
     }
 
     // Writes one value; the watcher brings it back through `set_config`.
-    fn write(&mut self, section: &'static str, key: &'static str, value: String, cx: &mut Context<Self>) {
+    fn write(
+        &mut self,
+        section: &'static str,
+        key: &'static str,
+        value: String,
+        cx: &mut Context<Self>,
+    ) {
         let path = config::paths::config_file();
-        let write = cx.background_spawn(async move { config::set_value(&path, section, key, &value) });
+        let write =
+            cx.background_spawn(async move { config::set_value(&path, section, key, &value) });
         cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
             if let Err(error) = write.await {
                 this.update(cx, |page, cx| {
-                    page.status = Some((tf!("Não foi possível salvar {section}.{key}: {error}", section = section, key = key, error = error), true));
+                    page.status = Some((
+                        tf!(
+                            "Não foi possível salvar {section}.{key}: {error}",
+                            section = section,
+                            key = key,
+                            error = error
+                        ),
+                        true,
+                    ));
                     cx.notify();
                 })
                 .log_err();
@@ -851,14 +999,31 @@ impl SettingsPage {
         // A first run may not have written it yet, and there is nothing to
         // open until it exists.
         if let Err(error) = config::ensure_exists(&path) {
-            self.status = Some((tf!("Não foi possível criar {path}: {error}", path = path.display(), error = error), true));
+            self.status = Some((
+                tf!(
+                    "Não foi possível criar {path}: {error}",
+                    path = path.display(),
+                    error = error
+                ),
+                true,
+            ));
             cx.notify();
             return;
         }
         // `explorer.exe <file>` hands it to whatever program `.toml` is
         // associated with, the same way a double click in the listing does.
-        if let Err(error) = std::process::Command::new("explorer.exe").arg(&path).spawn() {
-            self.status = Some((tf!("Não foi possível abrir {path}: {error}", path = path.display(), error = error), true));
+        if let Err(error) = std::process::Command::new("explorer.exe")
+            .arg(&path)
+            .spawn()
+        {
+            self.status = Some((
+                tf!(
+                    "Não foi possível abrir {path}: {error}",
+                    path = path.display(),
+                    error = error
+                ),
+                true,
+            ));
             cx.notify();
         }
     }
@@ -872,7 +1037,10 @@ impl SettingsPage {
             command.arg(config::paths::config_dir());
         }
         if let Err(error) = command.spawn() {
-            self.status = Some((tf!("Não foi possível abrir a pasta: {error}", error = error), true));
+            self.status = Some((
+                tf!("Não foi possível abrir a pasta: {error}", error = error),
+                true,
+            ));
             cx.notify();
         }
     }
@@ -891,11 +1059,17 @@ impl SettingsPage {
             this.update(cx, |page, cx| {
                 page.status = Some(match outcome {
                     Ok(Some(backup)) => (
-                        tf!("Configurações restauradas. A versão anterior ficou em {path}", path = backup.display()),
+                        tf!(
+                            "Configurações restauradas. A versão anterior ficou em {path}",
+                            path = backup.display()
+                        ),
                         false,
                     ),
                     Ok(None) => (t!("Configurações restauradas.").to_string(), false),
-                    Err(error) => (tf!("Não foi possível restaurar: {error}", error = error), true),
+                    Err(error) => (
+                        tf!("Não foi possível restaurar: {error}", error = error),
+                        true,
+                    ),
                 });
                 cx.notify();
             })
@@ -920,11 +1094,18 @@ impl SettingsPage {
     }
 
     pub(crate) fn install_update(&mut self, cx: &mut Context<Self>) {
-        self.updater.update(cx, |updater, cx| updater.install_now(cx));
+        self.updater
+            .update(cx, |updater, cx| updater.install_now(cx));
     }
 
     /// Writes `value` (TOML) to `[section] key`.
-    pub(crate) fn write_config(&mut self, section: &'static str, key: &'static str, value: &str, cx: &mut Context<Self>) {
+    pub(crate) fn write_config(
+        &mut self,
+        section: &'static str,
+        key: &'static str,
+        value: &str,
+        cx: &mut Context<Self>,
+    ) {
         self.write(section, key, value.to_string(), cx);
     }
 
@@ -932,9 +1113,14 @@ impl SettingsPage {
     /// wait while the registry is asked.
     pub(crate) fn default_explorer_switch(&self, cx: &mut Context<Self>) -> AnyElement {
         match self.default_explorer {
-            Some(is_default) => {
-                self.switch_pick("home-default-explorer", is_default, Pick::DefaultExplorer(!is_default), cx).into_any_element()
-            }
+            Some(is_default) => self
+                .switch_pick(
+                    "home-default-explorer",
+                    is_default,
+                    Pick::DefaultExplorer(!is_default),
+                    cx,
+                )
+                .into_any_element(),
             None => checking().into_any_element(),
         }
     }
@@ -1106,14 +1292,23 @@ impl SettingsPage {
     // cannot read the current one still finds theirs.
     fn language_row(&self, cx: &mut Context<Self>) -> Row {
         let chosen = Lang::parse(&self.config.ui.language);
-        let mut options: Vec<(&'static str, bool, SharedString)> =
-            vec![(t!("Automático"), chosen.is_none(), SharedString::from("\"auto\""))];
+        let mut options: Vec<(&'static str, bool, SharedString)> = vec![(
+            t!("Automático"),
+            chosen.is_none(),
+            SharedString::from("\"auto\""),
+        )];
         for lang in Lang::ALL {
-            options.push((lang.native_name(), chosen == Some(lang), SharedString::from(format!("\"{}\"", lang.code()))));
+            options.push((
+                lang.native_name(),
+                chosen == Some(lang),
+                SharedString::from(format!("\"{}\"", lang.code())),
+            ));
         }
         let options: Vec<_> = options
             .into_iter()
-            .map(|(label, selected, value)| (label, selected, Pick::Config("ui", "language", value)))
+            .map(|(label, selected, value)| {
+                (label, selected, Pick::Config("ui", "language", value))
+            })
             .collect();
         Row::hint(
             t!("Idioma"),
@@ -1134,17 +1329,48 @@ impl SettingsPage {
             vec!["copy", "copy_path", "rename", "delete"],
             vec!["new_tab", "more_options", "customize"],
         );
-        let complete = (config::MENU_QUICK_ALL.to_vec(), vec![
-            "new_tab", "windows", "copy_path", "properties", "tags", "more_options", "customize",
-        ]);
+        let complete = (
+            config::MENU_QUICK_ALL.to_vec(),
+            vec![
+                "new_tab",
+                "windows",
+                "copy_path",
+                "properties",
+                "tags",
+                "more_options",
+                "customize",
+            ],
+        );
         let is = |quick: &[&str], items: &[&str]| {
-            menu.quick.iter().map(String::as_str).eq(quick.iter().copied())
-                && menu.items.iter().map(String::as_str).eq(items.iter().copied())
+            menu.quick
+                .iter()
+                .map(String::as_str)
+                .eq(quick.iter().copied())
+                && menu
+                    .items
+                    .iter()
+                    .map(String::as_str)
+                    .eq(items.iter().copied())
         };
         let presets: Vec<(&'static str, bool, Pick)> = vec![
-            (t!("Minimalista"), is(&minimal.0, &minimal.1), Pick::MenuPreset(minimal.0.clone(), minimal.1.clone())),
-            (t!("Padrão"), *menu == default || is(config::MENU_QUICK_DEFAULT, config::MENU_ITEMS_DEFAULT), Pick::MenuPreset(config::MENU_QUICK_DEFAULT.to_vec(), config::MENU_ITEMS_DEFAULT.to_vec())),
-            (t!("Completo"), is(&complete.0, &complete.1), Pick::MenuPreset(complete.0.clone(), complete.1.clone())),
+            (
+                t!("Minimalista"),
+                is(&minimal.0, &minimal.1),
+                Pick::MenuPreset(minimal.0.clone(), minimal.1.clone()),
+            ),
+            (
+                t!("Padrão"),
+                *menu == default || is(config::MENU_QUICK_DEFAULT, config::MENU_ITEMS_DEFAULT),
+                Pick::MenuPreset(
+                    config::MENU_QUICK_DEFAULT.to_vec(),
+                    config::MENU_ITEMS_DEFAULT.to_vec(),
+                ),
+            ),
+            (
+                t!("Completo"),
+                is(&complete.0, &complete.1),
+                Pick::MenuPreset(complete.0.clone(), complete.1.clone()),
+            ),
         ];
         let mut groups = vec![
             Group::new(vec![
@@ -1206,8 +1432,13 @@ impl SettingsPage {
                 .flex_wrap()
                 .gap(px(6.0))
                 .children(menu.hidden.iter().enumerate().map(|(ix, label)| {
-                    let rest: Vec<String> =
-                        menu.hidden.iter().enumerate().filter(|(other, _)| *other != ix).map(|(_, label)| label.clone()).collect();
+                    let rest: Vec<String> = menu
+                        .hidden
+                        .iter()
+                        .enumerate()
+                        .filter(|(other, _)| *other != ix)
+                        .map(|(_, label)| label.clone())
+                        .collect();
                     let pick = Pick::Config("menu", "hidden", SharedString::from(toml_list(&rest)));
                     div()
                         .id(ElementId::NamedInteger("menu-hidden".into(), ix as u64))
@@ -1223,9 +1454,20 @@ impl SettingsPage {
                         .text_sm()
                         .text_color(rgb(theme::fg_secondary()))
                         .cursor_pointer()
-                        .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
-                        .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new(t!("Mostrar de novo")).build(window, cx))
-                        .on_click(cx.listener(move |page, _event, _window, cx| page.pick(pick.clone(), cx)))
+                        .hover(|style| {
+                            style
+                                .bg(rgb(theme::bg_hover()))
+                                .text_color(rgb(theme::fg()))
+                        })
+                        .tooltip(|window, cx| {
+                            gpui_component::tooltip::Tooltip::new(t!("Mostrar de novo"))
+                                .build(window, cx)
+                        })
+                        .on_click(
+                            cx.listener(move |page, _event, _window, cx| {
+                                page.pick(pick.clone(), cx)
+                            }),
+                        )
                         .child(label.clone())
                         .child(Icon::new(Icon::empty()).path("icons/close.svg").size_3())
                 }))
@@ -1246,7 +1488,14 @@ impl SettingsPage {
     // A list of every id `all` knows: the chosen ones first, in their order,
     // each with a switch and arrows; the rest after them, off. Every change
     // writes the whole list to `[menu] key`.
-    fn order_editor(&self, id: &'static str, key: &'static str, chosen: &[String], all: &[&str], cx: &mut Context<Self>) -> Div {
+    fn order_editor(
+        &self,
+        id: &'static str,
+        key: &'static str,
+        chosen: &[String],
+        all: &[&str],
+        cx: &mut Context<Self>,
+    ) -> Div {
         let chosen: Vec<String> = chosen
             .iter()
             .filter(|item| all.contains(&item.as_str()))
@@ -1256,8 +1505,14 @@ impl SettingsPage {
                 }
                 seen
             });
-        let rest: Vec<String> = all.iter().filter(|item| !chosen.iter().any(|on| on == *item)).map(|item| item.to_string()).collect();
-        let write = move |list: Vec<String>| Pick::Config("menu", key, SharedString::from(toml_list(&list)));
+        let rest: Vec<String> = all
+            .iter()
+            .filter(|item| !chosen.iter().any(|on| on == *item))
+            .map(|item| item.to_string())
+            .collect();
+        let write = move |list: Vec<String>| {
+            Pick::Config("menu", key, SharedString::from(toml_list(&list)))
+        };
         let count = chosen.len();
         let mut rows: Vec<AnyElement> = Vec::new();
         for (ix, item) in chosen.iter().chain(rest.iter()).enumerate() {
@@ -1266,7 +1521,11 @@ impl SettingsPage {
                 continue;
             };
             let toggled = if on {
-                chosen.iter().filter(|other| *other != item).cloned().collect()
+                chosen
+                    .iter()
+                    .filter(|other| *other != item)
+                    .cloned()
+                    .collect()
             } else {
                 let mut list = chosen.clone();
                 list.push(item.clone());
@@ -1281,21 +1540,41 @@ impl SettingsPage {
                 }
                 let pick = write(moved);
                 div()
-                    .id(ElementId::NamedInteger(SharedString::from(format!("{id}-{}", if direction < 0 { "up" } else { "down" })), ix as u64))
+                    .id(ElementId::NamedInteger(
+                        SharedString::from(format!(
+                            "{id}-{}",
+                            if direction < 0 { "up" } else { "down" }
+                        )),
+                        ix as u64,
+                    ))
                     .size(px(24.0))
                     .flex()
                     .items_center()
                     .justify_center()
                     .rounded(px(5.0))
-                    .text_color(rgb(if usable { theme::fg_secondary() } else { theme::border() }))
+                    .text_color(rgb(if usable {
+                        theme::fg_secondary()
+                    } else {
+                        theme::border()
+                    }))
                     .when(usable, |this| {
                         this.cursor_pointer()
-                            .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
-                            .on_click(cx.listener(move |page, _event, _window, cx| page.pick(pick.clone(), cx)))
+                            .hover(|style| {
+                                style
+                                    .bg(rgb(theme::bg_hover()))
+                                    .text_color(rgb(theme::fg()))
+                            })
+                            .on_click(cx.listener(move |page, _event, _window, cx| {
+                                page.pick(pick.clone(), cx)
+                            }))
                     })
                     .child(
                         Icon::new(Icon::empty())
-                            .path(if direction < 0 { "icons/chevron-up.svg" } else { "icons/chevron-down.svg" })
+                            .path(if direction < 0 {
+                                "icons/chevron-up.svg"
+                            } else {
+                                "icons/chevron-down.svg"
+                            })
                             .size_4(),
                     )
                     .into_any_element()
@@ -1311,10 +1590,15 @@ impl SettingsPage {
                     .items_center()
                     .gap(px(10.0))
                     .rounded(px(6.0))
-                    .when(ix + 1 < count + rest.len(), |this| this.border_b_1().border_color(rgb(theme::border())))
+                    .when(ix + 1 < count + rest.len(), |this| {
+                        this.border_b_1().border_color(rgb(theme::border()))
+                    })
                     .child(
                         div()
-                            .id(ElementId::NamedInteger(SharedString::from(format!("{id}-toggle")), ix as u64))
+                            .id(ElementId::NamedInteger(
+                                SharedString::from(format!("{id}-toggle")),
+                                ix as u64,
+                            ))
                             .size(px(18.0))
                             .flex()
                             .flex_shrink_0()
@@ -1325,13 +1609,21 @@ impl SettingsPage {
                             .cursor_pointer()
                             .map(|this| {
                                 if on {
-                                    this.bg(rgb(theme::accent())).border_color(rgb(theme::accent())).text_color(rgb(theme::accent_fg()))
+                                    this.bg(rgb(theme::accent()))
+                                        .border_color(rgb(theme::accent()))
+                                        .text_color(rgb(theme::accent_fg()))
                                 } else {
                                     this.border_color(rgb(theme::border_hover()))
                                 }
                             })
-                            .on_click(cx.listener(move |page, _event, _window, cx| page.pick(pick.clone(), cx)))
-                            .when(on, |this| this.child(Icon::new(Icon::empty()).path("icons/check.svg").size_3())),
+                            .on_click(cx.listener(move |page, _event, _window, cx| {
+                                page.pick(pick.clone(), cx)
+                            }))
+                            .when(on, |this| {
+                                this.child(
+                                    Icon::new(Icon::empty()).path("icons/check.svg").size_3(),
+                                )
+                            }),
                     )
                     .child(
                         Icon::new(Icon::empty())
@@ -1369,42 +1661,57 @@ impl SettingsPage {
         let custom = accent.starts_with('#') && theme::parse_accent(&accent).is_some();
         let ui = &self.config.ui;
 
-        let swatches = div().flex().flex_row().flex_wrap().gap_1().children(
-            theme::NAMED_ACCENTS.iter().zip(ACCENT_LABELS).map(|(&(name, color), &label)| {
-                let selected = accent.eq_ignore_ascii_case(name)
-                    || (color.is_none() && theme::parse_accent(&accent).is_none());
-                let swatch = color.unwrap_or_else(theme::palette_accent);
-                div()
-                    .id(ElementId::Name(SharedString::from(format!("accent-{name}"))))
-                    .w(px(64.0))
-                    .py(px(6.0))
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap_1()
-                    .rounded(px(6.0))
-                    .cursor_pointer()
-                    .hover(|style| style.bg(rgb(theme::bg_hover())))
-                    .on_click(cx.listener(move |page, _event, _window, cx| {
-                        page.write("theme", "accent", format!("\"{name}\""), cx);
-                    }))
-                    .child(
-                        div()
-                            .size(px(28.0))
-                            .rounded_full()
-                            .bg(rgb(swatch))
-                            .border_2()
-                            .border_color(rgb(if selected { theme::fg() } else { theme::bg_secondary() })),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(rgb(if selected { theme::fg() } else { theme::fg_secondary() }))
-                            .child(tr(label)),
-                    )
-            }),
-        )
-        .child(self.custom_accent(false, cx));
+        let swatches = div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap_1()
+            .children(theme::NAMED_ACCENTS.iter().zip(ACCENT_LABELS).map(
+                |(&(name, color), &label)| {
+                    let selected = accent.eq_ignore_ascii_case(name)
+                        || (color.is_none() && theme::parse_accent(&accent).is_none());
+                    let swatch = color.unwrap_or_else(theme::palette_accent);
+                    div()
+                        .id(ElementId::Name(SharedString::from(format!(
+                            "accent-{name}"
+                        ))))
+                        .w(px(64.0))
+                        .py(px(6.0))
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap_1()
+                        .rounded(px(6.0))
+                        .cursor_pointer()
+                        .hover(|style| style.bg(rgb(theme::bg_hover())))
+                        .on_click(cx.listener(move |page, _event, _window, cx| {
+                            page.write("theme", "accent", format!("\"{name}\""), cx);
+                        }))
+                        .child(
+                            div()
+                                .size(px(28.0))
+                                .rounded_full()
+                                .bg(rgb(swatch))
+                                .border_2()
+                                .border_color(rgb(if selected {
+                                    theme::fg()
+                                } else {
+                                    theme::bg_secondary()
+                                })),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(if selected {
+                                    theme::fg()
+                                } else {
+                                    theme::fg_secondary()
+                                }))
+                                .child(tr(label)),
+                        )
+                },
+            ))
+            .child(self.custom_accent(false, cx));
 
         vec![
             Group::titled(
@@ -1522,7 +1829,11 @@ impl SettingsPage {
                             (t!("Barra de rota"), compact.hide_header, "hide_header"),
                             (t!("Barra lateral"), compact.hide_sidebar, "hide_sidebar"),
                             (t!("Visualizador"), compact.hide_preview, "hide_preview"),
-                            (t!("Barra de baixo"), compact.hide_bottom_bar, "hide_bottom_bar"),
+                            (
+                                t!("Barra de baixo"),
+                                compact.hide_bottom_bar,
+                                "hide_bottom_bar",
+                            ),
                         ],
                         cx,
                     ),
@@ -1532,7 +1843,10 @@ impl SettingsPage {
                     t!("Por cima da lista ou empurrando ela."),
                     self.config_choice(
                         "compact-overlay",
-                        &[(t!("Por cima"), compact.overlay, "true"), (t!("Empurrando"), !compact.overlay, "false")],
+                        &[
+                            (t!("Por cima"), compact.overlay, "true"),
+                            (t!("Empurrando"), !compact.overlay, "false"),
+                        ],
                         ("compact", "overlay"),
                         cx,
                     ),
@@ -1574,7 +1888,11 @@ impl SettingsPage {
                         cx,
                     ),
                 )
-                .reset(("compact", "reveal_delay_ms"), compact.reveal_delay_ms == 100, "100"),
+                .reset(
+                    ("compact", "reveal_delay_ms"),
+                    compact.reveal_delay_ms == 100,
+                    "100",
+                ),
                 Row::hint(
                     t!("Espera para sumir"),
                     t!("Quanto tempo a barra fica depois que o mouse sai dela."),
@@ -1590,7 +1908,11 @@ impl SettingsPage {
                         cx,
                     ),
                 )
-                .reset(("compact", "hide_delay_ms"), compact.hide_delay_ms == 400, "400"),
+                .reset(
+                    ("compact", "hide_delay_ms"),
+                    compact.hide_delay_ms == 400,
+                    "400",
+                ),
                 Row::hint(
                     t!("Animação"),
                     t!("Duração do deslizar. Desligada, as barras aparecem e somem de uma vez."),
@@ -1606,7 +1928,11 @@ impl SettingsPage {
                         cx,
                     ),
                 )
-                .reset(("compact", "animation_ms"), compact.animation_ms == 220, "220"),
+                .reset(
+                    ("compact", "animation_ms"),
+                    compact.animation_ms == 220,
+                    "220",
+                ),
                 Row::hint(
                     t!("Área de ativação"),
                     t!("Largura da faixa em cada borda que chama a barra."),
@@ -1747,12 +2073,16 @@ impl SettingsPage {
         let mft_state = mft::state();
         let (mft_busy, mft_error) = cx
             .try_global::<crate::explorer::everything::Everything>()
-            .map_or((false, None), |state| (state.mft_busy, state.mft_error.clone()));
+            .map_or((false, None), |state| {
+                (state.mft_busy, state.mft_error.clone())
+            });
         let mft_text = match (mft_busy, mft_error, mft_state) {
             (true, _, _) => t!("Aguardando a permissão do Windows…").to_string(),
             (false, Some(error), _) => tf!("Não deu certo: {error}", error = error),
             (false, None, mft::State::On) => t!("Ligada").to_string(),
-            (false, None, mft::State::Stopped) => t!("O serviço está instalado mas parado.").to_string(),
+            (false, None, mft::State::Stopped) => {
+                t!("O serviço está instalado mas parado.").to_string()
+            }
             (false, None, mft::State::Off) => t!("Desligada").to_string(),
         };
         let mft_on = mft_state == mft::State::On;
@@ -1760,22 +2090,34 @@ impl SettingsPage {
             Group::new(vec![
                 Row::hint(
                     t!("Buscar em todo o computador"),
-                    t!("Clique na lupa da barra de baixo ou aperte Ctrl+E e digite qualquer parte do nome. Vários termos filtram juntos, * e ? funcionam, e um termo com \\ procura no caminho."),
+                    t!(
+                        "Clique na lupa da barra de baixo ou aperte Ctrl+E e digite qualquer parte do nome. Vários termos filtram juntos, * e ? funcionam, e um termo com \\ procura no caminho."
+                    ),
                     div()
                         .flex()
                         .flex_col()
                         .items_end()
                         .gap_2()
-                        .child(div().text_xs().text_color(rgb(theme::fg_secondary())).child(state))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme::fg_secondary()))
+                                .child(state),
+                        )
                         .when(!building, |this| {
-                            this.child(button("everything-rebuild", t!("Reindexar agora"), false).on_click(cx.listener(
-                                |_page, _event, _window, cx| crate::explorer::everything::rebuild(cx),
-                            )))
+                            this.child(
+                                button("everything-rebuild", t!("Reindexar agora"), false)
+                                    .on_click(cx.listener(|_page, _event, _window, cx| {
+                                        crate::explorer::everything::rebuild(cx)
+                                    })),
+                            )
                         }),
                 ),
                 Row::hint(
                     t!("Indexação instantânea"),
-                    t!("Lê a tabela dos discos NTFS como o Everything: o índice do computador fica pronto em segundos, também depois de reiniciar. Instala um serviço do Windows, com permissão de administrador uma vez."),
+                    t!(
+                        "Lê a tabela dos discos NTFS como o Everything: o índice do computador fica pronto em segundos, também depois de reiniciar. Instala um serviço do Windows, com permissão de administrador uma vez."
+                    ),
                     div()
                         .flex()
                         .flex_col()
@@ -1794,14 +2136,26 @@ impl SettingsPage {
                         )
                         .when(!mft_busy, |this| {
                             this.child(
-                                button("everything-mft", if mft_on { t!("Desativar") } else { t!("Ativar") }, false)
-                                    .on_click(cx.listener(move |_page, _event, _window, cx| mft::set(!mft_on, cx))),
+                                button(
+                                    "everything-mft",
+                                    if mft_on {
+                                        t!("Desativar")
+                                    } else {
+                                        t!("Ativar")
+                                    },
+                                    false,
+                                )
+                                .on_click(cx.listener(
+                                    move |_page, _event, _window, cx| mft::set(!mft_on, cx),
+                                )),
                             )
                         }),
                 ),
                 Row::hint(
                     t!("Como o índice é feito"),
-                    t!("Os nomes de todas as unidades fixas ficam guardados neste computador. Com o programa aberto, o que é criado ou renomeado entra na hora; o índice é relido em segundo plano quando passa de 6 horas (30 minutos com a indexação instantânea). Nada sai do computador."),
+                    t!(
+                        "Os nomes de todas as unidades fixas ficam guardados neste computador. Com o programa aberto, o que é criado ou renomeado entra na hora; o índice é relido em segundo plano quando passa de 6 horas (30 minutos com a indexação instantânea). Nada sai do computador."
+                    ),
                     div(),
                 ),
             ]),
@@ -1810,13 +2164,18 @@ impl SettingsPage {
                 vec![
                     Row::hint(
                         t!("Filtrar a pasta"),
-                        t!("Comece a digitar na lista: só os nomes da pasta aberta que combinam ficam."),
+                        t!(
+                            "Comece a digitar na lista: só os nomes da pasta aberta que combinam ficam."
+                        ),
                         key_cap(t!("Qualquer letra")),
                     ),
                     Row::hint(
                         t!("Buscar nas subpastas"),
                         t!("Procura a partir da pasta aberta, lendo o disco na hora."),
-                        key_cap_owned(shortcuts::display(Action::SearchSubfolders).unwrap_or_else(|| t!("Nenhum").to_string())),
+                        key_cap_owned(
+                            shortcuts::display(Action::SearchSubfolders)
+                                .unwrap_or_else(|| t!("Nenhum").to_string()),
+                        ),
                     ),
                 ],
             ),
@@ -1836,7 +2195,8 @@ impl SettingsPage {
                 .into_any_element(),
             Some(state) => {
                 let ours = state == crate::listary::State::Ours;
-                self.switch_pick("listary", ours, Pick::Listary(!ours), cx).into_any_element()
+                self.switch_pick("listary", ours, Pick::Listary(!ours), cx)
+                    .into_any_element()
             }
         };
         // Three cards by what they are about, each row one short line with
@@ -1907,7 +2267,13 @@ impl SettingsPage {
             cx.notify();
             return;
         }
-        match crate::quick_keys::from_keystroke(modifiers.control, modifiers.shift, modifiers.alt, modifiers.platform, &key) {
+        match crate::quick_keys::from_keystroke(
+            modifiers.control,
+            modifiers.shift,
+            modifiers.alt,
+            modifiers.platform,
+            &key,
+        ) {
             Some(setting) => self.write("launcher", "hotkey", format!("\"{setting}\""), cx),
             None => {
                 self.status = Some((
@@ -1932,8 +2298,10 @@ impl SettingsPage {
             ("shift+space", "\"shift+space\"", t!("Shift+Espaço")),
         ];
         let custom = !presets.iter().any(|(value, _, _)| *value == current);
-        let options: Vec<(&'static str, bool, &'static str)> =
-            presets.iter().map(|(value, toml, label)| (*label, *value == current, *toml)).collect();
+        let options: Vec<(&'static str, bool, &'static str)> = presets
+            .iter()
+            .map(|(value, toml, label)| (*label, *value == current, *toml))
+            .collect();
         let recording = self.recording_quick;
         let record_label = if recording {
             t!("Aperte o atalho… (Esc desiste)").to_string()
@@ -1973,7 +2341,9 @@ impl SettingsPage {
                                 .hover(|style| style.bg(rgb(theme::bg_hover())))
                         }
                     })
-                    .on_click(cx.listener(|page, _, _, cx| page.pick(Pick::RecordQuickShortcut, cx)))
+                    .on_click(
+                        cx.listener(|page, _, _, cx| page.pick(Pick::RecordQuickShortcut, cx)),
+                    )
                     .child(Icon::new(Icon::empty()).path("icons/keyboard.svg").size_4())
                     .child(record_label),
             )
@@ -1981,42 +2351,67 @@ impl SettingsPage {
 
     fn shortcuts(&self, cx: &mut Context<Self>) -> Vec<Group> {
         let bindings = &self.config.keybindings.bindings;
-        let customized = shortcuts::ACTIONS.iter().any(|info| bindings.contains_key(info.id));
+        let customized = shortcuts::ACTIONS
+            .iter()
+            .any(|info| bindings.contains_key(info.id));
         let mut groups = vec![Group::new(vec![Row::hint(
             t!("Como mudar"),
-            t!("Clique na tecla de um comando e aperte a combinação nova; Esc desiste. Um atalho que já era de outro comando sai dele. Vale na hora."),
+            t!(
+                "Clique na tecla de um comando e aperte a combinação nova; Esc desiste. Um atalho que já era de outro comando sai dele. Vale na hora."
+            ),
             div().when(customized, |this| {
-                this.child(button("shortcuts-reset-all", t!("Restaurar todos"), false).on_click(cx.listener(
-                    |page, _event, _window, cx| page.pick(Pick::ResetAllShortcuts, cx),
-                )))
+                this.child(
+                    button("shortcuts-reset-all", t!("Restaurar todos"), false).on_click(
+                        cx.listener(|page, _event, _window, cx| {
+                            page.pick(Pick::ResetAllShortcuts, cx)
+                        }),
+                    ),
+                )
             }),
         )])];
         let mut current: Option<(&'static str, Vec<Row>)> = None;
         for info in shortcuts::ACTIONS {
-            if current.as_ref().is_some_and(|(group, _)| *group != info.group) {
+            if current
+                .as_ref()
+                .is_some_and(|(group, _)| *group != info.group)
+            {
                 if let Some((group, rows)) = current.take() {
                     groups.push(Group::titled(tr(group), rows));
                 }
             }
             let row = self.shortcut_row(info, bindings.contains_key(info.id), cx);
-            current.get_or_insert_with(|| (info.group, Vec::new())).1.push(row);
+            current
+                .get_or_insert_with(|| (info.group, Vec::new()))
+                .1
+                .push(row);
         }
         if let Some((group, rows)) = current {
             groups.push(Group::titled(tr(group), rows));
         }
         groups.push(Group::titled(
             t!("Fixos"),
-            FIXED_KEYS.iter().map(|(keys, what)| Row::new(tr(what), None, key_cap(tr(keys)))).collect(),
+            FIXED_KEYS
+                .iter()
+                .map(|(keys, what)| Row::new(tr(what), None, key_cap(tr(keys))))
+                .collect(),
         ));
         groups
     }
 
     // A command, its keys as a button that records new ones, and a button to
     // leave it with none.
-    fn shortcut_row(&self, info: &'static shortcuts::ActionInfo, customized: bool, cx: &mut Context<Self>) -> Row {
+    fn shortcut_row(
+        &self,
+        info: &'static shortcuts::ActionInfo,
+        customized: bool,
+        cx: &mut Context<Self>,
+    ) -> Row {
         let action = info.action;
         let recording = self.recording == Some(action);
-        let keys: Vec<String> = shortcuts::chords(action).iter().map(Chord::display).collect();
+        let keys: Vec<String> = shortcuts::chords(action)
+            .iter()
+            .map(Chord::display)
+            .collect();
         let has_keys = !keys.is_empty();
         let shown = if recording {
             t!("Aperte as teclas…").to_string()
@@ -2032,7 +2427,10 @@ impl SettingsPage {
             .gap_1()
             .child(
                 div()
-                    .id(ElementId::Name(SharedString::from(format!("shortcut-{}", info.id))))
+                    .id(ElementId::Name(SharedString::from(format!(
+                        "shortcut-{}",
+                        info.id
+                    ))))
                     .min_w(px(110.0))
                     .h(px(28.0))
                     .px(px(10.0))
@@ -2052,7 +2450,11 @@ impl SettingsPage {
                         } else {
                             this.border_color(rgb(theme::border_hover()))
                                 .bg(rgb(theme::bg()))
-                                .text_color(rgb(if has_keys { theme::fg() } else { theme::muted() }))
+                                .text_color(rgb(if has_keys {
+                                    theme::fg()
+                                } else {
+                                    theme::muted()
+                                }))
                                 .hover(|style| style.bg(rgb(theme::bg_hover())))
                         }
                     })
@@ -2065,7 +2467,10 @@ impl SettingsPage {
             .when(has_keys && !recording, |this| {
                 this.child(
                     div()
-                        .id(ElementId::Name(SharedString::from(format!("shortcut-clear-{}", info.id))))
+                        .id(ElementId::Name(SharedString::from(format!(
+                            "shortcut-clear-{}",
+                            info.id
+                        ))))
                         .size(px(24.0))
                         .flex()
                         .items_center()
@@ -2073,9 +2478,18 @@ impl SettingsPage {
                         .rounded(px(5.0))
                         .cursor_pointer()
                         .text_color(rgb(theme::muted()))
-                        .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
-                        .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new(t!("Remover o atalho")).build(window, cx))
-                        .on_click(cx.listener(move |page, _event, _window, cx| page.pick(Pick::ClearShortcut(action), cx)))
+                        .hover(|style| {
+                            style
+                                .bg(rgb(theme::bg_hover()))
+                                .text_color(rgb(theme::fg()))
+                        })
+                        .tooltip(|window, cx| {
+                            gpui_component::tooltip::Tooltip::new(t!("Remover o atalho"))
+                                .build(window, cx)
+                        })
+                        .on_click(cx.listener(move |page, _event, _window, cx| {
+                            page.pick(Pick::ClearShortcut(action), cx)
+                        }))
                         .child(Icon::new(Icon::empty()).path("icons/close.svg").size_3()),
                 )
             });
@@ -2161,12 +2575,25 @@ impl SettingsPage {
         use crate::updater::Status;
         let status = self.updater.read(cx).status.clone();
         let (text, error) = match &status {
-            Status::NotInstalled => (t!("Esta cópia não foi instalada pelo instalador, então não se atualiza sozinha.").to_string(), false),
+            Status::NotInstalled => (
+                t!("Esta cópia não foi instalada pelo instalador, então não se atualiza sozinha.")
+                    .to_string(),
+                false,
+            ),
             Status::Idle => (t!("Ainda não procurou.").to_string(), false),
             Status::Checking => (t!("Procurando…").to_string(), false),
             Status::UpToDate => (t!("Você está na versão mais nova.").to_string(), false),
-            Status::Downloading(version) => (tf!("Baixando a versão {version}…", version = version), false),
-            Status::Ready { version, .. } => (tf!("A versão {version} está pronta para instalar.", version = version), false),
+            Status::Downloading(version) => (
+                tf!("Baixando a versão {version}…", version = version),
+                false,
+            ),
+            Status::Ready { version, .. } => (
+                tf!(
+                    "A versão {version} está pronta para instalar.",
+                    version = version
+                ),
+                false,
+            ),
             Status::Failed(error) => (tf!("Não deu para atualizar: {error}", error = error), true),
         };
         let busy = matches!(status, Status::Checking | Status::Downloading(_));
@@ -2174,7 +2601,9 @@ impl SettingsPage {
         let ready = matches!(status, Status::Ready { .. });
         Row::hint(
             t!("Procurar versão nova"),
-            t!("Vêm das releases do Prime Files no GitHub; cada instalador é conferido pelo SHA256SUMS.txt antes de rodar."),
+            t!(
+                "Vêm das releases do Prime Files no GitHub; cada instalador é conferido pelo SHA256SUMS.txt antes de rodar."
+            ),
             div()
                 .flex()
                 .flex_col()
@@ -2184,7 +2613,11 @@ impl SettingsPage {
                     div()
                         .text_xs()
                         .max_w(px(320.0))
-                        .text_color(rgb(if error { theme::danger() } else { theme::fg_secondary() }))
+                        .text_color(rgb(if error {
+                            theme::danger()
+                        } else {
+                            theme::fg_secondary()
+                        }))
                         .child(text),
                 )
                 .child(
@@ -2192,18 +2625,23 @@ impl SettingsPage {
                         .flex()
                         .gap_2()
                         .when(can_check, |row| {
-                            row.child(button("check-updates", t!("Procurar agora"), false).on_click(cx.listener(
-                                |page, _event, _window, cx| {
-                                    page.updater.update(cx, |updater, cx| updater.check(cx));
-                                },
-                            )))
+                            row.child(
+                                button("check-updates", t!("Procurar agora"), false).on_click(
+                                    cx.listener(|page, _event, _window, cx| {
+                                        page.updater.update(cx, |updater, cx| updater.check(cx));
+                                    }),
+                                ),
+                            )
                         })
                         .when(ready, |row| {
-                            row.child(button("install-update", t!("Atualizar agora"), false).on_click(cx.listener(
-                                |page, _event, _window, cx| {
-                                    page.updater.update(cx, |updater, cx| updater.install_now(cx));
-                                },
-                            )))
+                            row.child(
+                                button("install-update", t!("Atualizar agora"), false).on_click(
+                                    cx.listener(|page, _event, _window, cx| {
+                                        page.updater
+                                            .update(cx, |updater, cx| updater.install_now(cx));
+                                    }),
+                                ),
+                            )
                         }),
                 ),
         )
@@ -2221,11 +2659,22 @@ impl SettingsPage {
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let value = if on { "false" } else { "true" };
-        self.switch_pick(id, on, Pick::Config(section, key, SharedString::from(value)), cx)
+        self.switch_pick(
+            id,
+            on,
+            Pick::Config(section, key, SharedString::from(value)),
+            cx,
+        )
     }
 
     // An on/off switch whose click does `pick` (what turns it the other way).
-    fn switch_pick(&self, id: &'static str, on: bool, pick: Pick, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn switch_pick(
+        &self,
+        id: &'static str,
+        on: bool,
+        pick: Pick,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         const WIDTH: f32 = 38.0;
         const HEIGHT: f32 = 22.0;
         const KNOB: f32 = 16.0;
@@ -2241,7 +2690,11 @@ impl SettingsPage {
             .child(
                 div()
                     .text_xs()
-                    .text_color(rgb(if on { theme::fg() } else { theme::fg_secondary() }))
+                    .text_color(rgb(if on {
+                        theme::fg()
+                    } else {
+                        theme::fg_secondary()
+                    }))
                     .child(if on { t!("Ligado") } else { t!("Desligado") }),
             )
             .child(
@@ -2253,19 +2706,31 @@ impl SettingsPage {
                     .border_1()
                     .map(|track| {
                         if on {
-                            track.bg(rgb(theme::accent())).border_color(rgb(theme::accent()))
+                            track
+                                .bg(rgb(theme::accent()))
+                                .border_color(rgb(theme::accent()))
                         } else {
-                            track.bg(rgb(theme::bg())).border_color(rgb(theme::border_hover()))
+                            track
+                                .bg(rgb(theme::bg()))
+                                .border_color(rgb(theme::border_hover()))
                         }
                     })
                     .child(
                         div()
                             .absolute()
                             .top(px(inset - 1.0))
-                            .left(px(if on { WIDTH - KNOB - inset - 1.0 } else { inset - 1.0 }))
+                            .left(px(if on {
+                                WIDTH - KNOB - inset - 1.0
+                            } else {
+                                inset - 1.0
+                            }))
                             .size(px(KNOB))
                             .rounded_full()
-                            .bg(rgb(if on { theme::accent_fg() } else { theme::fg_secondary() })),
+                            .bg(rgb(if on {
+                                theme::accent_fg()
+                            } else {
+                                theme::fg_secondary()
+                            })),
                     ),
             )
     }
@@ -2281,7 +2746,13 @@ impl SettingsPage {
     ) -> Div {
         let options: Vec<_> = options
             .iter()
-            .map(|&(label, selected, value)| (label, selected, Pick::Config(section, key, SharedString::from(value))))
+            .map(|&(label, selected, value)| {
+                (
+                    label,
+                    selected,
+                    Pick::Config(section, key, SharedString::from(value)),
+                )
+            })
             .collect();
         self.chips(id, &options, false, cx)
     }
@@ -2298,7 +2769,15 @@ impl SettingsPage {
         let options: Vec<_> = options
             .iter()
             .map(|&(label, on, key)| {
-                (label, on, Pick::Config(section, key, SharedString::from(if on { "false" } else { "true" })))
+                (
+                    label,
+                    on,
+                    Pick::Config(
+                        section,
+                        key,
+                        SharedString::from(if on { "false" } else { "true" }),
+                    ),
+                )
             })
             .collect();
         self.chips(id, &options, true, cx)
@@ -2307,7 +2786,13 @@ impl SettingsPage {
     // The row of chips behind `config_choice` and `config_toggles`. A
     // selected chip only answers a click when the chips are toggles, which
     // also show a check so "on" reads apart from "chosen".
-    fn chips(&self, id: &'static str, options: &[(&'static str, bool, Pick)], toggles: bool, cx: &mut Context<Self>) -> Div {
+    fn chips(
+        &self,
+        id: &'static str,
+        options: &[(&'static str, bool, Pick)],
+        toggles: bool,
+        cx: &mut Context<Self>,
+    ) -> Div {
         div()
             .flex()
             // Only long rows wrap (the languages; six fit beside the text):
@@ -2320,42 +2805,59 @@ impl SettingsPage {
             // Toggles wrap too: their labels change width with the check, and
             // in English the five bars did not fit, so "Preview" was squeezed
             // under "Bottom bar".
-            .when(options.len() > 6, |this| this.flex_wrap().flex_1().min_w(px(0.0)))
+            .when(options.len() > 6, |this| {
+                this.flex_wrap().flex_1().min_w(px(0.0))
+            })
             .p(px(2.0))
             .gap(px(2.0))
             .rounded(px(7.0))
             .bg(rgb(theme::bg()))
             .border_1()
             .border_color(rgb(theme::border()))
-            .children(options.iter().enumerate().map(|(ix, (label, selected, pick))| {
-                let selected = *selected;
-                let pick = pick.clone();
-                div()
-                    .id(ElementId::NamedInteger(id.into(), ix as u64))
-                    .h(px(26.0))
-                    .flex_shrink_0()
-                    .px(px(11.0))
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .rounded(px(5.0))
-                    .cursor_pointer()
-                    .text_sm()
-                    .whitespace_nowrap()
-                    .map(|this| {
-                        if selected {
-                            this.bg(rgb(theme::accent())).text_color(rgb(theme::accent_fg()))
-                        } else {
-                            this.text_color(rgb(theme::fg_secondary()))
-                                .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
-                        }
-                    })
-                    .when(!selected || toggles, |this| {
-                        this.on_click(cx.listener(move |page, _event, _window, cx| page.pick(pick.clone(), cx)))
-                    })
-                    .when(toggles && selected, |this| this.child(Icon::new(Icon::empty()).path("icons/check.svg").size_3()))
-                    .child(*label)
-            }))
+            .children(
+                options
+                    .iter()
+                    .enumerate()
+                    .map(|(ix, (label, selected, pick))| {
+                        let selected = *selected;
+                        let pick = pick.clone();
+                        div()
+                            .id(ElementId::NamedInteger(id.into(), ix as u64))
+                            .h(px(26.0))
+                            .flex_shrink_0()
+                            .px(px(11.0))
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .rounded(px(5.0))
+                            .cursor_pointer()
+                            .text_sm()
+                            .whitespace_nowrap()
+                            .map(|this| {
+                                if selected {
+                                    this.bg(rgb(theme::accent()))
+                                        .text_color(rgb(theme::accent_fg()))
+                                } else {
+                                    this.text_color(rgb(theme::fg_secondary())).hover(|style| {
+                                        style
+                                            .bg(rgb(theme::bg_hover()))
+                                            .text_color(rgb(theme::fg()))
+                                    })
+                                }
+                            })
+                            .when(!selected || toggles, |this| {
+                                this.on_click(cx.listener(move |page, _event, _window, cx| {
+                                    page.pick(pick.clone(), cx)
+                                }))
+                            })
+                            .when(toggles && selected, |this| {
+                                this.child(
+                                    Icon::new(Icon::empty()).path("icons/check.svg").size_3(),
+                                )
+                            })
+                            .child(*label)
+                    }),
+            )
     }
 
     // ---------------------------------------------------------------------
@@ -2371,21 +2873,28 @@ impl SettingsPage {
             }
         };
         // Set each render: the language may have changed since.
-        input.update(cx, |state, cx| state.set_placeholder(t!("Buscar uma configuração…"), window, cx));
+        input.update(cx, |state, cx| {
+            state.set_placeholder(t!("Buscar uma configuração…"), window, cx)
+        });
         input
     }
 
     // The accent pickers, made on the first render (they need a `Window`)
     // and kept showing the accent the config has now.
     fn ensure_accent_pickers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let current = theme::parse_accent(&self.config.theme.accent).unwrap_or_else(theme::palette_accent);
+        let current =
+            theme::parse_accent(&self.config.theme.accent).unwrap_or_else(theme::palette_accent);
         let pickers = match &self.accent_pickers {
             Some(pickers) => pickers.clone(),
             None => {
                 let make = |window: &mut Window, cx: &mut Context<Self>| {
-                    let picker = cx.new(|cx| ColorPickerState::new(window, cx).default_value(accent_hsla(current)));
+                    let picker = cx.new(|cx| {
+                        ColorPickerState::new(window, cx).default_value(accent_hsla(current))
+                    });
                     cx.subscribe(&picker, |page, _picker, event: &ColorPickerEvent, cx| {
-                        let ColorPickerEvent::Change(Some(color)) = event else { return };
+                        let ColorPickerEvent::Change(Some(color)) = event else {
+                            return;
+                        };
                         page.write("theme", "accent", format!("\"{}\"", hex_of(*color)), cx);
                     })
                     .detach();
@@ -2403,7 +2912,9 @@ impl SettingsPage {
         for picker in pickers {
             let shown = picker.read(cx).value().map(hex_of);
             if shown.as_deref() != Some(hex_of(accent_hsla(current)).as_str()) {
-                picker.update(cx, |state, cx| state.set_value(accent_hsla(current), window, cx));
+                picker.update(cx, |state, cx| {
+                    state.set_value(accent_hsla(current), window, cx)
+                });
             }
         }
     }
@@ -2411,14 +2922,17 @@ impl SettingsPage {
     /// The "any colour" choice beside the named accents. `home` picks the
     /// home card's picker and its smaller look.
     pub(crate) fn custom_accent(&self, home: bool, _cx: &mut Context<Self>) -> AnyElement {
-        let Some(pickers) = &self.accent_pickers else { return div().into_any_element() };
+        let Some(pickers) = &self.accent_pickers else {
+            return div().into_any_element();
+        };
         let picker = pickers[if home { 1 } else { 0 }].clone();
         let custom = self.config.theme.accent.trim().starts_with('#');
         let featured: Vec<gpui::Hsla> = theme::NAMED_ACCENTS
             .iter()
             .map(|(_, color)| accent_hsla(color.unwrap_or_else(theme::palette_accent)))
             .collect();
-        let tip: SharedString = t!("Qualquer cor: escolha na paleta ou digite o código (#RRGGBB).").into();
+        let tip: SharedString =
+            t!("Qualquer cor: escolha na paleta ou digite o código (#RRGGBB).").into();
         // A dot like the named ones, with a palette in it: the picker's own
         // square button looked like a stray tile beside the round swatches.
         // Filled with the chosen colour once there is one.
@@ -2435,7 +2949,11 @@ impl SettingsPage {
         };
         let control = ColorPicker::new(&picker)
             .featured_colors(featured)
-            .icon(Icon::new(Icon::empty()).path("icons/palette.svg").text_color(rgb(ink)))
+            .icon(
+                Icon::new(Icon::empty())
+                    .path("icons/palette.svg")
+                    .text_color(rgb(ink)),
+            )
             .with_size(gpui_component::Size::Size(px(dot)));
         let ring = |inner: AnyElement| {
             div()
@@ -2444,7 +2962,11 @@ impl SettingsPage {
                 .justify_center()
                 .rounded_full()
                 .border_2()
-                .border_color(rgb(if custom { theme::fg() } else { theme::bg_secondary() }))
+                .border_color(rgb(if custom {
+                    theme::fg()
+                } else {
+                    theme::bg_secondary()
+                }))
                 .child(
                     div()
                         .size(px(dot))
@@ -2460,7 +2982,9 @@ impl SettingsPage {
         if home {
             div()
                 .id("home-accent-custom")
-                .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+                .tooltip(move |window, cx| {
+                    gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+                })
                 .child(ring(control.into_any_element()))
                 .into_any_element()
         } else {
@@ -2472,12 +2996,18 @@ impl SettingsPage {
                 .flex_col()
                 .items_center()
                 .gap_1()
-                .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+                .tooltip(move |window, cx| {
+                    gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+                })
                 .child(ring(control.into_any_element()))
                 .child(
                     div()
                         .text_xs()
-                        .text_color(rgb(if custom { theme::fg() } else { theme::fg_secondary() }))
+                        .text_color(rgb(if custom {
+                            theme::fg()
+                        } else {
+                            theme::fg_secondary()
+                        }))
                         .child(t!("Personalizada")),
                 )
                 .into_any_element()
@@ -2496,14 +3026,31 @@ impl SettingsPage {
             .bg(rgb(theme::bg()))
             .border_1()
             .border_color(rgb(theme::border()))
-            .child(Icon::new(Icon::empty()).path("icons/search.svg").size_4().text_color(rgb(theme::muted())))
-            .child(div().flex_1().min_w(px(0.0)).child(Input::new(input).small().appearance(false).cleanable(true)))
+            .child(
+                Icon::new(Icon::empty())
+                    .path("icons/search.svg")
+                    .size_4()
+                    .text_color(rgb(theme::muted())),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.0))
+                    .child(Input::new(input).small().appearance(false).cleanable(true)),
+            )
     }
 
-    fn render_nav_item(&self, section: SettingsSection, horizontal: bool, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn render_nav_item(
+        &self,
+        section: SettingsSection,
+        horizontal: bool,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let active = section == self.section;
         div()
-            .id(ElementId::Name(SharedString::from(format!("settings-nav-{section:?}"))))
+            .id(ElementId::Name(SharedString::from(format!(
+                "settings-nav-{section:?}"
+            ))))
             .h(px(34.0))
             .px(px(10.0))
             .flex()
@@ -2516,10 +3063,14 @@ impl SettingsPage {
             .whitespace_nowrap()
             .map(|this| {
                 if active {
-                    this.bg(rgb(theme::accent_subtle())).text_color(rgb(theme::accent()))
+                    this.bg(rgb(theme::accent_subtle()))
+                        .text_color(rgb(theme::accent()))
                 } else {
-                    this.text_color(rgb(theme::fg_secondary()))
-                        .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
+                    this.text_color(rgb(theme::fg_secondary())).hover(|style| {
+                        style
+                            .bg(rgb(theme::bg_hover()))
+                            .text_color(rgb(theme::fg()))
+                    })
                 }
             })
             .when(!horizontal, |this| this.w_full())
@@ -2550,9 +3101,13 @@ impl SettingsPage {
                     .bg(rgb(theme::bg_secondary()))
                     .border_1()
                     .border_color(rgb(theme::border()))
-                    .children(group.rows.into_iter().enumerate().map(|(ix, row)| {
-                        self.render_row(row, stacked, ix + 1 < count, cx)
-                    })),
+                    .children(
+                        group
+                            .rows
+                            .into_iter()
+                            .enumerate()
+                            .map(|(ix, row)| self.render_row(row, stacked, ix + 1 < count, cx)),
+                    ),
             )
     }
 
@@ -2560,7 +3115,10 @@ impl SettingsPage {
         let stacked = stacked || row.wide;
         let reset = row.reset.map(|pick| {
             div()
-                .id(ElementId::Name(SharedString::from(format!("reset-{}", row.label))))
+                .id(ElementId::Name(SharedString::from(format!(
+                    "reset-{}",
+                    row.label
+                ))))
                 .size(px(24.0))
                 .flex()
                 .flex_shrink_0()
@@ -2569,14 +3127,28 @@ impl SettingsPage {
                 .rounded(px(5.0))
                 .cursor_pointer()
                 .text_color(rgb(theme::muted()))
-                .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
-                .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new(t!("Voltar ao padrão")).build(window, cx))
+                .hover(|style| {
+                    style
+                        .bg(rgb(theme::bg_hover()))
+                        .text_color(rgb(theme::fg()))
+                })
+                .tooltip(|window, cx| {
+                    gpui_component::tooltip::Tooltip::new(t!("Voltar ao padrão")).build(window, cx)
+                })
                 .on_click(cx.listener(move |page, _event, _window, cx| page.pick(pick.clone(), cx)))
-                .child(Icon::new(Icon::empty()).path("icons/refresh-cw.svg").size_3())
+                .child(
+                    Icon::new(Icon::empty())
+                        .path("icons/refresh-cw.svg")
+                        .size_3(),
+                )
         });
         // Stacked, the reset sits by the name (under it is the control);
         // side by side, between the text and the control.
-        let (reset_by_label, reset_beside) = if stacked { (reset, None) } else { (None, reset) };
+        let (reset_by_label, reset_beside) = if stacked {
+            (reset, None)
+        } else {
+            (None, reset)
+        };
         let text = div()
             .flex()
             .flex_col()
@@ -2588,21 +3160,41 @@ impl SettingsPage {
                     .flex()
                     .items_center()
                     .gap_1()
-                    .child(div().text_sm().font_weight(gpui::FontWeight::MEDIUM).text_color(rgb(theme::fg())).child(row.label))
-                    .when_some(row.more, |this, more| this.child(more_mark(row.label, more)))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(gpui::FontWeight::MEDIUM)
+                            .text_color(rgb(theme::fg()))
+                            .child(row.label),
+                    )
+                    .when_some(row.more, |this, more| {
+                        this.child(more_mark(row.label, more))
+                    })
                     // Stacked, the reset sits by the name: under it is the control.
                     .children(reset_by_label),
             )
             .when_some(row.hint, |this, hint| {
-                this.child(div().text_xs().line_height(px(17.0)).text_color(rgb(theme::fg_secondary())).child(hint))
+                this.child(
+                    div()
+                        .text_xs()
+                        .line_height(px(17.0))
+                        .text_color(rgb(theme::fg_secondary()))
+                        .child(hint),
+                )
             });
         div()
             .px(px(16.0))
             .py(px(13.0))
-            .when(divider, |this| this.border_b_1().border_color(rgb(theme::border())))
+            .when(divider, |this| {
+                this.border_b_1().border_color(rgb(theme::border()))
+            })
             .map(|this| {
                 if stacked {
-                    this.flex().flex_col().gap(px(10.0)).child(text).child(div().w_full().flex().child(row.control))
+                    this.flex()
+                        .flex_col()
+                        .gap(px(10.0))
+                        .child(text)
+                        .child(div().w_full().flex().child(row.control))
                 } else {
                     this.flex()
                         .items_center()
@@ -2621,7 +3213,13 @@ impl SettingsPage {
     // title and each row on its own, so only the rows near the view are
     // drawn (`kept_heights`). A group's card is drawn piece by piece: the
     // first row carries its top edge and the last its bottom.
-    fn section_blocks(&self, section: SettingsSection, first: bool, stacked: bool, cx: &mut Context<Self>) -> Vec<Block> {
+    fn section_blocks(
+        &self,
+        section: SettingsSection,
+        first: bool,
+        stacked: bool,
+        cx: &mut Context<Self>,
+    ) -> Vec<Block> {
         let groups = self.groups(section, cx);
         let home = section == SettingsSection::General;
         let heading = div()
@@ -2630,52 +3228,66 @@ impl SettingsPage {
             .gap(px(22.0))
             // The first section opens on the app and the quick choices; its
             // own rows follow under a heading of their own.
-            .when(home, |this| this.child(self.render_home(cx)).child(
-                div()
-                    .mt(px(6.0))
-                    .text_lg()
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_color(rgb(theme::fg()))
-                    .child(t!("Geral")),
-            ))
-            .when(!home, |this| this.child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(12.0))
-                    .child(
-                        div()
-                            .size(px(40.0))
-                            .flex()
-                            .flex_shrink_0()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(10.0))
-                            .bg(rgb(theme::accent_subtle()))
-                            .text_color(rgb(theme::accent()))
-                            .child(Icon::new(Icon::empty()).path(section.icon()).size_5()),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(2.0))
-                            .child(
-                                div()
-                                    .text_xl()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                                    .text_color(rgb(theme::fg()))
-                                    .child(section.label()),
-                            )
-                            .child(div().text_sm().text_color(rgb(theme::fg_secondary())).child(section.description())),
-                    ),
-            ))
-;
-        let mut blocks = vec![Block { pad: if first { 24.0 } else { 56.0 }, body: heading }];
+            .when(home, |this| {
+                this.child(self.render_home(cx)).child(
+                    div()
+                        .mt(px(6.0))
+                        .text_lg()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(rgb(theme::fg()))
+                        .child(t!("Geral")),
+                )
+            })
+            .when(!home, |this| {
+                this.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(12.0))
+                        .child(
+                            div()
+                                .size(px(40.0))
+                                .flex()
+                                .flex_shrink_0()
+                                .items_center()
+                                .justify_center()
+                                .rounded(px(10.0))
+                                .bg(rgb(theme::accent_subtle()))
+                                .text_color(rgb(theme::accent()))
+                                .child(Icon::new(Icon::empty()).path(section.icon()).size_5()),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(2.0))
+                                .child(
+                                    div()
+                                        .text_xl()
+                                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                                        .text_color(rgb(theme::fg()))
+                                        .child(section.label()),
+                                )
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(rgb(theme::fg_secondary()))
+                                        .child(section.description()),
+                                ),
+                        ),
+                )
+            });
+        let mut blocks = vec![Block {
+            pad: if first { 24.0 } else { 56.0 },
+            body: heading,
+        }];
         for group in groups {
             let titled = group.title.is_some();
             if let Some(title) = group.title {
-                blocks.push(Block { pad: 22.0, body: group_title(title) });
+                blocks.push(Block {
+                    pad: 22.0,
+                    body: group_title(title),
+                });
             }
             let count = group.rows.len();
             for (ix, row) in group.rows.into_iter().enumerate() {
@@ -2707,18 +3319,23 @@ impl SettingsPage {
         let mut found = 0;
         let mut body = div().flex().flex_col().gap(px(22.0));
         for section in SettingsSection::ALL {
-            let section_matches =
-                fold(section.label()).contains(needle) || fold(section.description()).contains(needle);
+            let section_matches = fold(section.label()).contains(needle)
+                || fold(section.description()).contains(needle);
             let rows: Vec<Row> = self
                 .groups(section, cx)
                 .into_iter()
                 .flat_map(|group| {
-                    let group_matches = group.title.is_some_and(|title| fold(title).contains(needle));
+                    let group_matches = group
+                        .title
+                        .is_some_and(|title| fold(title).contains(needle));
                     group.rows.into_iter().filter(move |row| {
                         section_matches
                             || group_matches
                             || fold(row.label).contains(needle)
-                            || row.hint.as_ref().is_some_and(|hint| fold(hint).contains(needle))
+                            || row
+                                .hint
+                                .as_ref()
+                                .is_some_and(|hint| fold(hint).contains(needle))
                     })
                 })
                 .collect();
@@ -2733,7 +3350,9 @@ impl SettingsPage {
                     .gap(px(8.0))
                     .child(
                         div()
-                            .id(ElementId::Name(SharedString::from(format!("result-section-{section:?}"))))
+                            .id(ElementId::Name(SharedString::from(format!(
+                                "result-section-{section:?}"
+                            ))))
                             .flex()
                             .items_center()
                             .gap_2()
@@ -2749,7 +3368,12 @@ impl SettingsPage {
                                 }
                                 page.show_section(section, cx);
                             }))
-                            .child(Icon::new(Icon::empty()).path(section.icon()).size_4().text_color(rgb(theme::accent())))
+                            .child(
+                                Icon::new(Icon::empty())
+                                    .path(section.icon())
+                                    .size_4()
+                                    .text_color(rgb(theme::accent())),
+                            )
                             .child(section.label()),
                     )
                     .child(self.render_group(Group::new(rows), stacked, cx)),
@@ -2763,7 +3387,10 @@ impl SettingsPage {
                     .justify_center()
                     .text_sm()
                     .text_color(rgb(theme::fg_secondary()))
-                    .child(tf!("Nenhuma configuração com \"{query}\".", query = query.trim())),
+                    .child(tf!(
+                        "Nenhuma configuração com \"{query}\".",
+                        query = query.trim()
+                    )),
             );
         }
         body
@@ -2780,7 +3407,11 @@ impl SettingsPage {
                 .py(px(10.0))
                 .rounded(px(8.0))
                 .border_1()
-                .border_color(rgb(if error { theme::danger() } else { theme::border() }))
+                .border_color(rgb(if error {
+                    theme::danger()
+                } else {
+                    theme::border()
+                }))
                 .bg(rgb(theme::bg_secondary()))
                 .child(
                     div()
@@ -2799,7 +3430,11 @@ impl SettingsPage {
                         .rounded(px(4.0))
                         .cursor_pointer()
                         .text_color(rgb(theme::muted()))
-                        .hover(|style| style.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
+                        .hover(|style| {
+                            style
+                                .bg(rgb(theme::bg_hover()))
+                                .text_color(rgb(theme::fg()))
+                        })
                         .on_click(cx.listener(|page, _event, _window, cx| {
                             page.status = None;
                             cx.notify();
@@ -2822,7 +3457,12 @@ fn accent_hsla(color: u32) -> gpui::Hsla {
 fn hex_of(color: gpui::Hsla) -> String {
     let rgba = gpui::Rgba::from(color);
     let channel = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
-    format!("#{:02X}{:02X}{:02X}", channel(rgba.r), channel(rgba.g), channel(rgba.b))
+    format!(
+        "#{:02X}{:02X}{:02X}",
+        channel(rgba.r),
+        channel(rgba.g),
+        channel(rgba.b)
+    )
 }
 
 // A group's name above its card.
@@ -2891,7 +3531,10 @@ fn key_cap(keys: &'static str) -> Div {
 }
 
 fn checking() -> Div {
-    div().text_xs().text_color(rgb(theme::fg_secondary())).child(t!("Verificando…"))
+    div()
+        .text_xs()
+        .text_color(rgb(theme::fg_secondary()))
+        .child(t!("Verificando…"))
 }
 
 // "agora", "há 3 min", "há 2 h", "há 4 dias".
@@ -2923,9 +3566,11 @@ fn button(id: &'static str, label: &'static str, danger: bool) -> Stateful<Div> 
         .bg(rgb(theme::bg()))
         .map(|this| {
             if danger {
-                this.border_color(rgb(theme::danger())).text_color(rgb(theme::danger()))
+                this.border_color(rgb(theme::danger()))
+                    .text_color(rgb(theme::danger()))
             } else {
-                this.border_color(rgb(theme::border_hover())).text_color(rgb(theme::fg()))
+                this.border_color(rgb(theme::border_hover()))
+                    .text_color(rgb(theme::fg()))
             }
         })
         .hover(|style| style.bg(rgb(theme::bg_hover())))
@@ -2958,10 +3603,13 @@ fn load_nav_width() -> f32 {
 fn save_nav_width(width: f32, cx: &mut gpui::App) {
     cx.background_spawn(async move {
         let path = nav_width_file();
-        let written = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| {
-            #[allow(clippy::disallowed_methods)]
-            std::fs::write(&path, format!("{width:.0}"))
-        });
+        let written = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| {
+                #[allow(clippy::disallowed_methods)]
+                std::fs::write(&path, format!("{width:.0}"))
+            });
         if let Err(error) = written {
             tracing::warn!("could not keep the settings sidebar's width: {error}");
         }
@@ -2993,7 +3641,11 @@ impl Render for SettingsPage {
         let width = f32::from(window.viewport_size().width);
         let narrow = width < NARROW;
         let nav_width = self.nav_width;
-        let content_width = if narrow { width } else { width - nav_width - NAV_HANDLE };
+        let content_width = if narrow {
+            width
+        } else {
+            width - nav_width - NAV_HANDLE
+        };
         let stacked = content_width < STACK;
         // The column inside its side padding, up to its maximum width; three
         // cards need their 300 + 250 + 250 px and the gaps.
@@ -3004,10 +3656,17 @@ impl Render for SettingsPage {
         let blocks: Vec<Result<Block, gpui::Pixels>> = if searching {
             // Another set of children: nothing measured carries over.
             self.drawn = None;
-            if self.glide.as_ref().is_some_and(|glide| glide.section.is_some()) {
+            if self
+                .glide
+                .as_ref()
+                .is_some_and(|glide| glide.section.is_some())
+            {
                 self.glide = None;
             }
-            vec![Ok(Block { pad: 24.0, body: self.render_results(&query, stacked, cx) })]
+            vec![Ok(Block {
+                pad: 24.0,
+                body: self.render_results(&query, stacked, cx),
+            })]
         } else {
             let mut blocks = Vec::new();
             let mut starts = Vec::with_capacity(SettingsSection::ALL.len());
@@ -3052,7 +3711,11 @@ impl Render for SettingsPage {
                         // window's edge, the later sections looked missing.
                         .flex_wrap()
                         .gap_1()
-                        .children(SettingsSection::ALL.into_iter().map(|section| self.render_nav_item(section, true, cx))),
+                        .children(
+                            SettingsSection::ALL
+                                .into_iter()
+                                .map(|section| self.render_nav_item(section, true, cx)),
+                        ),
                 )
         } else {
             div()
@@ -3068,19 +3731,41 @@ impl Render for SettingsPage {
                 .bg(rgb(theme::toolbar_bg()))
                 // Flex, so the field takes the full width: in a plain block
                 // its `w_full` resolved to its content's width.
-                .child(div().pb(px(10.0)).flex().flex_col().child(self.render_search_field(&input)))
-                .children(SettingsSection::ALL.into_iter().map(|section| self.render_nav_item(section, false, cx)))
+                .child(
+                    div()
+                        .pb(px(10.0))
+                        .flex()
+                        .flex_col()
+                        .child(self.render_search_field(&input)),
+                )
+                .children(
+                    SettingsSection::ALL
+                        .into_iter()
+                        .map(|section| self.render_nav_item(section, false, cx)),
+                )
         };
 
         div()
             .size_full()
             .flex()
-            .map(|this| if narrow { this.flex_col() } else { this.flex_row() })
+            .map(|this| {
+                if narrow {
+                    this.flex_col()
+                } else {
+                    this.flex_row()
+                }
+            })
             .bg(rgb(theme::bg()))
             .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(|page, event: &KeyDownEvent, _window, cx| page.record_key(event, cx)))
+            .on_key_down(
+                cx.listener(|page, event: &KeyDownEvent, _window, cx| page.record_key(event, cx)),
+            )
             // The sidebar's edge, dragged anywhere over the page.
-            .on_mouse_move(cx.listener(|page, event: &gpui::MouseMoveEvent, _window, cx| page.drag_nav(event, cx)))
+            .on_mouse_move(
+                cx.listener(|page, event: &gpui::MouseMoveEvent, _window, cx| {
+                    page.drag_nav(event, cx)
+                }),
+            )
             .on_mouse_up(
                 gpui::MouseButton::Left,
                 cx.listener(|page, _: &gpui::MouseUpEvent, _window, cx| page.end_nav_drag(cx)),
@@ -3121,7 +3806,9 @@ impl SettingsPage {
             .flex_shrink_0()
             .cursor_col_resize()
             .when(dragging, |this| this.bg(rgb(theme::accent())))
-            .when(!dragging, |this| this.hover(|style| style.bg(rgb(theme::accent_subtle()))))
+            .when(!dragging, |this| {
+                this.hover(|style| style.bg(rgb(theme::accent_subtle())))
+            })
             .on_mouse_down(
                 gpui::MouseButton::Left,
                 cx.listener(|page, event: &gpui::MouseDownEvent, _window, cx| {
@@ -3147,7 +3834,9 @@ impl SettingsPage {
             self.end_nav_drag(cx);
             return;
         }
-        let next = (width + f32::from(event.position.x) - start).clamp(NAV_MIN, NAV_MAX).round();
+        let next = (width + f32::from(event.position.x) - start)
+            .clamp(NAV_MIN, NAV_MAX)
+            .round();
         if next != self.nav_width {
             self.nav_width = next;
             cx.notify();
@@ -3180,9 +3869,14 @@ impl SettingsPage {
                     {
                         return;
                     }
-                    let gpui::ScrollDelta::Lines(_) = event.delta else { return };
+                    let gpui::ScrollDelta::Lines(_) = event.delta else {
+                        return;
+                    };
                     let delta = event.delta.pixel_delta(window.line_height()).y;
-                    if entity.update(cx, |page, cx| page.smooth_wheel(delta, cx)).unwrap_or(false) {
+                    if entity
+                        .update(cx, |page, cx| page.smooth_wheel(delta, cx))
+                        .unwrap_or(false)
+                    {
                         cx.stop_propagation();
                     }
                 });
@@ -3207,11 +3901,15 @@ impl SettingsPage {
         // column it fitted its children to its own height, and the cards were
         // spaced out or stretched to fill it (06/11/2026).
         let centred = |inner: Div| {
-            div()
-                .w_full()
-                .flex()
-                .justify_center()
-                .child(div().flex_1().min_w(px(0.0)).max_w(px(1280.0)).flex().flex_col().child(inner))
+            div().w_full().flex().justify_center().child(
+                div()
+                    .flex_1()
+                    .min_w(px(0.0))
+                    .max_w(px(1280.0))
+                    .flex()
+                    .flex_col()
+                    .child(inner),
+            )
         };
         // Room under the last section for its heading to reach the top, so
         // the glide can bring it there and the side list can light it like
@@ -3222,7 +3920,9 @@ impl SettingsPage {
                 let first = self.scroll.bounds_for_item(start);
                 let last = self.scroll.bounds_for_item(count);
                 match (first, last) {
-                    (Some(first), Some(last)) => (view_height - (last.bottom() - first.top())).max(px(48.0)),
+                    (Some(first), Some(last)) => {
+                        (view_height - (last.bottom() - first.top())).max(px(48.0))
+                    }
                     _ => view_height,
                 }
             }
@@ -3241,7 +3941,9 @@ impl SettingsPage {
             .pl(px(if narrow { 14.0 } else { 32.0 }))
             // Room for the bar on the right.
             .pr(px(if narrow { 20.0 } else { 36.0 }))
-            .child(centred(div().children(status.map(|status| status.mt(px(24.0))))))
+            .child(centred(
+                div().children(status.map(|status| status.mt(px(24.0)))),
+            ))
             .children(blocks.into_iter().map(move |block| match block {
                 Ok(block) => centred(block.body).pt(px(block.pad)),
                 // Off screen: only its place, padding included.
@@ -3265,4 +3967,3 @@ mod tests {
         assert!(super::fold("Configuração").contains(&super::fold("configuracao")));
     }
 }
-

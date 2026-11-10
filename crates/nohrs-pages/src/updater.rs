@@ -28,7 +28,12 @@ use sha2::{Digest, Sha256};
 /// Where releases are published.
 pub const REPOSITORY: &str = "CakeDev4k/prime-files";
 const INSTALLER_PREFIX: &str = "PrimeFiles-Setup-";
+/// The file with the checksums of the release. Each platform has its own:
+/// the Windows one lists the installer, the Linux one the package.
+#[cfg(windows)]
 const SUMS_NAME: &str = "SHA256SUMS.txt";
+#[cfg(not(windows))]
+const SUMS_NAME: &str = "SHA256SUMS-linux.txt";
 
 /// What the updater is doing, for the settings page.
 #[derive(Clone, Debug, PartialEq)]
@@ -90,19 +95,30 @@ pub fn current_version() -> Version {
     std::env::var("PRIME_FILES_PRETEND_VERSION")
         .ok()
         .and_then(|value| Version::parse(value.trim()).ok())
-        .unwrap_or_else(|| Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or(Version::new(0, 0, 0)))
+        .unwrap_or_else(|| {
+            Version::parse(env!("CARGO_PKG_VERSION")).unwrap_or(Version::new(0, 0, 0))
+        })
 }
 
 fn curl() -> Command {
     #[cfg(windows)]
     let program = {
-        let system = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+        let system = std::env::var_os("SystemRoot")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
         system.join("System32").join("curl.exe")
     };
     #[cfg(not(windows))]
     let program = PathBuf::from("/usr/bin/curl");
     let mut command = Command::new(program);
-    command.args(["--silent", "--show-error", "--location", "--fail", "--max-time", "600"]);
+    command.args([
+        "--silent",
+        "--show-error",
+        "--location",
+        "--fail",
+        "--max-time",
+        "600",
+    ]);
     command.args(["--user-agent", "PrimeFiles-Updater"]);
     hide_window(&mut command);
     command
@@ -161,23 +177,33 @@ fn parse_release(json: &[u8]) -> Option<Release> {
     let url_of = |wanted: &dyn Fn(&str) -> bool| {
         assets.iter().find_map(|asset| {
             let name = asset.get("name")?.as_str()?;
-            wanted(name).then(|| Some((name.to_string(), asset.get("browser_download_url")?.as_str()?.to_string())))?
+            wanted(name).then(|| {
+                Some((
+                    name.to_string(),
+                    asset.get("browser_download_url")?.as_str()?.to_string(),
+                ))
+            })?
         })
     };
     // The file of the release that installs this program: on Windows the
     // installer, on Linux the package.
     #[cfg(windows)]
     let wanted = format!("{INSTALLER_PREFIX}{version}.exe");
-    #[cfg(not(windows))]
-    let wanted = String::new();
     #[cfg(windows)]
     let (installer_name, installer_url) = url_of(&|name| name == wanted)?;
     #[cfg(not(windows))]
     let (installer_name, installer_url) = url_of(&|name| {
-        name.ends_with(".deb") || name.ends_with(".AppImage") || name.ends_with(".tar.gz")
+        // The package of this program, and not another program's file that
+        // happens to be in the same release.
+        name.starts_with("prime-files_") && (name.ends_with(".deb") || name.ends_with(".AppImage"))
     })?;
     let (_, sums_url) = url_of(&|name| name == SUMS_NAME)?;
-    Some(Release { version, installer_name, installer_url, sums_url })
+    Some(Release {
+        version,
+        installer_name,
+        installer_url,
+        sums_url,
+    })
 }
 
 /// The hash `SHA256SUMS.txt` lists for `name` (lines of `<hex>  <name>`).
@@ -194,13 +220,19 @@ fn file_hash(path: &Path) -> io::Result<String> {
     let mut hasher = Sha256::new();
     let mut file = std::fs::File::open(path)?;
     io::copy(&mut file, &mut hasher)?;
-    Ok(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect())
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
 }
 
 /// Looks for a newer release and downloads it. `Ok(None)` when this is the
 /// newest. Blocking: run it off the UI thread.
 fn check_and_download(on_progress: &dyn Fn(Status)) -> Result<Option<(Version, PathBuf)>, String> {
-    let latest = fetch(&format!("https://api.github.com/repos/{REPOSITORY}/releases/latest"))?;
+    let latest = fetch(&format!(
+        "https://api.github.com/repos/{REPOSITORY}/releases/latest"
+    ))?;
     let Some(release) = parse_release(&latest) else {
         return Err(t!("a última release não tem o instalador ou o SHA256SUMS.txt").into());
     };
@@ -211,7 +243,11 @@ fn check_and_download(on_progress: &dyn Fn(Status)) -> Result<Option<(Version, P
 
     let sums = String::from_utf8_lossy(&fetch(&release.sums_url)?).to_string();
     let Some(expected) = listed_hash(&sums, &release.installer_name) else {
-        return Err(tf!("{installer} não está no {sums}", installer = release.installer_name, sums = SUMS_NAME));
+        return Err(tf!(
+            "{installer} não está no {sums}",
+            installer = release.installer_name,
+            sums = SUMS_NAME
+        ));
     };
     let folder = std::env::temp_dir().join("PrimeFiles-Update");
     std::fs::create_dir_all(&folder).map_err(|error| error.to_string())?;
@@ -223,9 +259,15 @@ fn check_and_download(on_progress: &dyn Fn(Status)) -> Result<Option<(Version, P
         let got = file_hash(&partial).map_err(|error| error.to_string())?;
         if got != expected {
             if let Err(error) = std::fs::remove_file(&partial) {
-                tracing::warn!("could not delete the bad download {}: {error}", partial.display());
+                tracing::warn!(
+                    "could not delete the bad download {}: {error}",
+                    partial.display()
+                );
             }
-            return Err(tf!("o instalador baixado não confere com o {sums}", sums = SUMS_NAME));
+            return Err(tf!(
+                "o instalador baixado não confere com o {sums}",
+                sums = SUMS_NAME
+            ));
         }
         std::fs::rename(&partial, &installer).map_err(|error| error.to_string())?;
     }
@@ -237,7 +279,13 @@ fn check_and_download(on_progress: &dyn Fn(Status)) -> Result<Option<(Version, P
 #[cfg(windows)]
 pub fn run_installer(installer: &Path, relaunch: bool) -> io::Result<()> {
     let mut command = Command::new(installer);
-    command.args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/CLOSEAPPLICATIONS"]);
+    command.args([
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/CURRENTUSER",
+        "/CLOSEAPPLICATIONS",
+    ]);
     if relaunch {
         command.arg("/RELAUNCH=1");
     }
@@ -264,11 +312,17 @@ pub fn run_installer(installer: &Path, _relaunch: bool) -> io::Result<()> {
 /// left one waiting. Called by `main` after the window has closed.
 #[cfg(windows)]
 pub fn install_pending_on_exit() {
-    let pending = PENDING.lock().map(|mut pending| pending.take()).unwrap_or(None);
+    let pending = PENDING
+        .lock()
+        .map(|mut pending| pending.take())
+        .unwrap_or(None);
     if let Some(installer) = pending {
         tracing::info!("installing the update {} on exit", installer.display());
         if let Err(error) = run_installer(&installer, false) {
-            tracing::error!("could not start the update {}: {error}", installer.display());
+            tracing::error!(
+                "could not start the update {}: {error}",
+                installer.display()
+            );
         }
     }
 }
@@ -278,9 +332,15 @@ pub fn install_pending_on_exit() {
 /// stays in the temporary folder, and the settings page says where it is.
 #[cfg(not(windows))]
 pub fn install_pending_on_exit() {
-    let pending = PENDING.lock().map(|mut pending| pending.take()).unwrap_or(None);
+    let pending = PENDING
+        .lock()
+        .map(|mut pending| pending.take())
+        .unwrap_or(None);
     if let Some(installer) = pending {
-        tracing::info!("the update {} is ready to be installed", installer.display());
+        tracing::info!(
+            "the update {} is ready to be installed",
+            installer.display()
+        );
     }
 }
 
@@ -308,8 +368,15 @@ pub fn updater(cx: &mut App) -> Entity<Updater> {
     if let Some(global) = cx.try_global::<GlobalUpdater>() {
         return global.0.clone();
     }
-    let status = if is_installed() { Status::Idle } else { Status::NotInstalled };
-    let entity = cx.new(|_| Updater { status, automatic: true });
+    let status = if is_installed() {
+        Status::Idle
+    } else {
+        Status::NotInstalled
+    };
+    let entity = cx.new(|_| Updater {
+        status,
+        automatic: true,
+    });
     cx.set_global(GlobalUpdater(entity.clone()));
     entity
 }
@@ -329,7 +396,10 @@ impl Updater {
     /// Looks for an update in the background. Does nothing on a copy that is
     /// not installed, or while a look is already under way.
     pub fn check(&mut self, cx: &mut Context<Self>) {
-        if matches!(self.status, Status::NotInstalled | Status::Checking | Status::Downloading(_)) {
+        if matches!(
+            self.status,
+            Status::NotInstalled | Status::Checking | Status::Downloading(_)
+        ) {
             return;
         }
         self.status = Status::Checking;
@@ -361,7 +431,10 @@ impl Updater {
                         if updater.automatic {
                             set_pending(Some(installer.clone()));
                         }
-                        Status::Ready { version: version.to_string(), installer }
+                        Status::Ready {
+                            version: version.to_string(),
+                            installer,
+                        }
                     }
                     Err(error) => {
                         tracing::warn!("update check failed: {error}");
@@ -387,7 +460,10 @@ impl Updater {
         match run_installer(installer, true) {
             Ok(()) => cx.quit(),
             Err(error) => {
-                self.status = Status::Failed(tf!("não foi possível abrir o instalador: {error}", error = error));
+                self.status = Status::Failed(tf!(
+                    "não foi possível abrir o instalador: {error}",
+                    error = error
+                ));
                 cx.notify();
             }
         }
@@ -398,6 +474,7 @@ impl Updater {
 mod tests {
     use super::{listed_hash, parse_release};
 
+    #[cfg(windows)]
     const LATEST: &str = r#"{
         "tag_name": "v0.2.0",
         "assets": [
@@ -406,6 +483,17 @@ mod tests {
         ]
     }"#;
 
+    // On Linux the release carries the package, not the Windows installer.
+    #[cfg(not(windows))]
+    const LATEST: &str = r#"{
+        "tag_name": "v0.2.0",
+        "assets": [
+            {"name": "prime-files_0.2.0_amd64.deb", "browser_download_url": "https://example.test/prime-files.deb"},
+            {"name": "SHA256SUMS-linux.txt", "browser_download_url": "https://example.test/sums.txt"}
+        ]
+    }"#;
+
+    #[cfg(windows)]
     #[test]
     fn reads_version_installer_and_checksums_from_the_latest_release() {
         let release = parse_release(LATEST.as_bytes()).expect("a complete release");
@@ -415,17 +503,52 @@ mod tests {
         assert_eq!(release.sums_url, "https://example.test/sums.txt");
     }
 
+    #[cfg(not(windows))]
+    #[test]
+    fn reads_version_package_and_checksums_from_the_latest_release() {
+        let release = parse_release(LATEST.as_bytes()).expect("a complete release");
+        assert_eq!(release.version.to_string(), "0.2.0");
+        assert_eq!(release.installer_name, "prime-files_0.2.0_amd64.deb");
+        assert_eq!(
+            release.installer_url,
+            "https://example.test/prime-files.deb"
+        );
+        assert_eq!(release.sums_url, "https://example.test/sums.txt");
+    }
+
+    #[cfg(windows)]
     #[test]
     fn a_release_without_its_installer_is_not_an_update() {
         let json = LATEST.replace("PrimeFiles-Setup-0.2.0.exe", "PrimeFiles-Setup-0.1.9.exe");
         assert_eq!(parse_release(json.as_bytes()), None);
-        assert_eq!(parse_release(b"{\"tag_name\": \"nightly\", \"assets\": []}"), None);
+        assert_eq!(
+            parse_release(b"{\"tag_name\": \"nightly\", \"assets\": []}"),
+            None
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_release_without_its_package_is_not_an_update() {
+        // A release with another program's file is not one of ours.
+        let json = LATEST.replace(
+            "prime-files_0.2.0_amd64.deb",
+            "other-program_0.2.0_amd64.deb",
+        );
+        assert_eq!(parse_release(json.as_bytes()), None);
+        assert_eq!(
+            parse_release(b"{\"tag_name\": \"nightly\", \"assets\": []}"),
+            None
+        );
     }
 
     #[test]
     fn finds_the_hash_on_windows_and_unix_lines() {
         let sums = "AbC123  PrimeFiles-Setup-0.2.0.exe\r\nfff *other.exe\r\n";
-        assert_eq!(listed_hash(sums, "PrimeFiles-Setup-0.2.0.exe").as_deref(), Some("abc123"));
+        assert_eq!(
+            listed_hash(sums, "PrimeFiles-Setup-0.2.0.exe").as_deref(),
+            Some("abc123")
+        );
         assert_eq!(listed_hash(sums, "other.exe").as_deref(), Some("fff"));
         assert_eq!(listed_hash(sums, "missing.exe"), None);
     }

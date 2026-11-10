@@ -8,7 +8,6 @@
 //! directories (`XDG_DATA_DIRS`, `~/.config/user-dirs.dirs`) and the
 //! `xdg-open` command, which is what the desktop's own file manager is.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// One action a `.desktop` file offers for a file (open it, open it with
@@ -44,7 +43,31 @@ pub struct DesktopFile {
 ///
 /// The user's own come first, so a program installed for the user wins over
 /// the same one in the system.
+///
+/// Reading them is a walk of every folder of applications of the system, and
+/// there are hundreds of files there: the answer is kept for a while, so the
+/// menu of the right button does not pay for it every time.
 pub fn desktop_files() -> Vec<DesktopFile> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<(std::time::Instant, Vec<DesktopFile>)>> =
+        std::sync::OnceLock::new();
+    const KEPT_FOR: std::time::Duration = std::time::Duration::from_secs(30);
+
+    let cache =
+        CACHE.get_or_init(|| std::sync::Mutex::new((std::time::Instant::now(), Vec::new())));
+    let mut cache = match cache.lock() {
+        Ok(cache) => cache,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if cache.0.elapsed() < KEPT_FOR && !cache.1.is_empty() {
+        return cache.1.clone();
+    }
+    let files = read_desktop_files();
+    *cache = (std::time::Instant::now(), files.clone());
+    files
+}
+
+/// The `.desktop` files of the system and of the user, read from the disk.
+fn read_desktop_files() -> Vec<DesktopFile> {
     let mut directories = Vec::new();
     if let Some(home) = dirs::home_dir() {
         directories.push(home.join(".local/share/applications"));
@@ -52,7 +75,10 @@ pub fn desktop_files() -> Vec<DesktopFile> {
     if let Some(data) = dirs::data_dir() {
         directories.push(data.join("applications"));
     }
-    for directory in std::env::var_os("XDG_DATA_DIRS").into_iter().flat_map(|value| std::env::split_paths(&value).collect::<Vec<_>>()) {
+    for directory in std::env::var_os("XDG_DATA_DIRS")
+        .into_iter()
+        .flat_map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
+    {
         directories.push(directory.join("applications"));
     }
 
@@ -64,10 +90,16 @@ pub fn desktop_files() -> Vec<DesktopFile> {
         };
         for entry in read.filter_map(Result::ok) {
             let path = entry.path();
-            if path.extension().is_none_or(|extension| extension != "desktop") {
+            if path
+                .extension()
+                .is_none_or(|extension| extension != "desktop")
+            {
                 continue;
             }
-            let Some(id) = path.file_stem().map(|stem| stem.to_string_lossy().into_owned()) else {
+            let Some(id) = path
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+            else {
                 continue;
             };
             if !seen.insert(id.clone()) {
@@ -103,7 +135,10 @@ fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopFile> {
         }
         if line.starts_with('[') && line.ends_with(']') {
             section = line[1..line.len() - 1].to_string();
-            action = section.strip_prefix("Desktop Action ").unwrap_or_default().to_string();
+            action = section
+                .strip_prefix("Desktop Action ")
+                .unwrap_or_default()
+                .to_string();
             continue;
         }
         let Some((key, value)) = line.split_once('=') else {
@@ -116,7 +151,12 @@ fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopFile> {
                 "Name" => file.name = value.to_string(),
                 "Exec" => file.exec = value.to_string(),
                 "MimeType" => {
-                    file.mime_types = value.split(';').map(str::trim).filter(|kind| !kind.is_empty()).map(str::to_string).collect();
+                    file.mime_types = value
+                        .split(';')
+                        .map(str::trim)
+                        .filter(|kind| !kind.is_empty())
+                        .map(str::to_string)
+                        .collect();
                 }
                 "NoDisplay" => file.no_display = value.eq_ignore_ascii_case("true"),
                 _ => {}
@@ -124,7 +164,11 @@ fn parse_desktop_file(path: &Path, id: &str) -> Option<DesktopFile> {
         } else if !action.is_empty() {
             // The action's own section: its name and its command.
             match key {
-                "Name" => file.actions.push(Action { id: action.clone(), name: value.to_string(), exec: String::new() }),
+                "Name" => file.actions.push(Action {
+                    id: action.clone(),
+                    name: value.to_string(),
+                    exec: String::new(),
+                }),
                 "Exec" => {
                     if let Some(last) = file.actions.last_mut()
                         && last.id == action
@@ -159,7 +203,9 @@ pub fn mime_type(path: &Path) -> Option<String> {
     }
     let extension = path.extension()?.to_string_lossy().to_lowercase();
     let kind = match extension.as_str() {
-        "txt" | "log" | "md" | "toml" | "rs" | "c" | "h" | "cpp" | "py" | "js" | "ts" | "sh" => "text/plain",
+        "txt" | "log" | "md" | "toml" | "rs" | "c" | "h" | "cpp" | "py" | "js" | "ts" | "sh" => {
+            "text/plain"
+        }
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
@@ -199,7 +245,11 @@ pub fn mime_type(path: &Path) -> Option<String> {
 pub fn handlers_for(mime_type: &str) -> Vec<DesktopFile> {
     let mut handlers = Vec::new();
     for file in desktop_files() {
-        if file.mime_types.iter().any(|kind| kind.eq_ignore_ascii_case(mime_type)) {
+        if file
+            .mime_types
+            .iter()
+            .any(|kind| kind.eq_ignore_ascii_case(mime_type))
+        {
             handlers.push(file);
         }
     }
@@ -215,7 +265,10 @@ pub fn open(path: &Path) -> std::io::Result<()> {
 
 /// Opens `path` with a named program, as the desktop's own "Open with" does.
 pub fn open_with(path: &Path, desktop_id: &str) -> std::io::Result<()> {
-    let Some(file) = desktop_files().into_iter().find(|file| file.id == desktop_id) else {
+    let Some(file) = desktop_files()
+        .into_iter()
+        .find(|file| file.id == desktop_id)
+    else {
         return open(path);
     };
     let mut command = std::process::Command::new("gtk-launch");
@@ -254,7 +307,10 @@ fn split_command(exec: &str) -> Option<(String, Vec<String>)> {
     for character in exec.chars() {
         match character {
             '"' => {
-                quote = quote.is_none().then_some('"').or_else(|| quote.filter(|q| *q == '"').and(None));
+                quote = quote
+                    .is_none()
+                    .then_some('"')
+                    .or_else(|| quote.filter(|q| *q == '"').and(None));
                 started = true;
             }
             '\\' if quote.is_some() => {}
@@ -299,10 +355,19 @@ pub fn user_dirs() -> Vec<(String, PathBuf)> {
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        let name = key.trim().strip_prefix("XDG_").unwrap_or(key.trim()).strip_suffix("_DIR").unwrap_or_default().to_string();
+        let name = key
+            .trim()
+            .strip_prefix("XDG_")
+            .unwrap_or(key.trim())
+            .strip_suffix("_DIR")
+            .unwrap_or_default()
+            .to_string();
         let value = value.trim().trim_matches('"');
         // "$HOME/Desktop" is written the way the shell would expand it.
-        let value = value.strip_prefix("$HOME").map_or_else(|| value.to_string(), |rest| home.join(rest).to_string_lossy().into_owned());
+        let value = value.strip_prefix("$HOME").map_or_else(
+            || value.to_string(),
+            |rest| home.join(rest).to_string_lossy().into_owned(),
+        );
         // The desktop writes the names of the folders with the escapes of a
         // URI, so "Música" is written "M%C3%BAsica".
         let value = percent_decoded(&value);
@@ -344,40 +409,14 @@ pub fn config_home() -> PathBuf {
     dirs::config_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".config"))
 }
 
+/// The folder where the user's own programs keep their data.
 pub fn data_home() -> PathBuf {
     dirs::data_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".local/share"))
 }
 
+/// The folder where the user's own programs keep what they must not lose.
 pub fn state_home() -> PathBuf {
     dirs::state_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".local/state"))
-}
-
-/// A directory of the program, created when it is not there yet.
-pub fn program_dir(base: &Path, name: &str) -> PathBuf {
-    let path = base.join(name);
-    if let Err(error) = std::fs::create_dir_all(&path) {
-        tracing::debug!("could not create {}: {error}", path.display());
-    }
-    path
-}
-
-/// The name of a program in the desktop's menus, in the language the user
-/// reads: the `.desktop` file's `Name`, or its `Name[xx]` in that language.
-pub fn localized_name(file: &DesktopFile, language: &str) -> String {
-    let _ = (file, language);
-    file.name.clone()
-}
-
-/// The programs that can open a file, for a menu.
-pub fn open_with_choices(mime_type: &str) -> Vec<(String, String)> {
-    let mut choices = BTreeMap::new();
-    for file in handlers_for(mime_type) {
-        if file.no_display {
-            continue;
-        }
-        choices.insert(file.id.clone(), file.name.clone());
-    }
-    choices.into_iter().collect()
 }
 
 #[cfg(test)]

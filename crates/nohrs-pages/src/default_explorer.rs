@@ -39,7 +39,8 @@ const NEW_WINDOW_KEY: &str =
 // File Explorer pinned to the taskbar (and the Start menu's) is a shortcut to
 // the object itself, which runs `open`: with only the first taken over, the
 // taskbar button kept opening Explorer (Prime Files issue #4).
-const OPEN_KEY: &str = r"HKCU\Software\Classes\CLSID\{52205fd8-5dfb-447d-801a-d0b52f2e83e1}\shell\open";
+const OPEN_KEY: &str =
+    r"HKCU\Software\Classes\CLSID\{52205fd8-5dfb-447d-801a-d0b52f2e83e1}\shell\open";
 
 #[cfg(windows)]
 fn reg(args: &[&str]) -> io::Result<std::process::Output> {
@@ -61,7 +62,9 @@ fn reg_ok(args: &[&str]) -> io::Result<()> {
     if output.status.success() {
         Ok(())
     } else {
-        Err(io::Error::other(String::from_utf8_lossy(&output.stderr).trim().to_string()))
+        Err(io::Error::other(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ))
     }
 }
 
@@ -88,7 +91,14 @@ pub fn enable(exe: &Path) -> io::Result<()> {
         let verb = format!(r"{shell}\{VERB}");
         reg_ok(&["add", &verb, "/ve", "/d", t!("Abrir no Prime Files"), "/f"])?;
         reg_ok(&["add", &verb, "/v", "Icon", "/d", &quoted, "/f"])?;
-        reg_ok(&["add", &format!(r"{verb}\command"), "/ve", "/d", &format!("{quoted} \"%1\""), "/f"])?;
+        reg_ok(&[
+            "add",
+            &format!(r"{verb}\command"),
+            "/ve",
+            "/d",
+            &format!("{quoted} \"%1\""),
+            "/f",
+        ])?;
         reg_ok(&["add", &shell, "/ve", "/d", VERB, "/f"])?;
     }
     launcher_verbs(&quoted)
@@ -115,7 +125,10 @@ pub fn repair() -> io::Result<()> {
     // copy, must not change what the person's taskbar opens.
     let installed = std::env::current_exe()
         .ok()
-        .and_then(|exe| exe.parent().map(|folder| folder.join("unins000.exe").is_file()))
+        .and_then(|exe| {
+            exe.parent()
+                .map(|folder| folder.join("unins000.exe").is_file())
+        })
         .unwrap_or(false);
     if !installed || !is_default() {
         return Ok(());
@@ -124,7 +137,10 @@ pub fn repair() -> io::Result<()> {
         let output = reg(&["query", &format!(r"{key}\command"), "/ve"]).ok()?;
         String::from_utf8_lossy(&output.stdout)
             .lines()
-            .find_map(|line| line.split_once("REG_SZ").map(|(_, value)| value.trim().to_string()))
+            .find_map(|line| {
+                line.split_once("REG_SZ")
+                    .map(|(_, value)| value.trim().to_string())
+            })
             .filter(|value| !value.is_empty())
     };
     if command_of(OPEN_KEY).is_some() || !is_ours(&format!(r"{NEW_WINDOW_KEY}\command")) {
@@ -163,15 +179,17 @@ pub fn disable() -> io::Result<()> {
 // names the executable, which the installer calls PrimeFiles.exe.
 #[cfg(windows)]
 fn is_ours(key: &str) -> bool {
-    let exe_name = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.file_name().map(|name| name.to_string_lossy().to_ascii_lowercase()));
+    let exe_name = std::env::current_exe().ok().and_then(|exe| {
+        exe.file_name()
+            .map(|name| name.to_string_lossy().to_ascii_lowercase())
+    });
     reg(&["query", key, "/ve"])
         .map(|output| {
             String::from_utf8_lossy(&output.stdout).lines().any(|line| {
                 let line = line.to_ascii_lowercase();
                 line.contains("reg_sz")
-                    && (line.contains("nohrs") || exe_name.as_deref().is_some_and(|name| line.contains(name)))
+                    && (line.contains("nohrs")
+                        || exe_name.as_deref().is_some_and(|name| line.contains(name)))
             })
         })
         .unwrap_or(false)
@@ -194,7 +212,9 @@ pub fn starts_with_windows() -> bool {
 pub fn set_starts_with_windows(exe: &Path, enable: bool) -> io::Result<()> {
     if enable {
         let command = format!("\"{}\" --background", exe.display());
-        reg_ok(&["add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &command, "/f"])
+        reg_ok(&[
+            "add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &command, "/f",
+        ])
     } else if starts_with_windows() {
         reg_ok(&["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
     } else {
@@ -253,7 +273,9 @@ mod linux {
 
     /// The file the desktop reads the program's own entries from.
     fn desktop_file() -> PathBuf {
-        crate::linux::data_home().join("applications").join(format!("{DESKTOP_ID}.desktop"))
+        crate::linux::data_home()
+            .join("applications")
+            .join(format!("{DESKTOP_ID}.desktop"))
     }
 
     /// The file the desktop reads the user's own choices from.
@@ -263,7 +285,11 @@ mod linux {
 
     /// Whether the desktop opens folders in this program.
     pub fn is_default() -> bool {
-        let output = Command::new("xdg-mime").arg("query").arg("default").arg(FOLDER_MIME).output();
+        let output = Command::new("xdg-mime")
+            .arg("query")
+            .arg("default")
+            .arg(FOLDER_MIME)
+            .output();
         match output {
             Ok(output) if output.status.success() => {
                 String::from_utf8_lossy(&output.stdout).trim() == format!("{DESKTOP_ID}.desktop")
@@ -333,7 +359,10 @@ mod linux {
             return format!("{data}/icons/hicolor/256x256/apps/{DESKTOP_ID}.png");
         }
         let home = dirs::home_dir().unwrap_or_default();
-        format!("{}/.local/share/icons/hicolor/256x256/apps/{DESKTOP_ID}.png", home.display())
+        format!(
+            "{}/.local/share/icons/hicolor/256x256/apps/{DESKTOP_ID}.png",
+            home.display()
+        )
     }
 
     /// Gives folders back to the desktop, removing only what [`enable`]
@@ -348,7 +377,10 @@ mod linux {
         if let Ok(text) = std::fs::read_to_string(&list) {
             let kept = text
                 .lines()
-                .filter(|line| !line.trim_start().starts_with(&format!("{FOLDER_MIME}=")) || !line.contains(DESKTOP_ID))
+                .filter(|line| {
+                    !line.trim_start().starts_with(&format!("{FOLDER_MIME}="))
+                        || !line.contains(DESKTOP_ID)
+                })
                 .collect::<Vec<_>>()
                 .join("\n");
             std::fs::write(&list, kept)?;
@@ -358,7 +390,11 @@ mod linux {
 
     /// Where the desktop keeps the programs that start at sign-in.
     pub(super) fn autostart_file() -> Option<PathBuf> {
-        Some(crate::linux::config_home().join("autostart").join(format!("{DESKTOP_ID}.desktop")))
+        Some(
+            crate::linux::config_home()
+                .join("autostart")
+                .join(format!("{DESKTOP_ID}.desktop")),
+        )
     }
 
     /// Starts `exe` at sign-in, or stops it.

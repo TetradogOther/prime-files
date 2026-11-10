@@ -4,54 +4,54 @@
 
 use gpui::AnyElement;
 
+/// A reusable 2-way split/tab container shared across pages.
+pub mod compact;
 /// Making Nohrs the folder handler of the Windows user.
 pub mod default_explorer;
+/// Panels docked to any side: the shared gestures and drawing.
+pub(crate) mod dock;
 /// The file explorer page and its supporting state and views.
 pub mod explorer;
-/// The git page.
-pub mod git;
 /// Picking files for a browser's "Open" dialog from Nohrs.
 pub mod file_dialog;
-pub mod picking_bar;
-pub mod quick_keys;
-pub mod quick_search;
+/// The git page.
+pub mod git;
 /// The local channel other programs (a second `nohrs.exe`, the Listary
 /// plugin) reach the running instance through.
 pub mod ipc;
-pub mod listary;
-/// Which language "auto" means on this machine.
-pub mod locale;
 /// What the Linux desktop is asked: opening files, the programs that offer
 /// to open them, and the user's own folders.
 pub mod linux;
-/// A reusable 2-way split/tab container shared across pages.
-pub mod compact;
-/// Panels docked to any side: the shared gestures and drawing.
-pub(crate) mod dock;
+pub mod listary;
+/// Which language "auto" means on this machine.
+pub mod locale;
 pub mod pane_group;
-/// Automatic updates from the project's GitHub releases.
-pub mod updater;
+pub mod picking_bar;
+pub mod quick_keys;
+pub mod quick_search;
 /// Other programs' "show in folder", answered by Nohrs.
 pub mod reveal;
 /// The application root view that hosts the sidebar and active page.
 pub mod root;
 /// The S3 page.
 pub mod s3;
+/// Automatic updates from the project's GitHub releases.
+pub mod updater;
 // removed search
+/// The chip that follows a dragged tab, over every window and monitor.
+pub(crate) mod drag_chip;
 /// The settings page.
 pub mod settings;
-pub mod startup;
 mod settings_home;
 /// The right-click menu: the Windows context menu with Nohrs's entries.
 pub(crate) mod shell_menu;
+pub mod startup;
 /// The terminal panel under the explorer, one shell per tab.
 pub mod terminal;
 /// The welcome screen of the first run.
 pub mod welcome;
 /// Several explorer windows; the one other programs open folders in.
 pub mod windows;
-/// The chip that follows a dragged tab, over every window and monitor.
-pub(crate) mod drag_chip;
 
 pub use root::RootView;
 

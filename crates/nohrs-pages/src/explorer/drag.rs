@@ -7,8 +7,10 @@
 //! from Explorer: gpui's drop target, as `ExternalPaths`. The drop side then
 //! only has to handle that.
 
+use gpui::{
+    Context, ExternalPaths, InteractiveElement, MouseMoveEvent, Pixels, Point, Styled, Window, rgb,
+};
 use nohrs_core::{t, tf};
-use gpui::{Context, ExternalPaths, InteractiveElement, MouseMoveEvent, Pixels, Point, Styled, Window, rgb};
 use nohrs_ui::theme::theme;
 use std::path::{Path, PathBuf};
 
@@ -95,7 +97,12 @@ impl ExplorerPane {
     /// moved far enough, the same Windows drag the listing starts: dropped on
     /// Premiere it imports, on Explorer it copies or moves, on Nohrs it lands
     /// like any drop.
-    pub(crate) fn preview_drag_moved(&mut self, event: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn preview_drag_moved(
+        &mut self,
+        event: &MouseMoveEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(candidate) = self.preview_drag_ready(event) else {
             return;
         };
@@ -108,7 +115,11 @@ impl ExplorerPane {
                     .as_ref()
                     .map(|listing| self.preview_listing_selection.paths(listing))
                     .unwrap_or_default();
-                let paths = if picked.len() > 1 && picked.contains(&path) { picked } else { vec![path] };
+                let paths = if picked.len() > 1 && picked.contains(&path) {
+                    picked
+                } else {
+                    vec![path]
+                };
                 self.start_drag_out(paths, DragFrom::Preview, window, cx)
             }
             PreviewDragSource::Archive(archive, member, is_dir) => {
@@ -119,7 +130,10 @@ impl ExplorerPane {
 
     // The pressed preview item, once the press has moved past the threshold
     // with the button held; a press whose button came up is forgotten.
-    pub(crate) fn preview_drag_ready(&mut self, event: &MouseMoveEvent) -> Option<PreviewDragCandidate> {
+    pub(crate) fn preview_drag_ready(
+        &mut self,
+        event: &MouseMoveEvent,
+    ) -> Option<PreviewDragCandidate> {
         let candidate = self.preview_drag.as_ref()?;
         if event.pressed_button != Some(gpui::MouseButton::Left) {
             self.preview_drag = None;
@@ -156,7 +170,12 @@ impl ExplorerPane {
     }
 
     /// Starts a drag once a press has moved far enough.
-    pub(crate) fn drag_moved(&mut self, event: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn drag_moved(
+        &mut self,
+        event: &MouseMoveEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(candidate) = &self.drag_candidate else {
             return;
         };
@@ -179,14 +198,23 @@ impl ExplorerPane {
         };
         // The selection if the press was on part of it, else just that entry.
         let paths: Vec<PathBuf> = if self.selection.contains(&entry.path) {
-            self.selected_paths().into_iter().map(PathBuf::from).collect()
+            self.selected_paths()
+                .into_iter()
+                .map(PathBuf::from)
+                .collect()
         } else {
             vec![PathBuf::from(&entry.path)]
         };
         self.start_drag_out(paths, DragFrom::Listing, window, cx);
     }
 
-    fn start_drag_out(&mut self, paths: Vec<PathBuf>, from: DragFrom, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_drag_out(
+        &mut self,
+        paths: Vec<PathBuf>,
+        from: DragFrom,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         // A drag of the selected item is no click on it.
         self.slow_rename = None;
         let Some(hwnd) = crate::ipc::window_hwnd(window) else {
@@ -200,7 +228,10 @@ impl ExplorerPane {
             let outcome = platform::drag(hwnd, &paths);
             this.update(cx, |pane, cx| {
                 if let Err(error) = outcome {
-                    pane.set_status(StatusLevel::Error, tf!("Não foi possível arrastar: {error}", error = error));
+                    pane.set_status(
+                        StatusLevel::Error,
+                        tf!("Não foi possível arrastar: {error}", error = error),
+                    );
                 }
                 // A move to another program takes the files out of this folder.
                 pane.reload(cx);
@@ -232,7 +263,10 @@ impl ExplorerPane {
         let stage = match super::preview_listing::stage_for_drag(&member, is_dir) {
             Ok(stage) => stage,
             Err(error) => {
-                self.set_status(StatusLevel::Error, tf!("Não foi possível arrastar: {error}", error = error));
+                self.set_status(
+                    StatusLevel::Error,
+                    tf!("Não foi possível arrastar: {error}", error = error),
+                );
                 cx.notify();
                 return;
             }
@@ -248,7 +282,9 @@ impl ExplorerPane {
         self.archive_extracting = Some(entry.clone());
         cx.notify();
         std::thread::spawn(move || {
-            writer.finish(super::preview_listing::extract_staged(&stage, &archive, &member, is_dir));
+            writer.finish(super::preview_listing::extract_staged(
+                &stage, &archive, &member, is_dir,
+            ));
         });
         // The loading mark comes off when the extraction ends, not when the
         // drag does: an entry that is whole while the button is still down is
@@ -257,7 +293,9 @@ impl ExplorerPane {
         let watched = extraction.clone();
         cx.spawn_in(window, async move |this, cx| {
             while watched.result().is_none() {
-                cx.background_executor().timer(std::time::Duration::from_millis(60)).await;
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(60))
+                    .await;
             }
             this.update(cx, |pane, cx| {
                 if pane.archive_extracting.as_ref() == Some(&entry) {
@@ -269,7 +307,8 @@ impl ExplorerPane {
         })
         .detach();
         cx.spawn_in(window, async move |this, cx| {
-            let dragged = platform::drag_pending(hwnd, &[target], &extraction).map_err(|error| error.to_string());
+            let dragged = platform::drag_pending(hwnd, &[target], &extraction)
+                .map_err(|error| error.to_string());
             // A drop the extraction failed under was cancelled; its reason is
             // the one to show. A drag cancelled with Esc leaves the extraction
             // to end on its own, in a folder nothing points at.
@@ -279,7 +318,10 @@ impl ExplorerPane {
             };
             this.update(cx, |pane, cx| {
                 if let Err(error) = outcome {
-                    pane.set_status(StatusLevel::Error, tf!("Não foi possível arrastar: {error}", error = error));
+                    pane.set_status(
+                        StatusLevel::Error,
+                        tf!("Não foi possível arrastar: {error}", error = error),
+                    );
                 }
                 pane.reload(cx);
                 cx.notify();
@@ -292,10 +334,23 @@ impl ExplorerPane {
     /// Copies or moves files dropped on the window into `dest`. Explorer's
     /// rules: Shift moves, Ctrl copies, and otherwise a drop on the same drive
     /// moves and one from another drive copies.
-    pub(crate) fn drop_paths(&mut self, paths: &[PathBuf], dest: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        let DropPlan { mode, sources, into_itself } = drop_plan(paths, &dest, window.modifiers());
+    pub(crate) fn drop_paths(
+        &mut self,
+        paths: &[PathBuf],
+        dest: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let DropPlan {
+            mode,
+            sources,
+            into_itself,
+        } = drop_plan(paths, &dest, window.modifiers());
         if into_itself {
-            self.set_status(StatusLevel::Warning, t!("Uma pasta não pode ir para dentro dela mesma."));
+            self.set_status(
+                StatusLevel::Warning,
+                t!("Uma pasta não pode ir para dentro dela mesma."),
+            );
             cx.notify();
         }
         if sources.is_empty() {
@@ -343,7 +398,11 @@ fn drop_plan(paths: &[PathBuf], dest: &Path, modifiers: gpui::Modifiers) -> Drop
         })
         .cloned()
         .collect();
-    DropPlan { mode, sources, into_itself }
+    DropPlan {
+        mode,
+        sources,
+        into_itself,
+    }
 }
 
 // What the cursor says over `dest`: "Move" or "Copy" as the drop will do,
@@ -428,13 +487,27 @@ pub(crate) fn drop_into<E: InteractiveElement + Styled>(
 // Whether `a` and `b` are on the same drive, by their prefix (`C:`, or a UNC
 // share); compared without case, as Windows does.
 fn same_volume(a: &Path, b: &Path) -> bool {
-    let prefix = |path: &Path| match path.components().next() {
-        Some(std::path::Component::Prefix(prefix)) => {
-            Some(prefix.as_os_str().to_string_lossy().to_ascii_lowercase())
+    #[cfg(windows)]
+    {
+        let prefix = |path: &Path| match path.components().next() {
+            Some(std::path::Component::Prefix(prefix)) => {
+                Some(prefix.as_os_str().to_string_lossy().to_ascii_lowercase())
+            }
+            _ => None,
+        };
+        prefix(a).is_some() && prefix(a) == prefix(b)
+    }
+    #[cfg(not(windows))]
+    {
+        // Two paths are on the same unit when the kernel says they are on
+        // the same device: the number it gives each filesystem.
+        use std::os::unix::fs::MetadataExt as _;
+        let device = |path: &Path| std::fs::metadata(path).ok().map(|metadata| metadata.dev());
+        match (device(a), device(b)) {
+            (Some(a), Some(b)) => a == b,
+            _ => false,
         }
-        _ => None,
-    };
-    prefix(a).is_some() && prefix(a) == prefix(b)
+    }
 }
 
 #[cfg(windows)]
@@ -452,7 +525,8 @@ mod platform {
     };
     use windows::Win32::System::Com::IDataObject;
     use windows::Win32::System::Ole::{
-        DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_MOVE, IDropSource, IDropSource_Impl,
+        DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_MOVE, IDropSource,
+        IDropSource_Impl,
     };
     use windows::Win32::System::SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS};
     use windows::Win32::UI::WindowsAndMessaging::{IDC_WAIT, LoadCursorW, SetCursor};
@@ -461,14 +535,17 @@ mod platform {
     use super::Extraction;
     use windows::Win32::UI::Shell::Common::ITEMIDLIST;
     use windows::Win32::UI::Shell::{
-        BHID_DataObject, ILFree, SHCreateShellItemArrayFromIDLists, SHDoDragDrop, SHParseDisplayName,
+        BHID_DataObject, ILFree, SHCreateShellItemArrayFromIDLists, SHDoDragDrop,
+        SHParseDisplayName,
     };
     use windows::core::HSTRING;
 
     /// The Properties window Explorer opens for these items: one file's, or
     /// the combined one for several.
     pub fn properties(paths: &[PathBuf]) -> windows::core::Result<()> {
-        with_data_object(paths, |data| unsafe { windows::Win32::UI::Shell::SHMultiFileProperties(data, 0) })
+        with_data_object(paths, |data| unsafe {
+            windows::Win32::UI::Shell::SHMultiFileProperties(data, 0)
+        })
     }
 
     fn with_data_object(
@@ -479,10 +556,13 @@ mod platform {
         let result = (|| {
             for path in paths {
                 let mut pidl = std::ptr::null_mut();
-                unsafe { SHParseDisplayName(&HSTRING::from(path.as_os_str()), None, &mut pidl, 0, None)? };
+                unsafe {
+                    SHParseDisplayName(&HSTRING::from(path.as_os_str()), None, &mut pidl, 0, None)?
+                };
                 pidls.push(pidl);
             }
-            let items: Vec<*const ITEMIDLIST> = pidls.iter().map(|pidl| pidl.cast_const()).collect();
+            let items: Vec<*const ITEMIDLIST> =
+                pidls.iter().map(|pidl| pidl.cast_const()).collect();
             let data: IDataObject = unsafe {
                 let array = SHCreateShellItemArrayFromIDLists(&items)?;
                 array.BindToHandler(None, &BHID_DataObject)?
@@ -500,10 +580,13 @@ mod platform {
         let result = (|| {
             for path in paths {
                 let mut pidl = std::ptr::null_mut();
-                unsafe { SHParseDisplayName(&HSTRING::from(path.as_os_str()), None, &mut pidl, 0, None)? };
+                unsafe {
+                    SHParseDisplayName(&HSTRING::from(path.as_os_str()), None, &mut pidl, 0, None)?
+                };
                 pidls.push(pidl);
             }
-            let items: Vec<*const ITEMIDLIST> = pidls.iter().map(|pidl| pidl.cast_const()).collect();
+            let items: Vec<*const ITEMIDLIST> =
+                pidls.iter().map(|pidl| pidl.cast_const()).collect();
             unsafe {
                 let array = SHCreateShellItemArrayFromIDLists(&items)?;
                 let data: IDataObject = array.BindToHandler(None, &BHID_DataObject)?;
@@ -529,8 +612,15 @@ mod platform {
     /// `extraction` ends, and cancels it when the extraction failed. The
     /// data object is still the Shell's, so the drag image and every target
     /// are the same as for any other file.
-    pub fn drag_pending(hwnd: i64, paths: &[PathBuf], extraction: &Arc<Extraction>) -> windows::core::Result<()> {
-        let source: IDropSource = PendingSource { extraction: extraction.clone() }.into();
+    pub fn drag_pending(
+        hwnd: i64,
+        paths: &[PathBuf],
+        extraction: &Arc<Extraction>,
+    ) -> windows::core::Result<()> {
+        let source: IDropSource = PendingSource {
+            extraction: extraction.clone(),
+        }
+        .into();
         with_data_object(paths, |data| unsafe {
             SHDoDragDrop(
                 Some(HWND(hwnd as *mut _)),
@@ -585,7 +675,11 @@ mod platform {
         Ok(())
     }
 
-    pub fn drag_pending(_hwnd: i64, _paths: &[PathBuf], _extraction: &Arc<Extraction>) -> Result<(), std::io::Error> {
+    pub fn drag_pending(
+        _hwnd: i64,
+        _paths: &[PathBuf],
+        _extraction: &Arc<Extraction>,
+    ) -> Result<(), std::io::Error> {
         Ok(())
     }
 
@@ -599,34 +693,115 @@ mod tests {
     use super::same_volume;
     use std::path::Path;
 
+    #[cfg(windows)]
     #[test]
     fn volumes_compare_by_drive_without_case() {
         assert!(same_volume(Path::new(r"C:\a\b.txt"), Path::new(r"c:\x")));
         assert!(!same_volume(Path::new(r"C:\a"), Path::new(r"D:\a")));
-        assert!(!same_volume(Path::new(r"I:\Meu Drive\a.mp4"), Path::new(r"C:\Users")));
+        assert!(!same_volume(
+            Path::new(r"I:\Meu Drive\a.mp4"),
+            Path::new(r"C:\Users")
+        ));
+    }
+
+    // On Linux the unit is the filesystem: two paths of the same one are
+    // of the same volume, and a path of another is not.
+    #[cfg(not(windows))]
+    #[test]
+    fn volumes_compare_by_the_filesystem_they_are_on() {
+        let folder = std::env::temp_dir();
+        let file = folder.join("a.txt");
+        std::fs::write(&file, "x").expect("write");
+        assert!(same_volume(&file, &folder));
+        assert!(!same_volume(&file, Path::new("/proc")));
     }
 
     // The case RML reported: a download on the Desktop dropped on a folder
     // of the same drive moves, and the cursor has to say so.
+    #[cfg(windows)]
     #[test]
     fn the_cursor_says_what_the_drop_does() {
         use super::drop_effect;
         use gpui::{FileDropEffect, Modifiers};
         use std::path::PathBuf;
         let none = Modifiers::default();
-        let shift = Modifiers { shift: true, ..Modifiers::default() };
-        let ctrl = Modifiers { control: true, ..Modifiers::default() };
+        let shift = Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        };
+        let ctrl = Modifiers {
+            control: true,
+            ..Modifiers::default()
+        };
         let download = [PathBuf::from(r"C:\Users\a\Desktop\video.mp4")];
         let same_drive = Path::new(r"C:\Projetos");
         let other_drive = Path::new(r"D:\Projetos");
-        assert_eq!(drop_effect(&download, same_drive, none), FileDropEffect::Move);
-        assert_eq!(drop_effect(&download, same_drive, ctrl), FileDropEffect::Copy);
-        assert_eq!(drop_effect(&download, other_drive, none), FileDropEffect::Copy);
-        assert_eq!(drop_effect(&download, other_drive, shift), FileDropEffect::Move);
+        assert_eq!(
+            drop_effect(&download, same_drive, none),
+            FileDropEffect::Move
+        );
+        assert_eq!(
+            drop_effect(&download, same_drive, ctrl),
+            FileDropEffect::Copy
+        );
+        assert_eq!(
+            drop_effect(&download, other_drive, none),
+            FileDropEffect::Copy
+        );
+        assert_eq!(
+            drop_effect(&download, other_drive, shift),
+            FileDropEffect::Move
+        );
         // Back into the folder it is in, or a folder into itself: nothing.
-        assert_eq!(drop_effect(&download, Path::new(r"C:\Users\a\Desktop"), none), FileDropEffect::None);
+        assert_eq!(
+            drop_effect(&download, Path::new(r"C:\Users\a\Desktop"), none),
+            FileDropEffect::None
+        );
         let folder = [PathBuf::from(r"C:\Projetos")];
-        assert_eq!(drop_effect(&folder, Path::new(r"C:\Projetos\sub"), none), FileDropEffect::None);
+        assert_eq!(
+            drop_effect(&folder, Path::new(r"C:\Projetos\sub"), none),
+            FileDropEffect::None
+        );
+    }
+
+    // The same, with the paths of this system: a file dropped on a folder
+    // of the same filesystem moves.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_cursor_says_what_the_drop_does() {
+        use super::drop_effect;
+        use gpui::{FileDropEffect, Modifiers};
+        let folder = tempfile::tempdir().expect("a folder");
+        let download = folder.path().join("video.mp4");
+        std::fs::write(&download, "x").expect("write");
+        let same = folder.path().join("Projetos");
+        std::fs::create_dir(&same).expect("a folder");
+        let none = Modifiers::default();
+        let shift = Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        };
+        let ctrl = Modifiers {
+            control: true,
+            ..Modifiers::default()
+        };
+        let files = [download.clone()];
+        assert_eq!(drop_effect(&files, &same, none), FileDropEffect::Move);
+        assert_eq!(drop_effect(&files, &same, ctrl), FileDropEffect::Copy);
+        // Another filesystem: the file is copied, not moved.
+        assert_eq!(
+            drop_effect(&files, Path::new("/proc"), none),
+            FileDropEffect::Copy
+        );
+        assert_eq!(
+            drop_effect(&files, Path::new("/proc"), shift),
+            FileDropEffect::Move
+        );
+        // Back into the folder it is in: nothing.
+        assert_eq!(
+            drop_effect(&files, folder.path(), none),
+            FileDropEffect::None
+        );
     }
 }
 

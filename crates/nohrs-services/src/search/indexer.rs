@@ -323,7 +323,10 @@ impl IndexManager {
         let content_field = schema.get_field("content").context("Schema error")?;
         let is_directory_field = schema.get_field("is_directory").context("Schema error")?;
 
-        let paths: Vec<&PathBuf> = paths.iter().filter(|path| self.is_indexable_change(path)).collect();
+        let paths: Vec<&PathBuf> = paths
+            .iter()
+            .filter(|path| self.is_indexable_change(path))
+            .collect();
         if paths.is_empty() {
             return Ok(());
         }
@@ -490,7 +493,12 @@ mod tests {
 
         let outside = dir.path().join("elsewhere.txt");
         std::fs::write(&outside, "x").unwrap();
-        let own_file = std::fs::read_dir(&index_path).unwrap().next().unwrap().unwrap().path();
+        let own_file = std::fs::read_dir(&index_path)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
         manager.process_changes(&[own_file, outside]).unwrap();
         assert_eq!(indexed(&manager), 0);
 

@@ -62,7 +62,10 @@ fn set_picking(dialog: Option<Dialog>) {
 static RELEASED: Mutex<Option<isize>> = Mutex::new(None);
 
 fn released(hwnd: isize) -> bool {
-    RELEASED.lock().ok().is_some_and(|released| *released == Some(hwnd))
+    RELEASED
+        .lock()
+        .ok()
+        .is_some_and(|released| *released == Some(hwnd))
 }
 
 // Shows the dialog again, in front, and leaves it to the user.
@@ -145,7 +148,10 @@ pub fn file_types(hwnd: isize) -> (Vec<FileType>, usize) {
     let (labels, chosen) = platform::file_types(hwnd);
     let types = labels
         .into_iter()
-        .map(|label| FileType { patterns: parse_patterns(&label), label })
+        .map(|label| FileType {
+            patterns: parse_patterns(&label),
+            label,
+        })
         .collect();
     (types, chosen)
 }
@@ -167,7 +173,11 @@ pub fn parse_typed_patterns(text: &str) -> Option<Vec<String>> {
         .filter(|pattern| !pattern.is_empty())
         .map(str::to_lowercase)
         .collect();
-    if patterns.is_empty() || patterns.iter().any(|pattern| pattern == "*" || pattern == "*.*") {
+    if patterns.is_empty()
+        || patterns
+            .iter()
+            .any(|pattern| pattern == "*" || pattern == "*.*")
+    {
         return None;
     }
     Some(patterns)
@@ -403,12 +413,11 @@ mod platform {
     };
     use windows::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
     use windows::Win32::UI::WindowsAndMessaging::{
-        BN_CLICKED, DispatchMessageW, EVENT_SYSTEM_FOREGROUND, FindWindowExW, GetClassNameW,
+        BN_CLICKED, CB_GETCOUNT, CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN, DispatchMessageW,
+        EVENT_SYSTEM_FOREGROUND, EnumChildWindows, FindWindowExW, GetClassNameW, GetDlgCtrlID,
         GetDlgItem, GetMessageW, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IDOK,
-        IsWindow, MSG, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW,
-        SetForegroundWindow, SetWindowPos, TranslateMessage, CB_GETCOUNT, CB_GETCURSEL,
-        CB_GETLBTEXT, CB_GETLBTEXTLEN, EnumChildWindows, GetDlgCtrlID, SMTO_ABORTIFHUNG,
-        SMTO_BLOCK, SendMessageTimeoutW,
+        IsWindow, MSG, SMTO_ABORTIFHUNG, SMTO_BLOCK, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+        SendMessageTimeoutW, SendMessageW, SetForegroundWindow, SetWindowPos, TranslateMessage,
         WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_COMMAND, WM_SETTEXT,
     };
     use windows::core::{PCWSTR, PWSTR, w};
@@ -531,9 +540,17 @@ mod platform {
             }
             true.into()
         }
-        let mut search = Search { id, class, found: None };
+        let mut search = Search {
+            id,
+            class,
+            found: None,
+        };
         unsafe {
-            let _ = EnumChildWindows(Some(parent), Some(visit), LPARAM(&mut search as *mut Search as isize));
+            let _ = EnumChildWindows(
+                Some(parent),
+                Some(visit),
+                LPARAM(&mut search as *mut Search as isize),
+            );
         }
         search.found
     }
@@ -560,10 +577,13 @@ mod platform {
         let Some(combo) = find_child(HWND(hwnd as *mut _), FILE_TYPE_COMBO, "ComboBox") else {
             return (Vec::new(), 0);
         };
-        let count = ask(combo, CB_GETCOUNT, 0, 0).map(|count| count as isize).unwrap_or(0);
+        let count = ask(combo, CB_GETCOUNT, 0, 0)
+            .map(|count| count as isize)
+            .unwrap_or(0);
         let mut labels = Vec::new();
         for index in 0..count.clamp(0, 64) as usize {
-            let Some(length) = ask(combo, CB_GETLBTEXTLEN, index, 0).map(|length| length as isize) else {
+            let Some(length) = ask(combo, CB_GETLBTEXTLEN, index, 0).map(|length| length as isize)
+            else {
                 break;
             };
             if !(0..4096).contains(&length) {
@@ -589,14 +609,15 @@ mod platform {
         };
         use windows::Win32::System::Variant::VARIANT;
         use windows::Win32::UI::Shell::{
-            IFolderView, IPersistFolder2, IShellBrowser, IShellWindows, IWebBrowserApp, SHGetNameFromIDList,
-            SID_STopLevelBrowser, SIGDN_FILESYSPATH, ShellWindows,
+            IFolderView, IPersistFolder2, IShellBrowser, IShellWindows, IWebBrowserApp,
+            SHGetNameFromIDList, SID_STopLevelBrowser, SIGDN_FILESYSPATH, ShellWindows,
         };
         use windows::core::Interface;
         unsafe {
             let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
             let folder = (|| -> Option<String> {
-                let shell_windows: IShellWindows = CoCreateInstance(&ShellWindows, None, CLSCTX_ALL).ok()?;
+                let shell_windows: IShellWindows =
+                    CoCreateInstance(&ShellWindows, None, CLSCTX_ALL).ok()?;
                 let count = shell_windows.Count().ok()?;
                 for index in 0..count {
                     let Ok(item) = shell_windows.Item(&VARIANT::from(index)) else {
@@ -609,7 +630,8 @@ mod platform {
                         continue;
                     }
                     let provider: IServiceProvider = browser.cast().ok()?;
-                    let shell_browser: IShellBrowser = provider.QueryService(&SID_STopLevelBrowser).ok()?;
+                    let shell_browser: IShellBrowser =
+                        provider.QueryService(&SID_STopLevelBrowser).ok()?;
                     let view = shell_browser.QueryActiveShellView().ok()?;
                     let folder_view: IFolderView = view.cast().ok()?;
                     let folder: IPersistFolder2 = folder_view.GetFolder().ok()?;
@@ -674,7 +696,10 @@ mod platform {
         unsafe { CloseHandle(process) }.ok();
         queried.ok()?;
         let path = String::from_utf16_lossy(&path[..length as usize]);
-        let name = std::path::Path::new(&path).file_name()?.to_string_lossy().to_lowercase();
+        let name = std::path::Path::new(&path)
+            .file_name()?
+            .to_string_lossy()
+            .to_lowercase();
         Some(name)
     }
 
@@ -685,7 +710,9 @@ mod platform {
     pub fn bring_forward(hwnd: isize) {
         // Nohrs is in front when this runs, which is what lets it hand the
         // foreground over.
-        unsafe { SetForegroundWindow(HWND(hwnd as *mut _)) }.ok().ok();
+        unsafe { SetForegroundWindow(HWND(hwnd as *mut _)) }
+            .ok()
+            .ok();
     }
 
     /// Where parked dialogs go: where Windows itself puts minimized windows,
@@ -703,7 +730,15 @@ mod platform {
 
     fn move_to(hwnd: isize, x: i32, y: i32) {
         unsafe {
-            SetWindowPos(HWND(hwnd as *mut _), None, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
+            SetWindowPos(
+                HWND(hwnd as *mut _),
+                None,
+                x,
+                y,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            )
         }
         .ok();
     }
@@ -782,15 +817,19 @@ mod platform {
     fn file_name_edit(dialog: HWND) -> Option<HWND> {
         if let Ok(combo) = unsafe { GetDlgItem(Some(dialog), FILE_NAME_COMBO) } {
             // The older dialog: the box is the combo's own child.
-            if let Ok(edit) = unsafe { FindWindowExW(Some(combo), None, w!("Edit"), PCWSTR::null()) } {
+            if let Ok(edit) =
+                unsafe { FindWindowExW(Some(combo), None, w!("Edit"), PCWSTR::null()) }
+            {
                 return Some(edit);
             }
             // The one Windows 10 and 11 show (Firefox and Zen use it): 1148
             // is a ComboBoxEx32, with a ComboBox inside and the box inside
             // that. Looked for one level up only, it was never found, and a
             // double click sent nothing (07/11/2026).
-            if let Ok(inner) = unsafe { FindWindowExW(Some(combo), None, w!("ComboBox"), PCWSTR::null()) }
-                && let Ok(edit) = unsafe { FindWindowExW(Some(inner), None, w!("Edit"), PCWSTR::null()) }
+            if let Ok(inner) =
+                unsafe { FindWindowExW(Some(combo), None, w!("ComboBox"), PCWSTR::null()) }
+                && let Ok(edit) =
+                    unsafe { FindWindowExW(Some(inner), None, w!("Edit"), PCWSTR::null()) }
             {
                 return Some(edit);
             }
@@ -801,7 +840,12 @@ mod platform {
     fn set_text(edit: HWND, text: &str) {
         let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
-            SendMessageW(edit, WM_SETTEXT, Some(WPARAM(0)), Some(LPARAM(wide.as_ptr() as isize)));
+            SendMessageW(
+                edit,
+                WM_SETTEXT,
+                Some(WPARAM(0)),
+                Some(LPARAM(wide.as_ptr() as isize)),
+            );
         }
     }
 
@@ -862,9 +906,15 @@ mod tests {
             parse_patterns("Imagens (*.png;*.JPG)"),
             Some(vec!["*.png".to_string(), "*.jpg".to_string()])
         );
-        assert_eq!(parse_patterns("Image Files (*.png, *.gif)"), Some(vec!["*.png".into(), "*.gif".into()]));
+        assert_eq!(
+            parse_patterns("Image Files (*.png, *.gif)"),
+            Some(vec!["*.png".into(), "*.gif".into()])
+        );
         assert_eq!(parse_patterns("Arquivos personalizados"), None);
-        assert_eq!(parse_typed_patterns("*.mp4 *.mov"), Some(vec!["*.mp4".into(), "*.mov".into()]));
+        assert_eq!(
+            parse_typed_patterns("*.mp4 *.mov"),
+            Some(vec!["*.mp4".into(), "*.mov".into()])
+        );
     }
 
     #[test]

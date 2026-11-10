@@ -85,10 +85,11 @@ pub(crate) fn in_sidebar() -> bool {
     IN_SIDEBAR.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-
 /// The same item however its path was spelled.
 fn item_key(path: &str) -> String {
-    path.trim_end_matches(['\\', '/']).replace('/', "\\").to_lowercase()
+    path.trim_end_matches(['\\', '/'])
+        .replace('/', "\\")
+        .to_lowercase()
 }
 
 /// The tag a pane's address names, if it is a tag's.
@@ -198,12 +199,18 @@ impl Tags {
 
     /// Every tag, in the order they were made.
     pub(crate) fn all(cx: &App) -> Vec<Tag> {
-        cx.try_global::<Self>().map(|tags| tags.tags.clone()).unwrap_or_default()
+        cx.try_global::<Self>()
+            .map(|tags| tags.tags.clone())
+            .unwrap_or_default()
     }
 
     /// The tag `id`, if it exists.
     pub(crate) fn get(id: u32, cx: &App) -> Option<Tag> {
-        cx.try_global::<Self>()?.tags.iter().find(|tag| tag.id == id).cloned()
+        cx.try_global::<Self>()?
+            .tags
+            .iter()
+            .find(|tag| tag.id == id)
+            .cloned()
     }
 
     /// The colours of the tags on `path`, for the dots beside its name.
@@ -219,7 +226,12 @@ impl Tags {
             return Vec::new();
         };
         ids.iter()
-            .filter_map(|id| tags.tags.iter().find(|tag| tag.id == *id).map(|tag| tag.color))
+            .filter_map(|id| {
+                tags.tags
+                    .iter()
+                    .find(|tag| tag.id == *id)
+                    .map(|tag| tag.color)
+            })
             .collect()
     }
 
@@ -242,9 +254,11 @@ impl Tags {
             return false;
         };
         !paths.is_empty()
-            && paths
-                .iter()
-                .all(|path| tags.items.get(&item_key(path)).is_some_and(|(_, ids)| ids.contains(&id)))
+            && paths.iter().all(|path| {
+                tags.items
+                    .get(&item_key(path))
+                    .is_some_and(|(_, ids)| ids.contains(&id))
+            })
     }
 
     /// Puts tag `id` on every one of `paths`, or takes it off all of them
@@ -262,7 +276,10 @@ impl Tags {
                         }
                     }
                 } else {
-                    let (_, ids) = tags.items.entry(key).or_insert_with(|| (path.clone(), Vec::new()));
+                    let (_, ids) = tags
+                        .items
+                        .entry(key)
+                        .or_insert_with(|| (path.clone(), Vec::new()));
                     if !ids.contains(&id) {
                         ids.push(id);
                     }
@@ -280,7 +297,10 @@ impl Tags {
                 return;
             }
             for path in paths {
-                let (_, ids) = tags.items.entry(item_key(path)).or_insert_with(|| (path.clone(), Vec::new()));
+                let (_, ids) = tags
+                    .items
+                    .entry(item_key(path))
+                    .or_insert_with(|| (path.clone(), Vec::new()));
                 if !ids.contains(&id) {
                     ids.push(id);
                     added += 1;
@@ -430,11 +450,15 @@ mod tests {
         let two = folder.path().join("Two");
         std::fs::write(&one, "1").expect("write");
         std::fs::create_dir(&two).expect("folder");
-        let (one, two) = (one.to_string_lossy().into_owned(), two.to_string_lossy().into_owned());
+        let (one, two) = (
+            one.to_string_lossy().into_owned(),
+            two.to_string_lossy().into_owned(),
+        );
         cx.update(|cx| {
             Tags::install(None, cx);
             let id = Tags::create("Edição".into(), &[one.clone(), two.clone()], cx);
-            let mut names: Vec<String> = read_items(id).into_iter().map(|entry| entry.name).collect();
+            let mut names: Vec<String> =
+                read_items(id).into_iter().map(|entry| entry.name).collect();
             names.sort();
             assert_eq!(names, ["Two", "one.txt"]);
             // Another spelling of the same path is the same item.
@@ -443,7 +467,11 @@ mod tests {
             Tags::toggle(&[one.clone(), two.clone()], id, cx);
             assert!(read_items(id).is_empty());
             Tags::toggle(&[one.clone()], id, cx);
-            let renamed = folder.path().join("renamed.txt").to_string_lossy().into_owned();
+            let renamed = folder
+                .path()
+                .join("renamed.txt")
+                .to_string_lossy()
+                .into_owned();
             std::fs::rename(&one, &renamed).expect("rename");
             Tags::moved(&one, &renamed, cx);
             let names: Vec<String> = read_items(id).into_iter().map(|entry| entry.name).collect();

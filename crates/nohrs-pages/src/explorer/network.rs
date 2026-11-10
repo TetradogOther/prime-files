@@ -13,8 +13,8 @@
 //! (`smb://nas/edicao`, `//nas/edicao`, `https://cloud/dav`) and turned into
 //! the UNC form Windows reads (`normalize_address`).
 
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use gpui::{App, AppContext as _, BorrowAppContext, Global, Task};
 use nohrs_core::telemetry::LogErr;
@@ -71,14 +71,18 @@ pub(crate) fn normalize_address(text: &str) -> String {
             let rest = text[scheme.len()..].trim_matches('/');
             let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
             let (host, port) = match authority.rsplit_once(':') {
-                Some((host, port)) if port.chars().all(|digit| digit.is_ascii_digit()) => (host, Some(port)),
+                Some((host, port)) if port.chars().all(|digit| digit.is_ascii_digit()) => {
+                    (host, Some(port))
+                }
                 _ => (authority, None),
             };
             let mut server = host.to_string();
             if ssl {
                 server.push_str("@SSL");
             }
-            if let Some(port) = port.filter(|port| !(ssl && *port == "443") && !(!ssl && *port == "80")) {
+            if let Some(port) =
+                port.filter(|port| !(ssl && *port == "443") && !(!ssl && *port == "80"))
+            {
                 server.push('@');
                 server.push_str(port);
             }
@@ -137,7 +141,10 @@ pub(crate) fn server_of(path: &str) -> Option<&str> {
 
 /// Whether `path` is a server alone (`\\nas`), which lists its shares.
 pub(crate) fn is_server(path: &str) -> bool {
-    is_unc(path) && !path[platform::PREFIX.len()..].trim_end_matches(platform::SEPARATOR).contains(platform::SEPARATOR)
+    is_unc(path)
+        && !path[platform::PREFIX.len()..]
+            .trim_end_matches(platform::SEPARATOR)
+            .contains(platform::SEPARATOR)
 }
 
 /// `\\server\share` of a path inside a share.
@@ -145,7 +152,9 @@ pub(crate) fn share_root(path: &str) -> Option<String> {
     if !is_unc(path) {
         return None;
     }
-    let mut parts = path[platform::PREFIX.len()..].split(platform::SEPARATOR).filter(|part| !part.is_empty());
+    let mut parts = path[platform::PREFIX.len()..]
+        .split(platform::SEPARATOR)
+        .filter(|part| !part.is_empty());
     let server = parts.next()?;
     let share = parts.next()?;
     Some(platform::address(server, share))
@@ -161,7 +170,10 @@ pub(crate) fn parent_location(path: &str) -> Option<String> {
         return Some(NETWORK.to_string());
     }
     let root = share_root(path)?;
-    if path.trim_end_matches(platform::SEPARATOR).eq_ignore_ascii_case(&root) {
+    if path
+        .trim_end_matches(platform::SEPARATOR)
+        .eq_ignore_ascii_case(&root)
+    {
         return server_of(path).map(|server| platform::address(server, ""));
     }
     None
@@ -179,7 +191,16 @@ pub(crate) fn read_location(path: &str) -> Option<Result<Vec<FileEntryDto>, Stri
         return Some(platform::shares(server).map(|shares| {
             shares
                 .into_iter()
-                .map(|share| folder_row(share.rsplit(platform::SEPARATOR).next().unwrap_or(&share).to_string(), share.clone()))
+                .map(|share| {
+                    folder_row(
+                        share
+                            .rsplit(platform::SEPARATOR)
+                            .next()
+                            .unwrap_or(&share)
+                            .to_string(),
+                        share.clone(),
+                    )
+                })
                 .collect()
         }));
     }
@@ -230,12 +251,22 @@ fn network_entries() -> Vec<FileEntryDto> {
     }
     for (drive, remote) in platform::mapped_drives() {
         if seen.insert(drive.to_lowercase()) {
-            rows.push(folder_row(format!("{} ({})", display_name(&remote), drive.trim_end_matches(platform::SEPARATOR)), drive));
+            rows.push(folder_row(
+                format!(
+                    "{} ({})",
+                    display_name(&remote),
+                    drive.trim_end_matches(platform::SEPARATOR)
+                ),
+                drive,
+            ));
         }
     }
     for computer in platform::computers() {
         if seen.insert(computer.to_lowercase()) {
-            rows.push(folder_row(computer.trim_start_matches(platform::SEPARATOR).to_string(), computer));
+            rows.push(folder_row(
+                computer.trim_start_matches(platform::SEPARATOR).to_string(),
+                computer,
+            ));
         }
     }
     rows
@@ -247,7 +278,11 @@ pub(crate) fn display_name(path: &str) -> String {
     let Some(server) = server_of(path) else {
         return path.to_string();
     };
-    let last = path.trim_end_matches(platform::SEPARATOR).rsplit(platform::SEPARATOR).next().unwrap_or(server);
+    let last = path
+        .trim_end_matches(platform::SEPARATOR)
+        .rsplit(platform::SEPARATOR)
+        .next()
+        .unwrap_or(server);
     if last.eq_ignore_ascii_case(server) {
         server.to_string()
     } else {
@@ -293,7 +328,9 @@ impl NetworkPlaces {
 
     /// The places added by hand, in the order they were added.
     pub(crate) fn all(cx: &App) -> Vec<String> {
-        cx.try_global::<Self>().map(|places| places.places.clone()).unwrap_or_default()
+        cx.try_global::<Self>()
+            .map(|places| places.places.clone())
+            .unwrap_or_default()
     }
 
     /// Adds `address` (any spelling `normalize_address` reads). Returns the
@@ -306,7 +343,11 @@ impl NetworkPlaces {
         }
         let kept = address.clone();
         Self::change(cx, move |places| {
-            if !places.places.iter().any(|place| place.eq_ignore_ascii_case(&address)) {
+            if !places
+                .places
+                .iter()
+                .any(|place| place.eq_ignore_ascii_case(&address))
+            {
                 places.places.push(address);
             }
         });
@@ -315,7 +356,11 @@ impl NetworkPlaces {
 
     pub(crate) fn remove(address: &str, cx: &mut App) {
         let address = address.to_string();
-        Self::change(cx, move |places| places.places.retain(|place| !place.eq_ignore_ascii_case(&address)));
+        Self::change(cx, move |places| {
+            places
+                .places
+                .retain(|place| !place.eq_ignore_ascii_case(&address))
+        });
     }
 
     fn change(cx: &mut App, edit: impl FnOnce(&mut Self)) {
@@ -325,7 +370,9 @@ impl NetworkPlaces {
         cx.update_global(|places: &mut Self, cx| {
             edit(places);
             places.publish();
-            let (Some(store), Ok(bytes)) = (places.store.clone(), serde_json::to_vec(&places.places)) else {
+            let (Some(store), Ok(bytes)) =
+                (places.store.clone(), serde_json::to_vec(&places.places))
+            else {
                 return;
             };
             places.save = Some(cx.background_spawn(async move {
@@ -359,12 +406,13 @@ mod platform {
     }
 
     use windows::Win32::Foundation::{
-        ERROR_ACCESS_DENIED, ERROR_MORE_DATA, ERROR_NO_MORE_ITEMS, HANDLE, HWND, NO_ERROR, WIN32_ERROR,
+        ERROR_ACCESS_DENIED, ERROR_MORE_DATA, ERROR_NO_MORE_ITEMS, HANDLE, HWND, NO_ERROR,
+        WIN32_ERROR,
     };
     use windows::Win32::NetworkManagement::WNet::{
         CONNECT_INTERACTIVE, CONNECT_PROMPT, CONNECT_TEMPORARY, NETRESOURCEW, RESOURCE_GLOBALNET,
-        RESOURCETYPE_DISK, WNET_OPEN_ENUM_USAGE, WNetAddConnection3W, WNetCloseEnum, WNetEnumResourceW,
-        WNetGetConnectionW, WNetOpenEnumW,
+        RESOURCETYPE_DISK, WNET_OPEN_ENUM_USAGE, WNetAddConnection3W, WNetCloseEnum,
+        WNetEnumResourceW, WNetGetConnectionW, WNetOpenEnumW,
     };
     use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives};
     use windows::core::{HSTRING, PCWSTR, PWSTR};
@@ -424,7 +472,10 @@ mod platform {
             listed => listed,
         };
         match listed {
-            Ok(shares) => Ok(shares.into_iter().filter(|share| !share.ends_with('$')).collect()),
+            Ok(shares) => Ok(shares
+                .into_iter()
+                .filter(|share| !share.ends_with('$'))
+                .collect()),
             Err(code) => Err(std::io::Error::from_raw_os_error(code.0 as i32).to_string()),
         }
     }
@@ -439,7 +490,13 @@ mod platform {
         };
         let mut handle = HANDLE::default();
         let opened = unsafe {
-            WNetOpenEnumW(RESOURCE_GLOBALNET, RESOURCETYPE_DISK, WNET_OPEN_ENUM_USAGE(0), Some(&container), &mut handle)
+            WNetOpenEnumW(
+                RESOURCE_GLOBALNET,
+                RESOURCETYPE_DISK,
+                WNET_OPEN_ENUM_USAGE(0),
+                Some(&container),
+                &mut handle,
+            )
         };
         if opened != NO_ERROR {
             return Err(opened);
@@ -450,7 +507,9 @@ mod platform {
         let result = loop {
             let mut count = u32::MAX;
             let mut size = (buffer.len() * 8) as u32;
-            let read = unsafe { WNetEnumResourceW(handle, &mut count, buffer.as_mut_ptr().cast(), &mut size) };
+            let read = unsafe {
+                WNetEnumResourceW(handle, &mut count, buffer.as_mut_ptr().cast(), &mut size)
+            };
             if read == ERROR_NO_MORE_ITEMS {
                 break Ok(names);
             }
@@ -461,7 +520,9 @@ mod platform {
             if read != NO_ERROR {
                 break Err(read);
             }
-            let records = unsafe { std::slice::from_raw_parts(buffer.as_ptr().cast::<NETRESOURCEW>(), count as usize) };
+            let records = unsafe {
+                std::slice::from_raw_parts(buffer.as_ptr().cast::<NETRESOURCEW>(), count as usize)
+            };
             for record in records {
                 if !record.lpRemoteName.is_null()
                     && let Ok(remote) = unsafe { record.lpRemoteName.to_string() }
@@ -491,9 +552,14 @@ mod platform {
                 let mut buffer = vec![0u16; 1024];
                 let mut length = buffer.len() as u32;
                 let local = HSTRING::from(format!("{letter}:"));
-                let found = unsafe { WNetGetConnectionW(&local, Some(PWSTR(buffer.as_mut_ptr())), &mut length) };
+                let found = unsafe {
+                    WNetGetConnectionW(&local, Some(PWSTR(buffer.as_mut_ptr())), &mut length)
+                };
                 let remote = if found == NO_ERROR {
-                    let end = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+                    let end = buffer
+                        .iter()
+                        .position(|&unit| unit == 0)
+                        .unwrap_or(buffer.len());
                     String::from_utf16_lossy(&buffer[..end])
                 } else {
                     root.clone()
@@ -565,22 +631,28 @@ mod platform {
 
     /// Where the desktop keeps the shares it has mounted.
     fn gvfs_directory() -> Option<std::path::PathBuf> {
-        let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from).or_else(|| {
-            std::env::var_os("UID").map(|uid| std::path::PathBuf::from(format!("/run/user/{}", uid.to_string_lossy()))).or_else(|| {
-                // The id of the user, not of the process: read from the
-                // process' own entry in the process list.
-                std::fs::read_to_string("/proc/self/status")
-                    .ok()
-                    .and_then(|status| {
-                        status.lines().find_map(|line| {
-                            line.strip_prefix("Uid:")
-                                .and_then(|rest| rest.split_whitespace().next())
-                                .map(str::to_string)
-                        })
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("UID")
+                    .map(|uid| {
+                        std::path::PathBuf::from(format!("/run/user/{}", uid.to_string_lossy()))
                     })
-                    .map(|uid| std::path::PathBuf::from(format!("/run/user/{uid}")))
-            })
-        })?;
+                    .or_else(|| {
+                        // The id of the user, not of the process: read from the
+                        // process' own entry in the process list.
+                        std::fs::read_to_string("/proc/self/status")
+                            .ok()
+                            .and_then(|status| {
+                                status.lines().find_map(|line| {
+                                    line.strip_prefix("Uid:")
+                                        .and_then(|rest| rest.split_whitespace().next())
+                                        .map(str::to_string)
+                                })
+                            })
+                            .map(|uid| std::path::PathBuf::from(format!("/run/user/{uid}")))
+                    })
+            })?;
         Some(runtime.join("gvfs"))
     }
 
@@ -614,21 +686,45 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn addresses_from_other_programs_become_unc() {
-        assert_eq!(normalize_address("smb://nas/edicao/2026"), r"\\nas\edicao\2026");
-        assert_eq!(normalize_address("//192.168.1.10/media/"), r"\\192.168.1.10\media");
+        assert_eq!(
+            normalize_address("smb://nas/edicao/2026"),
+            r"\\nas\edicao\2026"
+        );
+        assert_eq!(
+            normalize_address("//192.168.1.10/media/"),
+            r"\\192.168.1.10\media"
+        );
         assert_eq!(normalize_address(" \"\\\\nas\\edicao\" "), r"\\nas\edicao");
-        assert_eq!(normalize_address("https://cloud.example/remote.php/dav"), r"\\cloud.example@SSL\DavWWWRoot\remote.php\dav");
-        assert_eq!(normalize_address("http://nas:5005/"), r"\\nas@5005\DavWWWRoot");
+        assert_eq!(
+            normalize_address("https://cloud.example/remote.php/dav"),
+            r"\\cloud.example@SSL\DavWWWRoot\remote.php\dav"
+        );
+        assert_eq!(
+            normalize_address("http://nas:5005/"),
+            r"\\nas@5005\DavWWWRoot"
+        );
         assert_eq!(normalize_address(r"C:\Users"), r"C:\Users");
     }
 
     #[cfg(not(windows))]
     #[test]
     fn addresses_from_other_programs_become_the_desktop_ones() {
-        assert_eq!(normalize_address("smb://nas/edicao/2026"), "smb://nas/edicao/2026");
-        assert_eq!(normalize_address("//192.168.1.10/media/"), "smb://192.168.1.10/media");
-        assert_eq!(normalize_address(" \"smb://nas/edicao\" "), "smb://nas/edicao");
-        assert_eq!(normalize_address("https://cloud.example/remote.php/dav"), "https://cloud.example/remote.php/dav");
+        assert_eq!(
+            normalize_address("smb://nas/edicao/2026"),
+            "smb://nas/edicao/2026"
+        );
+        assert_eq!(
+            normalize_address("//192.168.1.10/media/"),
+            "smb://192.168.1.10/media"
+        );
+        assert_eq!(
+            normalize_address(" \"smb://nas/edicao\" "),
+            "smb://nas/edicao"
+        );
+        assert_eq!(
+            normalize_address("https://cloud.example/remote.php/dav"),
+            "https://cloud.example/remote.php/dav"
+        );
         assert_eq!(normalize_address("/home/user"), "/home/user");
     }
 
@@ -642,20 +738,32 @@ mod tests {
         assert_eq!(parent_location(r"C:\Users"), None);
         assert!(!is_unc(r"\\?\C:\long"));
         assert!(is_server(r"\\nas\"));
-        assert_eq!(share_root(r"\\nas\edicao\2026\a.mp4").as_deref(), Some(r"\\nas\edicao"));
+        assert_eq!(
+            share_root(r"\\nas\edicao\2026\a.mp4").as_deref(),
+            Some(r"\\nas\edicao")
+        );
     }
 
     #[cfg(not(windows))]
     #[test]
     fn up_from_a_share_goes_to_its_server_then_to_the_network() {
-        assert_eq!(parent_location("smb://nas/edicao").as_deref(), Some("smb://nas"));
-        assert_eq!(parent_location("smb://nas/edicao/").as_deref(), Some("smb://nas"));
+        assert_eq!(
+            parent_location("smb://nas/edicao").as_deref(),
+            Some("smb://nas")
+        );
+        assert_eq!(
+            parent_location("smb://nas/edicao/").as_deref(),
+            Some("smb://nas")
+        );
         assert_eq!(parent_location("smb://nas").as_deref(), Some(NETWORK));
         assert_eq!(parent_location("smb://nas/edicao/2026"), None);
         assert_eq!(parent_location("/home/user"), None);
         assert!(!is_unc("/home/user"));
         assert!(is_server("smb://nas/"));
-        assert_eq!(share_root("smb://nas/edicao/2026/a.mp4").as_deref(), Some("smb://nas/edicao"));
+        assert_eq!(
+            share_root("smb://nas/edicao/2026/a.mp4").as_deref(),
+            Some("smb://nas/edicao")
+        );
     }
 
     #[cfg(windows)]

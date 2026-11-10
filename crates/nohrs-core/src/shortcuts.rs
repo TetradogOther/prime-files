@@ -107,27 +107,153 @@ const TAGS: &str = crate::k!("Tags");
 
 /// Every command, in the order the settings page lists them.
 pub const ACTIONS: &[ActionInfo] = &[
-    info(Action::Copy, "copy", FILES, crate::k!("Copiar"), &["ctrl-c"]),
-    info(Action::CopyPath, "copy_path", FILES, crate::k!("Copiar como caminho"), &["ctrl-shift-c"]),
-    info(Action::Cut, "cut", FILES, crate::k!("Recortar"), &["ctrl-x"]),
-    info(Action::Paste, "paste", FILES, crate::k!("Colar"), &["ctrl-v"]),
-    info(Action::Rename, "rename", FILES, crate::k!("Renomear"), &["f2"]),
-    info(Action::Refresh, "refresh", FILES, crate::k!("Atualizar a pasta"), &["f5"]),
-    info(Action::Trash, "trash", FILES, crate::k!("Mandar para a Lixeira"), &["delete"]),
-    info(Action::Undo, "undo", FILES, crate::k!("Desfazer"), &["ctrl-z"]),
-    info(Action::Redo, "redo", FILES, crate::k!("Refazer"), &["ctrl-y", "ctrl-shift-z"]),
-    info(Action::DeletePermanently, "delete_permanently", FILES, crate::k!("Excluir para sempre"), &["shift-delete"]),
-    info(Action::NewFolder, "new_folder", FILES, crate::k!("Nova pasta"), &["ctrl-shift-n"]),
-    info(Action::GoUp, "go_up", FILES, crate::k!("Subir para a pasta de cima"), &["alt-up"]),
-    info(Action::EditPath, "edit_path", FILES, crate::k!("Editar o caminho"), &["ctrl-l", "alt-d"]),
-    info(Action::SelectAll, "select_all", SEARCH, crate::k!("Selecionar tudo"), &["ctrl-a"]),
-    info(Action::SearchSubfolders, "search_subfolders", SEARCH, crate::k!("Buscar nas subpastas"), &["ctrl-f"]),
-    info(Action::SearchEverything, "search_everything", SEARCH, crate::k!("Buscar em todo o computador"), &["ctrl-e"]),
-    info(Action::SearchIndex, "search_index", SEARCH, crate::k!("Buscar no índice"), &["ctrl-shift-f"]),
-    info(Action::FilterBar, "filter_bar", SEARCH, crate::k!("Barra de filtros"), &["ctrl-shift-l"]),
-    info(Action::NewTab, "new_tab", PANES, crate::k!("Nova aba"), &["ctrl-t"]),
-    info(Action::CloseTab, "close_tab", PANES, crate::k!("Fechar aba"), &["ctrl-w"]),
-    info(Action::SplitVertical, "split_vertical", PANES, crate::k!("Dividir lado a lado"), &["ctrl-\\"]),
+    info(
+        Action::Copy,
+        "copy",
+        FILES,
+        crate::k!("Copiar"),
+        &["ctrl-c"],
+    ),
+    info(
+        Action::CopyPath,
+        "copy_path",
+        FILES,
+        crate::k!("Copiar como caminho"),
+        &["ctrl-shift-c"],
+    ),
+    info(
+        Action::Cut,
+        "cut",
+        FILES,
+        crate::k!("Recortar"),
+        &["ctrl-x"],
+    ),
+    info(
+        Action::Paste,
+        "paste",
+        FILES,
+        crate::k!("Colar"),
+        &["ctrl-v"],
+    ),
+    info(
+        Action::Rename,
+        "rename",
+        FILES,
+        crate::k!("Renomear"),
+        &["f2"],
+    ),
+    info(
+        Action::Refresh,
+        "refresh",
+        FILES,
+        crate::k!("Atualizar a pasta"),
+        &["f5"],
+    ),
+    info(
+        Action::Trash,
+        "trash",
+        FILES,
+        crate::k!("Mandar para a Lixeira"),
+        &["delete"],
+    ),
+    info(
+        Action::Undo,
+        "undo",
+        FILES,
+        crate::k!("Desfazer"),
+        &["ctrl-z"],
+    ),
+    info(
+        Action::Redo,
+        "redo",
+        FILES,
+        crate::k!("Refazer"),
+        &["ctrl-y", "ctrl-shift-z"],
+    ),
+    info(
+        Action::DeletePermanently,
+        "delete_permanently",
+        FILES,
+        crate::k!("Excluir para sempre"),
+        &["shift-delete"],
+    ),
+    info(
+        Action::NewFolder,
+        "new_folder",
+        FILES,
+        crate::k!("Nova pasta"),
+        &["ctrl-shift-n"],
+    ),
+    info(
+        Action::GoUp,
+        "go_up",
+        FILES,
+        crate::k!("Subir para a pasta de cima"),
+        &["alt-up"],
+    ),
+    info(
+        Action::EditPath,
+        "edit_path",
+        FILES,
+        crate::k!("Editar o caminho"),
+        &["ctrl-l", "alt-d"],
+    ),
+    info(
+        Action::SelectAll,
+        "select_all",
+        SEARCH,
+        crate::k!("Selecionar tudo"),
+        &["ctrl-a"],
+    ),
+    info(
+        Action::SearchSubfolders,
+        "search_subfolders",
+        SEARCH,
+        crate::k!("Buscar nas subpastas"),
+        &["ctrl-f"],
+    ),
+    info(
+        Action::SearchEverything,
+        "search_everything",
+        SEARCH,
+        crate::k!("Buscar em todo o computador"),
+        &["ctrl-e"],
+    ),
+    info(
+        Action::SearchIndex,
+        "search_index",
+        SEARCH,
+        crate::k!("Buscar no índice"),
+        &["ctrl-shift-f"],
+    ),
+    info(
+        Action::FilterBar,
+        "filter_bar",
+        SEARCH,
+        crate::k!("Barra de filtros"),
+        &["ctrl-shift-l"],
+    ),
+    info(
+        Action::NewTab,
+        "new_tab",
+        PANES,
+        crate::k!("Nova aba"),
+        &["ctrl-t"],
+    ),
+    info(
+        Action::CloseTab,
+        "close_tab",
+        PANES,
+        crate::k!("Fechar aba"),
+        &["ctrl-w"],
+    ),
+    info(
+        Action::SplitVertical,
+        "split_vertical",
+        PANES,
+        crate::k!("Dividir lado a lado"),
+        &["ctrl-\\"],
+    ),
     // Shift+\ comes as `|` on some layouts, with or without the shift.
     info(
         Action::SplitHorizontal,
@@ -136,11 +262,41 @@ pub const ACTIONS: &[ActionInfo] = &[
         crate::k!("Dividir em cima e embaixo"),
         &["ctrl-shift-\\", "ctrl-|", "ctrl-shift-|"],
     ),
-    info(Action::FocusPane1, "focus_pane_1", PANES, crate::k!("Ir para o painel 1"), &["ctrl-1"]),
-    info(Action::FocusPane2, "focus_pane_2", PANES, crate::k!("Ir para o painel 2"), &["ctrl-2"]),
-    info(Action::NextPane, "next_pane", PANES, crate::k!("Próximo painel"), &["ctrl-]"]),
-    info(Action::PreviousPane, "previous_pane", PANES, crate::k!("Painel anterior"), &["ctrl-["]),
-    info(Action::ToggleSidebar, "toggle_sidebar", PANES, crate::k!("Mostrar ou esconder a barra lateral"), &["ctrl-b"]),
+    info(
+        Action::FocusPane1,
+        "focus_pane_1",
+        PANES,
+        crate::k!("Ir para o painel 1"),
+        &["ctrl-1"],
+    ),
+    info(
+        Action::FocusPane2,
+        "focus_pane_2",
+        PANES,
+        crate::k!("Ir para o painel 2"),
+        &["ctrl-2"],
+    ),
+    info(
+        Action::NextPane,
+        "next_pane",
+        PANES,
+        crate::k!("Próximo painel"),
+        &["ctrl-]"],
+    ),
+    info(
+        Action::PreviousPane,
+        "previous_pane",
+        PANES,
+        crate::k!("Painel anterior"),
+        &["ctrl-["],
+    ),
+    info(
+        Action::ToggleSidebar,
+        "toggle_sidebar",
+        PANES,
+        crate::k!("Mostrar ou esconder a barra lateral"),
+        &["ctrl-b"],
+    ),
     // Ctrl+' is VS Code's spelling on ABNT2, where ` is a dead key.
     info(
         Action::ToggleTerminal,
@@ -150,22 +306,106 @@ pub const ACTIONS: &[ActionInfo] = &[
         &["ctrl-'", "ctrl-`"],
     ),
     // `+` because on most layouts it is Shift+= and some report it so.
-    info(Action::ZoomIn, "zoom_in", VIEW, crate::k!("Aumentar o zoom"), &["ctrl-=", "ctrl-+", "ctrl-shift-="]),
-    info(Action::ZoomOut, "zoom_out", VIEW, crate::k!("Diminuir o zoom"), &["ctrl--"]),
-    info(Action::ZoomReset, "zoom_reset", VIEW, crate::k!("Zoom padrão"), &["ctrl-0"]),
-    info(Action::OpenCommandPrompt, "open_command_prompt", OPEN, crate::k!("Abrir a pasta no Prompt de Comando"), &[]),
-    info(Action::OpenPowerShell, "open_powershell", OPEN, crate::k!("Abrir a pasta no PowerShell"), &[]),
-    info(Action::OpenFileExplorer, "open_file_explorer", OPEN, crate::k!("Abrir a pasta no Explorador do Windows"), &[]),
+    info(
+        Action::ZoomIn,
+        "zoom_in",
+        VIEW,
+        crate::k!("Aumentar o zoom"),
+        &["ctrl-=", "ctrl-+", "ctrl-shift-="],
+    ),
+    info(
+        Action::ZoomOut,
+        "zoom_out",
+        VIEW,
+        crate::k!("Diminuir o zoom"),
+        &["ctrl--"],
+    ),
+    info(
+        Action::ZoomReset,
+        "zoom_reset",
+        VIEW,
+        crate::k!("Zoom padrão"),
+        &["ctrl-0"],
+    ),
+    info(
+        Action::OpenCommandPrompt,
+        "open_command_prompt",
+        OPEN,
+        crate::k!("Abrir a pasta no Prompt de Comando"),
+        &[],
+    ),
+    info(
+        Action::OpenPowerShell,
+        "open_powershell",
+        OPEN,
+        crate::k!("Abrir a pasta no PowerShell"),
+        &[],
+    ),
+    info(
+        Action::OpenFileExplorer,
+        "open_file_explorer",
+        OPEN,
+        crate::k!("Abrir a pasta no Explorador do Windows"),
+        &[],
+    ),
     // Finder puts its tags on Ctrl+1…7 and clears them with Ctrl+0; here
     // Ctrl+1, Ctrl+2 and Ctrl+0 are the panes and the zoom, so Alt.
-    info(Action::Tag1, "tag_1", TAGS, crate::k!("Pôr ou tirar a 1ª tag"), &["alt-1"]),
-    info(Action::Tag2, "tag_2", TAGS, crate::k!("Pôr ou tirar a 2ª tag"), &["alt-2"]),
-    info(Action::Tag3, "tag_3", TAGS, crate::k!("Pôr ou tirar a 3ª tag"), &["alt-3"]),
-    info(Action::Tag4, "tag_4", TAGS, crate::k!("Pôr ou tirar a 4ª tag"), &["alt-4"]),
-    info(Action::Tag5, "tag_5", TAGS, crate::k!("Pôr ou tirar a 5ª tag"), &["alt-5"]),
-    info(Action::Tag6, "tag_6", TAGS, crate::k!("Pôr ou tirar a 6ª tag"), &["alt-6"]),
-    info(Action::Tag7, "tag_7", TAGS, crate::k!("Pôr ou tirar a 7ª tag"), &["alt-7"]),
-    info(Action::TagsClear, "tags_clear", TAGS, crate::k!("Tirar todas as tags"), &["alt-0"]),
+    info(
+        Action::Tag1,
+        "tag_1",
+        TAGS,
+        crate::k!("Pôr ou tirar a 1ª tag"),
+        &["alt-1"],
+    ),
+    info(
+        Action::Tag2,
+        "tag_2",
+        TAGS,
+        crate::k!("Pôr ou tirar a 2ª tag"),
+        &["alt-2"],
+    ),
+    info(
+        Action::Tag3,
+        "tag_3",
+        TAGS,
+        crate::k!("Pôr ou tirar a 3ª tag"),
+        &["alt-3"],
+    ),
+    info(
+        Action::Tag4,
+        "tag_4",
+        TAGS,
+        crate::k!("Pôr ou tirar a 4ª tag"),
+        &["alt-4"],
+    ),
+    info(
+        Action::Tag5,
+        "tag_5",
+        TAGS,
+        crate::k!("Pôr ou tirar a 5ª tag"),
+        &["alt-5"],
+    ),
+    info(
+        Action::Tag6,
+        "tag_6",
+        TAGS,
+        crate::k!("Pôr ou tirar a 6ª tag"),
+        &["alt-6"],
+    ),
+    info(
+        Action::Tag7,
+        "tag_7",
+        TAGS,
+        crate::k!("Pôr ou tirar a 7ª tag"),
+        &["alt-7"],
+    ),
+    info(
+        Action::TagsClear,
+        "tags_clear",
+        TAGS,
+        crate::k!("Tirar todas as tags"),
+        &["alt-0"],
+    ),
 ];
 
 const fn info(
@@ -175,13 +415,22 @@ const fn info(
     label: &'static str,
     defaults: &'static [&'static str],
 ) -> ActionInfo {
-    ActionInfo { action, id, group, label, defaults }
+    ActionInfo {
+        action,
+        id,
+        group,
+        label,
+        defaults,
+    }
 }
 
 /// The table row of `action`.
 pub fn info_of(action: Action) -> &'static ActionInfo {
     // Every variant has a row; the test below holds the table to that.
-    ACTIONS.iter().find(|info| info.action == action).unwrap_or(&ACTIONS[0])
+    ACTIONS
+        .iter()
+        .find(|info| info.action == action)
+        .unwrap_or(&ACTIONS[0])
 }
 
 /// A key with its modifiers.
@@ -198,7 +447,9 @@ pub struct Chord {
 }
 
 /// Keys that only modify others; a chord is never just one of these.
-pub const MODIFIER_KEYS: &[&str] = &["control", "ctrl", "shift", "alt", "platform", "cmd", "win", "function", "fn", "capslock"];
+pub const MODIFIER_KEYS: &[&str] = &[
+    "control", "ctrl", "shift", "alt", "platform", "cmd", "win", "function", "fn", "capslock",
+];
 
 impl Chord {
     /// Reads `ctrl-shift-n`. `None` for an empty or modifier-only text.
@@ -207,11 +458,18 @@ impl Chord {
         if text.is_empty() {
             return None;
         }
-        let mut chord = Chord { ctrl: false, alt: false, shift: false, key: String::new() };
+        let mut chord = Chord {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: String::new(),
+        };
         let mut rest = text.as_str();
         // `-` separates parts, but `ctrl--` is Ctrl and the minus key.
         loop {
-            let Some((head, tail)) = rest.split_once('-') else { break };
+            let Some((head, tail)) = rest.split_once('-') else {
+                break;
+            };
             if tail.is_empty() {
                 break;
             }
@@ -316,7 +574,10 @@ pub fn build(bindings: &BTreeMap<String, String>) -> HashMap<Action, Vec<Chord>>
 }
 
 fn defaults(info: &ActionInfo) -> Vec<Chord> {
-    info.defaults.iter().filter_map(|text| Chord::parse(text)).collect()
+    info.defaults
+        .iter()
+        .filter_map(|text| Chord::parse(text))
+        .collect()
 }
 
 /// Makes `[keybindings]` the keymap. Returns whether anything changed, so
@@ -369,7 +630,12 @@ pub fn resolve(ctrl: bool, alt: bool, shift: bool, key: &str) -> Option<Action> 
     let find = |shift: bool| {
         ACTIONS.iter().map(|info| info.action).find(|action| {
             current.get(action).is_some_and(|chords| {
-                chords.iter().any(|chord| chord.ctrl == ctrl && chord.alt == alt && chord.shift == shift && chord.key == key)
+                chords.iter().any(|chord| {
+                    chord.ctrl == ctrl
+                        && chord.alt == alt
+                        && chord.shift == shift
+                        && chord.key == key
+                })
             })
         })
     };
@@ -380,7 +646,11 @@ pub fn resolve(ctrl: bool, alt: bool, shift: bool, key: &str) -> Option<Action> 
 }
 
 /// The other commands already answering to `chord` in `bindings`'s keymap.
-pub fn conflicts(bindings: &BTreeMap<String, String>, chord: &Chord, except: Action) -> Vec<Action> {
+pub fn conflicts(
+    bindings: &BTreeMap<String, String>,
+    chord: &Chord,
+    except: Action,
+) -> Vec<Action> {
     let map = build(bindings);
     ACTIONS
         .iter()
@@ -402,14 +672,22 @@ mod tests {
             assert_eq!(info_of(info.action).id, info.id);
             for text in info.defaults {
                 let chord = Chord::parse(text).unwrap_or_else(|| panic!("bad default {text}"));
-                assert_eq!(&chord.to_config(), text, "defaults are written in canonical order");
+                assert_eq!(
+                    &chord.to_config(),
+                    text,
+                    "defaults are written in canonical order"
+                );
             }
         }
         // No two commands share a default key.
         let map = build(&BTreeMap::new());
         for info in ACTIONS {
             for chord in &map[&info.action] {
-                assert!(conflicts(&BTreeMap::new(), chord, info.action).is_empty(), "{} shares {chord:?}", info.id);
+                assert!(
+                    conflicts(&BTreeMap::new(), chord, info.action).is_empty(),
+                    "{} shares {chord:?}",
+                    info.id
+                );
             }
         }
     }
@@ -435,9 +713,16 @@ mod tests {
         bindings.insert("cut".to_string(), String::new());
         bindings.insert("paste".to_string(), "ctrl-shift".to_string());
         let map = build(&bindings);
-        assert_eq!(map[&Action::Copy], vec![Chord::parse("ctrl-shift-c").unwrap()]);
+        assert_eq!(
+            map[&Action::Copy],
+            vec![Chord::parse("ctrl-shift-c").unwrap()]
+        );
         assert!(map[&Action::Cut].is_empty());
-        assert_eq!(map[&Action::Paste], vec![Chord::parse("ctrl-v").unwrap()], "unreadable keeps the default");
+        assert_eq!(
+            map[&Action::Paste],
+            vec![Chord::parse("ctrl-v").unwrap()],
+            "unreadable keeps the default"
+        );
         let conflicting = conflicts(&bindings, &Chord::parse("ctrl-v").unwrap(), Action::Copy);
         assert_eq!(conflicting, vec![Action::Paste]);
     }
@@ -446,7 +731,10 @@ mod tests {
     fn a_key_press_finds_its_command() {
         apply(&BTreeMap::new());
         assert_eq!(resolve(true, false, false, "C"), Some(Action::Copy));
-        assert_eq!(resolve(false, false, true, "delete"), Some(Action::DeletePermanently));
+        assert_eq!(
+            resolve(false, false, true, "delete"),
+            Some(Action::DeletePermanently)
+        );
         assert_eq!(resolve(false, false, false, "delete"), Some(Action::Trash));
         // `+` with the Shift the layout needs for it.
         assert_eq!(resolve(true, false, true, "+"), Some(Action::ZoomIn));

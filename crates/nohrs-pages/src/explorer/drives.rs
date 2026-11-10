@@ -95,14 +95,20 @@ pub(crate) fn mounts() -> Vec<(std::path::PathBuf, String)> {
 /// The filesystems mounted on this machine, as the units of the sidebar.
 #[cfg(target_os = "windows")]
 pub(crate) fn mount_points() -> Vec<std::path::PathBuf> {
-    platform::read_all().into_keys().map(std::path::PathBuf::from).collect()
+    platform::read_all()
+        .into_keys()
+        .map(std::path::PathBuf::from)
+        .collect()
 }
 
 /// The filesystems mounted on this machine, with the name of the disk each
 /// is on.
 #[cfg(target_os = "windows")]
 pub(crate) fn mounts() -> Vec<(std::path::PathBuf, String)> {
-    platform::read_all().into_keys().map(|root| (std::path::PathBuf::from(root), String::new())).collect()
+    platform::read_all()
+        .into_keys()
+        .map(|root| (std::path::PathBuf::from(root), String::new()))
+        .collect()
 }
 
 /// The space on the drive whose root is `path`, if known; asks Windows again
@@ -116,7 +122,9 @@ pub(crate) fn space(path: &str, cx: &mut App) -> Option<Space> {
 
 fn refresh_if_stale(cx: &mut App) {
     let spaces = cx.default_global::<Spaces>();
-    let fresh = spaces.read_at.is_some_and(|at| at.elapsed() < REFRESH_AFTER);
+    let fresh = spaces
+        .read_at
+        .is_some_and(|at| at.elapsed() < REFRESH_AFTER);
     if fresh || spaces.reading {
         return;
     }
@@ -157,8 +165,15 @@ mod platform {
                 // The free space this user may fill (quotas count), as
                 // Explorer reports it. An empty card reader fails here and is
                 // left out.
-                unsafe { GetDiskFreeSpaceExW(&HSTRING::from(root.as_str()), Some(&mut free), Some(&mut total), None) }
-                    .ok()?;
+                unsafe {
+                    GetDiskFreeSpaceExW(
+                        &HSTRING::from(root.as_str()),
+                        Some(&mut free),
+                        Some(&mut total),
+                        None,
+                    )
+                }
+                .ok()?;
                 (total > 0).then_some((root, Space { free, total }))
             })
             .collect()
@@ -290,7 +305,9 @@ mod platform {
             if !path.starts_with(&mount) {
                 continue;
             }
-            let deeper = root.as_ref().is_none_or(|current| mount.components().count() > current.components().count());
+            let deeper = root
+                .as_ref()
+                .is_none_or(|current| mount.components().count() > current.components().count());
             if deeper {
                 root = Some(mount);
             }
@@ -317,7 +334,11 @@ mod platform {
         // The size a block takes on this filesystem, and the number of
         // blocks: the total is what the disk has, the free is what this user
         // may still use.
-        let block = if stat.f_frsize > 0 { stat.f_frsize } else { stat.f_bsize };
+        let block = if stat.f_frsize > 0 {
+            stat.f_frsize
+        } else {
+            stat.f_bsize
+        };
         let total = stat.f_blocks.saturating_mul(block);
         let free = stat.f_bavail.saturating_mul(block);
         (total > 0).then_some(Space { free, total })
@@ -328,6 +349,7 @@ mod platform {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
     #[test]
     fn only_a_bare_drive_is_a_root() {
         assert_eq!(drive_root("c:").as_deref(), Some("C:\\"));
@@ -336,12 +358,31 @@ mod tests {
         assert_eq!(drive_root("\\\\server\\share"), None);
     }
 
+    // On Linux the unit that holds a folder is the filesystem it is on,
+    // and every folder of the machine is on the one of its root.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_unit_of_a_folder_is_the_filesystem_it_is_on() {
+        assert_eq!(drive_root("/").as_deref(), Some("/"));
+        assert_eq!(drive_root("/home").as_deref(), Some("/"));
+        assert_eq!(drive_root("/home/user/Documents").as_deref(), Some("/"));
+    }
+
     #[test]
     fn the_bar_turns_red_past_ninety_percent() {
-        let space = Space { free: 50, total: 1000 };
+        let space = Space {
+            free: 50,
+            total: 1000,
+        };
         assert!(space.nearly_full());
         assert!((space.used_fraction() - 0.95).abs() < 1e-6);
-        assert!(!Space { free: 500, total: 1000 }.nearly_full());
+        assert!(
+            !Space {
+                free: 500,
+                total: 1000
+            }
+            .nearly_full()
+        );
         assert_eq!(Space { free: 0, total: 0 }.used_fraction(), 0.0);
     }
 }

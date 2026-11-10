@@ -32,15 +32,15 @@ use gpui::prelude::*;
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{Icon, IconName};
-use nohrs_core::{t, tf};
 use nohrs_core::telemetry::LogErr;
+use nohrs_core::{t, tf};
 use nohrs_ui::theme::theme;
 
 use super::media::{self as player, MediaPreview};
 use super::page::ExplorerPage;
-use crate::shell_menu::{self, Choice, Entry, Request};
 use super::thumbnails::Thumbnails;
 use super::waveforms::Waveforms;
+use crate::shell_menu::{self, Choice, Entry, Request};
 
 // How many hits of the index the box shows.
 const HITS: usize = 60;
@@ -143,7 +143,12 @@ impl HitPreview {
 
 // The player of the box's preview, wherever its host keeps the box.
 fn preview_player<H: PaletteHost>(host: &mut H) -> Option<&mut MediaPreview> {
-    host.palette_slot().as_mut()?.preview.as_mut()?.media.as_mut()
+    host.palette_slot()
+        .as_mut()?
+        .preview
+        .as_mut()?
+        .media
+        .as_mut()
 }
 
 /// What can be done to a hit, from its preview or its right-click menu. The
@@ -158,8 +163,13 @@ pub(crate) enum HitAction {
 }
 
 impl HitAction {
-    const ALL: [HitAction; 5] =
-        [HitAction::Preview, HitAction::Open, HitAction::ShowInFolder, HitAction::Copy, HitAction::CopyPath];
+    const ALL: [HitAction; 5] = [
+        HitAction::Preview,
+        HitAction::Open,
+        HitAction::ShowInFolder,
+        HitAction::Copy,
+        HitAction::CopyPath,
+    ];
 
     fn from_id(id: u32) -> Option<Self> {
         Self::ALL.into_iter().find(|action| *action as u32 == id)
@@ -174,12 +184,22 @@ fn plays_in_box(path: &str, dir: bool) -> bool {
 #[derive(Clone)]
 pub(crate) enum Row {
     /// An open tab: its entity id, title and folder.
-    Tab { id: u64, title: String, folder: String },
+    Tab {
+        id: u64,
+        title: String,
+        folder: String,
+    },
     /// A path typed in full that exists.
     Typed { path: String, dir: bool },
     /// A hit of the index, with its size and modification time (seconds),
     /// which a waveform is kept by.
-    Hit { name: String, path: String, dir: bool, size: u64, modified: u64 },
+    Hit {
+        name: String,
+        path: String,
+        dir: bool,
+        size: u64,
+        modified: u64,
+    },
 }
 
 impl Row {
@@ -210,7 +230,11 @@ pub(crate) enum Chosen {
     Tab(u64),
     /// A file or folder; `in_folder` when asked to show it in its folder
     /// (Ctrl+Enter) rather than open it.
-    Path { path: String, dir: bool, in_folder: bool },
+    Path {
+        path: String,
+        dir: bool,
+        in_folder: bool,
+    },
     /// A file to open in its program (or send to the dialog waiting for
     /// one): the preview's Open.
     Open(String),
@@ -271,10 +295,13 @@ fn load_zoom() -> f32 {
 fn save_zoom(zoom: f32, cx: &mut App) {
     cx.background_spawn(async move {
         let path = zoom_file();
-        let written = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| {
-            #[allow(clippy::disallowed_methods)]
-            std::fs::write(&path, format!("{zoom:.3}"))
-        });
+        let written = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| {
+                #[allow(clippy::disallowed_methods)]
+                std::fs::write(&path, format!("{zoom:.3}"))
+            });
         if let Err(error) = written {
             tracing::warn!("could not keep the search box's size: {error}");
         }
@@ -316,18 +343,24 @@ pub(crate) trait PaletteBox: PaletteHost {
         // are typed.
         super::everything::ensure(cx);
         let input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t!("Buscar arquivos e pastas no computador ou digitar um caminho"))
+            InputState::new(window, cx).placeholder(t!(
+                "Buscar arquivos e pastas no computador ou digitar um caminho"
+            ))
         });
         input.update(cx, |state, cx| state.focus(window, cx));
-        let subscription = cx.subscribe_in(&input, window, |page, _input, event: &InputEvent, window, cx| match event {
-            InputEvent::Change => page.palette_changed(cx),
-            // Ctrl+Enter reaches the field as Enter with the key held.
-            InputEvent::PressEnter { .. } => {
-                let in_folder = window.modifiers().control;
-                page.activate_palette_row(None, in_folder, window, cx);
-            }
-            _ => {}
-        });
+        let subscription = cx.subscribe_in(
+            &input,
+            window,
+            |page, _input, event: &InputEvent, window, cx| match event {
+                InputEvent::Change => page.palette_changed(cx),
+                // Ctrl+Enter reaches the field as Enter with the key held.
+                InputEvent::PressEnter { .. } => {
+                    let in_folder = window.modifiers().control;
+                    page.activate_palette_row(None, in_folder, window, cx);
+                }
+                _ => {}
+            },
+        );
         *self.palette_slot() = Some(Palette {
             input,
             _subscription: subscription,
@@ -338,7 +371,9 @@ pub(crate) trait PaletteBox: PaletteHost {
             _search: None,
             press: None,
             scroll: ScrollHandle::new(),
-            generation: cx.try_global::<super::everything::Everything>().map_or(0, |state| state.generation),
+            generation: cx
+                .try_global::<super::everything::Everything>()
+                .map_or(0, |state| state.generation),
             chose: false,
             columns: 0,
             line_of: Vec::new(),
@@ -383,13 +418,21 @@ pub(crate) trait PaletteBox: PaletteHost {
         let mut rows: Vec<Row> = titles
             .into_iter()
             .filter(|(_, title, folder)| {
-                needle.is_empty() || title.to_lowercase().contains(&needle) || folder.to_lowercase().contains(&needle)
+                needle.is_empty()
+                    || title.to_lowercase().contains(&needle)
+                    || folder.to_lowercase().contains(&needle)
             })
             .map(|(id, title, folder)| Row::Tab { id, title, folder })
             .collect();
         let typed = query.trim().trim_matches('"');
         if Path::new(typed).is_absolute() && Path::new(typed).exists() {
-            rows.insert(0, Row::Typed { path: typed.to_string(), dir: Path::new(typed).is_dir() });
+            rows.insert(
+                0,
+                Row::Typed {
+                    path: typed.to_string(),
+                    dir: Path::new(typed).is_dir(),
+                },
+            );
         }
         // The hits of the last search stay until the new ones come, so the
         // list does not blink at each letter.
@@ -425,7 +468,13 @@ pub(crate) trait PaletteBox: PaletteHost {
                         .ok()
                         .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
                         .map_or(0, |since| since.as_secs());
-                    Some(Row::Hit { name, path, dir, size: metadata.len(), modified })
+                    Some(Row::Hit {
+                        name,
+                        path,
+                        dir,
+                        size: metadata.len(),
+                        modified,
+                    })
                 })
                 .take(HITS)
                 .collect::<Vec<_>>()
@@ -452,7 +501,9 @@ pub(crate) trait PaletteBox: PaletteHost {
     /// The index was loaded, rebuilt or grew: the words typed are searched
     /// again, at most once per index generation.
     fn palette_index_changed(&mut self, cx: &mut Context<Self>) {
-        let generation = cx.try_global::<super::everything::Everything>().map_or(0, |state| state.generation);
+        let generation = cx
+            .try_global::<super::everything::Everything>()
+            .map_or(0, |state| state.generation);
         let Some(palette) = self.palette_slot().as_mut() else {
             return;
         };
@@ -482,17 +533,28 @@ pub(crate) trait PaletteBox: PaletteHost {
             0
         } else if !palette.chose {
             current
-        } else if vertical && palette.columns > 1 && let Some(first_hit) = first_hit {
+        } else if vertical
+            && palette.columns > 1
+            && let Some(first_hit) = first_hit
+        {
             let first_hit = first_hit as isize;
             let columns = palette.columns as isize;
             if current >= first_hit {
                 let moved = current + step * columns;
                 if moved < first_hit {
                     // Up from the first line of tiles: the row above them.
-                    if first_hit > 0 { first_hit - 1 } else { current }
+                    if first_hit > 0 {
+                        first_hit - 1
+                    } else {
+                        current
+                    }
                 } else if moved > last {
                     // Down from a short last line keeps to the last tile.
-                    if (current - first_hit) / columns < (last - first_hit) / columns { last } else { current }
+                    if (current - first_hit) / columns < (last - first_hit) / columns {
+                        last
+                    } else {
+                        current
+                    }
                 } else {
                     moved
                 }
@@ -512,7 +574,13 @@ pub(crate) trait PaletteBox: PaletteHost {
 
     // Enter (`None`: the selected row) or a click on `row`; `in_folder` for
     // Ctrl+Enter.
-    fn activate_palette_row(&mut self, row: Option<usize>, in_folder: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn activate_palette_row(
+        &mut self,
+        row: Option<usize>,
+        in_folder: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(palette) = self.palette_ref() else {
             return;
         };
@@ -525,7 +593,11 @@ pub(crate) trait PaletteBox: PaletteHost {
         self.close_palette(window, cx);
         let chosen = match chosen {
             Some(Row::Tab { id, .. }) => Chosen::Tab(id),
-            Some(Row::Typed { path, dir }) | Some(Row::Hit { path, dir, .. }) => Chosen::Path { path, dir, in_folder },
+            Some(Row::Typed { path, dir }) | Some(Row::Hit { path, dir, .. }) => Chosen::Path {
+                path,
+                dir,
+                in_folder,
+            },
             None if empty => Chosen::Empty,
             None => return,
         };
@@ -534,7 +606,13 @@ pub(crate) trait PaletteBox: PaletteHost {
 
     // A click on a hit: a video or a sound plays in the box first, anything
     // else opens as Enter would.
-    fn click_palette_row(&mut self, index: usize, in_folder: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn click_palette_row(
+        &mut self,
+        index: usize,
+        in_folder: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let plays = self
             .palette_ref()
             .and_then(|palette| palette.rows.get(index))
@@ -563,8 +641,13 @@ pub(crate) trait PaletteBox: PaletteHost {
         let media = MediaPreview::start(path.clone(), true, preview_player::<Self>, cx);
         let file = Path::new(&path);
         let preview = HitPreview {
-            name: file.file_name().map_or_else(|| path.clone(), |name| name.to_string_lossy().into_owned()),
-            folder: file.parent().map(|parent| parent.to_string_lossy().into_owned()).unwrap_or_default(),
+            name: file
+                .file_name()
+                .map_or_else(|| path.clone(), |name| name.to_string_lossy().into_owned()),
+            folder: file
+                .parent()
+                .map(|parent| parent.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             path,
             media,
             track: Rc::default(),
@@ -616,7 +699,10 @@ pub(crate) trait PaletteBox: PaletteHost {
 
     // A click on the timeline (or the wave) at `x`.
     fn seek_hit_preview(&mut self, x: Pixels, cx: &mut Context<Self>) {
-        let Some(track) = self.palette_ref().and_then(|palette| palette.preview.as_ref()).map(|preview| preview.track.get())
+        let Some(track) = self
+            .palette_ref()
+            .and_then(|palette| palette.preview.as_ref())
+            .map(|preview| preview.track.get())
         else {
             return;
         };
@@ -634,7 +720,9 @@ pub(crate) trait PaletteBox: PaletteHost {
     // Says `text` in the footer for a moment.
     fn palette_notice(&mut self, text: String, cx: &mut Context<Self>) {
         let timer = cx.spawn(async move |host: WeakEntity<Self>, cx| {
-            cx.background_executor().timer(std::time::Duration::from_millis(NOTICE_MS)).await;
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(NOTICE_MS))
+                .await;
             host.update(cx, |host, cx| {
                 if let Some(palette) = host.palette_slot().as_mut() {
                     palette.notice = None;
@@ -669,17 +757,37 @@ pub(crate) trait PaletteBox: PaletteHost {
             }
             HitAction::Open => {
                 self.close_palette(window, cx);
-                let chosen = if dir { Chosen::Path { path, dir, in_folder: false } } else { Chosen::Open(path) };
+                let chosen = if dir {
+                    Chosen::Path {
+                        path,
+                        dir,
+                        in_folder: false,
+                    }
+                } else {
+                    Chosen::Open(path)
+                };
                 self.palette_chose(chosen, window, cx);
             }
             HitAction::ShowInFolder => {
                 self.close_palette(window, cx);
                 // A folder too is shown in the folder it is in, selected.
-                self.palette_chose(Chosen::Path { path, dir: false, in_folder: true }, window, cx);
+                self.palette_chose(
+                    Chosen::Path {
+                        path,
+                        dir: false,
+                        in_folder: true,
+                    },
+                    window,
+                    cx,
+                );
             }
             HitAction::Copy => {
                 super::file_ops::copy_files(&[PathBuf::from(path)], cx);
-                let said = nohrs_core::i18n::plural(1, nohrs_core::k!("{n} item copiado"), nohrs_core::k!("{n} itens copiados"));
+                let said = nohrs_core::i18n::plural(
+                    1,
+                    nohrs_core::k!("{n} item copiado"),
+                    nohrs_core::k!("{n} itens copiados"),
+                );
                 self.palette_notice(said, cx);
             }
             HitAction::CopyPath => {
@@ -695,7 +803,11 @@ pub(crate) trait PaletteBox: PaletteHost {
         let Some(palette) = self.palette_slot().as_mut() else {
             return;
         };
-        let Some((path, dir)) = palette.rows.get(index).and_then(Row::path).map(|(path, dir)| (path.to_string(), dir))
+        let Some((path, dir)) = palette
+            .rows
+            .get(index)
+            .and_then(Row::path)
+            .map(|(path, dir)| (path.to_string(), dir))
         else {
             return;
         };
@@ -710,54 +822,78 @@ pub(crate) trait PaletteBox: PaletteHost {
     // the Windows menu of the file (Open with, Properties, what programs
     // add), less the entries the box's own replace. `index` is `None` from
     // the preview, which needs no Preview entry.
-    fn show_hit_menu(&mut self, path: String, dir: bool, index: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+    fn show_hit_menu(
+        &mut self,
+        path: String,
+        dir: bool,
+        index: Option<usize>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(hwnd) = crate::ipc::window_hwnd(window) else {
             return;
         };
         let mut own = Vec::new();
         if index.is_some() && plays_in_box(&path, dir) {
-            own.push(Entry::command(HitAction::Preview as u32, t!("Visualização rápida")));
+            own.push(Entry::command(
+                HitAction::Preview as u32,
+                t!("Visualização rápida"),
+            ));
         }
         own.push(Entry::command(HitAction::Open as u32, t!("Abrir")));
-        own.push(Entry::command(HitAction::ShowInFolder as u32, t!("Mostrar na pasta")));
+        own.push(Entry::command(
+            HitAction::ShowInFolder as u32,
+            t!("Mostrar na pasta"),
+        ));
         own.push(Entry::Separator);
         own.push(Entry::command(HitAction::Copy as u32, t!("Copiar")));
-        own.push(Entry::command(HitAction::CopyPath as u32, t!("Copiar como caminho")));
+        own.push(Entry::command(
+            HitAction::CopyPath as u32,
+            t!("Copiar como caminho"),
+        ));
         let dark = theme::is_dark();
         // The menu runs its own message loop until it closes: from a task,
         // so the app is not borrowed meanwhile (as the listing's menu).
-        cx.spawn_in(window, async move |host: WeakEntity<Self>, cx: &mut AsyncWindowContext| {
-            let target = shell_menu::Target::Items(vec![path.clone()]);
-            let choice = shell_menu::show(&Request {
-                hwnd: hwnd as isize,
-                target: &target,
-                own: &own,
-                before: &[],
-                own_first: true,
-                extended: false,
-                dark,
-                intercept: &[],
-                hide: &["open", "copy", "copyaspath"],
-            });
-            host.update_in(cx, |host, window, cx| match choice {
-                Choice::Own(id) => {
-                    if let Some(action) = HitAction::from_id(id) {
-                        host.hit_action(action, path, dir, index, window, cx);
+        cx.spawn_in(
+            window,
+            async move |host: WeakEntity<Self>, cx: &mut AsyncWindowContext| {
+                let target = shell_menu::Target::Items(vec![path.clone()]);
+                let choice = shell_menu::show(&Request {
+                    hwnd: hwnd as isize,
+                    target: &target,
+                    own: &own,
+                    before: &[],
+                    own_first: true,
+                    extended: false,
+                    dark,
+                    intercept: &[],
+                    hide: &["open", "copy", "copyaspath"],
+                });
+                host.update_in(cx, |host, window, cx| match choice {
+                    Choice::Own(id) => {
+                        if let Some(action) = HitAction::from_id(id) {
+                            host.hit_action(action, path, dir, index, window, cx);
+                        }
                     }
-                }
-                // A Windows command ran (delete, rename, …): the hits are
-                // looked at again, so a file gone leaves the list.
-                Choice::Ran if index.is_some() => host.palette_changed(cx),
-                _ => {}
-            })
-            .log_err();
-        })
+                    // A Windows command ran (delete, rename, …): the hits are
+                    // looked at again, so a file gone leaves the list.
+                    Choice::Ran if index.is_some() => host.palette_changed(cx),
+                    _ => {}
+                })
+                .log_err();
+            },
+        )
         .detach();
     }
 
     // A press that moved far enough with the button down: the hit leaves the
     // box as a file dragged from the listing would.
-    fn palette_drag_moved(&mut self, event: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+    fn palette_drag_moved(
+        &mut self,
+        event: &MouseMoveEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(palette) = self.palette_slot().as_mut() else {
             return;
         };
@@ -812,30 +948,61 @@ pub(crate) trait PaletteBox: PaletteHost {
             && icon >= PICTURES_FROM
             && self.palette_waveforms()
             && super::waveforms::is_audio(path)
-            && let Some(bars) =
-                self.media().waveforms.get_for(path, *size, *modified, |page: &mut Self| &mut page.media().waveforms, cx)
+            && let Some(bars) = self.media().waveforms.get_for(
+                path,
+                *size,
+                *modified,
+                |page: &mut Self| &mut page.media().waveforms,
+                cx,
+            )
         {
             return Media::Waveform(bars);
         }
         let image = if dir || icon < PICTURES_FROM {
-            self.media().thumbnails.icon_for(path, dir, pixels, |page: &mut Self| &mut page.media().thumbnails, cx)
+            self.media().thumbnails.icon_for(
+                path,
+                dir,
+                pixels,
+                |page: &mut Self| &mut page.media().thumbnails,
+                cx,
+            )
         } else {
             let bucket = super::zoom::thumbnail_bucket(icon, scale);
-            self.media().thumbnails.get_for(path, bucket, |page: &mut Self| &mut page.media().thumbnails, cx)
+            self.media().thumbnails.get_for(
+                path,
+                bucket,
+                |page: &mut Self| &mut page.media().thumbnails,
+                cx,
+            )
         };
         image.map_or(Media::None, Media::Image)
     }
 
     // The preview in place of the list, `width` by `height`.
-    fn render_hit_preview(&mut self, width: f32, height: f32, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn render_hit_preview(
+        &mut self,
+        width: f32,
+        height: f32,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         let preview = self.palette_ref()?.preview.as_ref()?;
-        let (path, name, folder, track) =
-            (preview.path.clone(), preview.name.clone(), preview.folder.clone(), preview.track.clone());
+        let (path, name, folder, track) = (
+            preview.path.clone(),
+            preview.name.clone(),
+            preview.folder.clone(),
+            preview.track.clone(),
+        );
         let screen_height = (height - PREVIEW_TITLE - PREVIEW_CONTROLS - PREVIEW_ACTIONS).max(60.0);
         let inner = width - 24.0;
         let media = preview.media.as_ref();
-        let (position, duration, playing) = media.map_or((0.0, 0.0, false), |media| (media.position, media.duration, media.playing));
-        let fraction = if duration > 0.0 { (position / duration).clamp(0.0, 1.0) as f32 } else { 0.0 };
+        let (position, duration, playing) = media.map_or((0.0, 0.0, false), |media| {
+            (media.position, media.duration, media.playing)
+        });
+        let fraction = if duration > 0.0 {
+            (position / duration).clamp(0.0, 1.0) as f32
+        } else {
+            0.0
+        };
 
         // The picture: the video's frame, the sound's wave, or what went wrong.
         let screen = div()
@@ -851,31 +1018,61 @@ pub(crate) trait PaletteBox: PaletteHost {
             .bg(rgb(theme::preview_backdrop()))
             .cursor_pointer();
         let screen = match media {
-            None => screen.child(div().text_sm().text_color(rgb(theme::muted())).child(t!("(Sem visualização para este arquivo)"))),
+            None => screen.child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(theme::muted()))
+                    .child(t!("(Sem visualização para este arquivo)")),
+            ),
             Some(media) => match (&media.error, &media.frame) {
-                (Some(error), _) => {
-                    screen.child(div().px(px(16.0)).text_sm().text_color(rgb(theme::muted())).child(error.clone()))
-                }
+                (Some(error), _) => screen.child(
+                    div()
+                        .px(px(16.0))
+                        .text_sm()
+                        .text_color(rgb(theme::muted()))
+                        .child(error.clone()),
+                ),
                 (None, Some(frame)) => screen
-                    .on_click(cx.listener(|page, _: &ClickEvent, _, cx| page.toggle_hit_preview(cx)))
-                    .child(img(ImageSource::Render(frame.clone())).w(px(inner)).h(px(screen_height)).object_fit(ObjectFit::Contain)),
+                    .on_click(
+                        cx.listener(|page, _: &ClickEvent, _, cx| page.toggle_hit_preview(cx)),
+                    )
+                    .child(
+                        img(ImageSource::Render(frame.clone()))
+                            .w(px(inner))
+                            .h(px(screen_height))
+                            .object_fit(ObjectFit::Contain),
+                    ),
                 (None, None) if player::is_audio(&path) => {
-                    let bars = player::waveform_bars(&media.peaks, media.peak_max, media.duration, 400);
+                    let bars =
+                        player::waveform_bars(&media.peaks, media.peak_max, media.duration, 400);
                     let track = track.clone();
                     // A click on the wave seeks there, as on the timeline.
                     screen
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(|page, event: &MouseDownEvent, _, cx| page.seek_hit_preview(event.position.x, cx)),
+                            cx.listener(|page, event: &MouseDownEvent, _, cx| {
+                                page.seek_hit_preview(event.position.x, cx)
+                            }),
                         )
-                        .child(wave(bars, fraction, inner - 32.0, screen_height * 0.7, track))
+                        .child(wave(
+                            bars,
+                            fraction,
+                            inner - 32.0,
+                            screen_height * 0.7,
+                            track,
+                        ))
                 }
                 (None, None) => screen.child(match media.preparing {
                     Some(Some(done)) => div()
                         .text_sm()
                         .text_color(rgb(theme::muted()))
                         .child(format!("{}%", (done * 100.0).round() as u32)),
-                    _ => div().child(Icon::new(Icon::empty()).path("icons/loader.svg").size_5().text_color(rgb(theme::muted()))),
+                    _ => div().child(
+                        Icon::new(Icon::empty())
+                            .path("icons/loader.svg")
+                            .size_5()
+                            .text_color(rgb(theme::muted())),
+                    ),
                 }),
             },
         };
@@ -900,7 +1097,9 @@ pub(crate) trait PaletteBox: PaletteHost {
                     .cursor_pointer()
                     .bg(rgb(theme::bg()))
                     .hover(|style| style.bg(rgb(theme::bg_hover())))
-                    .on_click(cx.listener(|page, _: &ClickEvent, _, cx| page.toggle_hit_preview(cx)))
+                    .on_click(
+                        cx.listener(|page, _: &ClickEvent, _, cx| page.toggle_hit_preview(cx)),
+                    )
                     .child(
                         div()
                             .font_family(theme::icon_font())
@@ -914,7 +1113,11 @@ pub(crate) trait PaletteBox: PaletteHost {
                     .flex_shrink_0()
                     .text_xs()
                     .text_color(rgb(theme::muted()))
-                    .child(format!("{} / {}", player::clock(position), player::clock(duration))),
+                    .child(format!(
+                        "{} / {}",
+                        player::clock(position),
+                        player::clock(duration)
+                    )),
             )
             // The wave is the timeline of a sound; a video gets a bar.
             .when(!is_audio, |this| {
@@ -930,7 +1133,9 @@ pub(crate) trait PaletteBox: PaletteHost {
                         .cursor_pointer()
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(|page, event: &MouseDownEvent, _, cx| page.seek_hit_preview(event.position.x, cx)),
+                            cx.listener(|page, event: &MouseDownEvent, _, cx| {
+                                page.seek_hit_preview(event.position.x, cx)
+                            }),
                         )
                         .child(timeline(fraction, bar_width, track)),
                 )
@@ -949,40 +1154,74 @@ pub(crate) trait PaletteBox: PaletteHost {
             .items_center()
             .gap(px(8.0))
             .child(
-                action_button("palette-preview-open", "icons/external-link.svg", t!("Abrir"), true).on_click(cx.listener(
-                    move |page, _: &ClickEvent, window, cx| {
-                        page.hit_action(HitAction::Open, open_path.clone(), false, None, window, cx)
-                    },
-                )),
+                action_button(
+                    "palette-preview-open",
+                    "icons/external-link.svg",
+                    t!("Abrir"),
+                    true,
+                )
+                .on_click(cx.listener(move |page, _: &ClickEvent, window, cx| {
+                    page.hit_action(HitAction::Open, open_path.clone(), false, None, window, cx)
+                })),
             )
             .child(
-                action_button("palette-preview-folder", "icons/folder-open.svg", t!("Mostrar na pasta"), false).on_click(
-                    cx.listener(move |page, _: &ClickEvent, window, cx| {
-                        page.hit_action(HitAction::ShowInFolder, folder_path.clone(), false, None, window, cx)
-                    }),
-                ),
+                action_button(
+                    "palette-preview-folder",
+                    "icons/folder-open.svg",
+                    t!("Mostrar na pasta"),
+                    false,
+                )
+                .on_click(cx.listener(move |page, _: &ClickEvent, window, cx| {
+                    page.hit_action(
+                        HitAction::ShowInFolder,
+                        folder_path.clone(),
+                        false,
+                        None,
+                        window,
+                        cx,
+                    )
+                })),
             )
             .child(
-                action_button("palette-preview-copy", "icons/copy.svg", t!("Copiar"), false).on_click(cx.listener(
-                    move |page, _: &ClickEvent, window, cx| {
-                        page.hit_action(HitAction::Copy, copy_path.clone(), false, None, window, cx)
-                    },
-                )),
+                action_button(
+                    "palette-preview-copy",
+                    "icons/copy.svg",
+                    t!("Copiar"),
+                    false,
+                )
+                .on_click(cx.listener(move |page, _: &ClickEvent, window, cx| {
+                    page.hit_action(HitAction::Copy, copy_path.clone(), false, None, window, cx)
+                })),
             )
             .child(
-                action_button("palette-preview-copy-path", "icons/link.svg", t!("Copiar como caminho"), false).on_click(
-                    cx.listener(move |page, _: &ClickEvent, window, cx| {
-                        page.hit_action(HitAction::CopyPath, copy_as_path.clone(), false, None, window, cx)
-                    }),
-                ),
+                action_button(
+                    "palette-preview-copy-path",
+                    "icons/link.svg",
+                    t!("Copiar como caminho"),
+                    false,
+                )
+                .on_click(cx.listener(move |page, _: &ClickEvent, window, cx| {
+                    page.hit_action(
+                        HitAction::CopyPath,
+                        copy_as_path.clone(),
+                        false,
+                        None,
+                        window,
+                        cx,
+                    )
+                })),
             )
             .child(div().flex_1())
             .child(
-                action_button("palette-preview-more", "icons/ellipsis.svg", t!("Mostrar mais opções"), false).on_click(
-                    cx.listener(move |page, _: &ClickEvent, window, cx| {
-                        page.show_hit_menu(more_path.clone(), false, None, window, cx)
-                    }),
-                ),
+                action_button(
+                    "palette-preview-more",
+                    "icons/ellipsis.svg",
+                    t!("Mostrar mais opções"),
+                    false,
+                )
+                .on_click(cx.listener(move |page, _: &ClickEvent, window, cx| {
+                    page.show_hit_menu(more_path.clone(), false, None, window, cx)
+                })),
             );
 
         // Back, the name and the folder.
@@ -1030,7 +1269,10 @@ pub(crate) trait PaletteBox: PaletteHost {
                     .text_color(rgb(theme::muted()))
                     .overflow_hidden()
                     .whitespace_nowrap()
-                    .child(super::view::listing::truncate_middle(&folder, ((width * 0.4 / 6.5) as usize).max(12))),
+                    .child(super::view::listing::truncate_middle(
+                        &folder,
+                        ((width * 0.4 / 6.5) as usize).max(12),
+                    )),
             );
 
         Some(
@@ -1058,7 +1300,11 @@ pub(crate) trait PaletteBox: PaletteHost {
     }
 
     /// The box over the window, when it is open.
-    fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn render_palette(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         self.palette_ref()?;
         let fills = self.palette_fills_window();
         let zoom = self.palette_zoom();
@@ -1081,19 +1327,37 @@ pub(crate) trait PaletteBox: PaletteHost {
         // room its shadow needs, and grows to the list up to `FILL_MAX`.
         let (width, left, top, list_max) = if fills {
             let width = (vw - 2.0 * FILL_MARGIN).max(280.0);
-            (width, FILL_MARGIN, FILL_MARGIN, (FILL_MAX - 150.0).max(120.0))
+            (
+                width,
+                FILL_MARGIN,
+                FILL_MARGIN,
+                (FILL_MAX - 150.0).max(120.0),
+            )
         } else {
             let width = (vw - 48.0).clamp(280.0, if plain { PLAIN_WIDTH } else { 960.0 });
             let top = (vh * 0.10).clamp(16.0, 96.0);
             // Room for the list under the field and above the footer.
-            ((width), (vw - width) / 2.0, top, (vh - top - 150.0).max(120.0))
+            (
+                (width),
+                (vw - width) / 2.0,
+                top,
+                (vh - top - 150.0).max(120.0),
+            )
         };
         // The scrolled area's inner width: the card's, less its padding and
         // the scrollbar's lane.
         let inner = width - 2.0 * 6.0 - 10.0;
-        let columns = if grid { ((inner / (icon + 2.0 * TILE_PADDING)).floor() as usize).max(1) } else { 0 };
+        let columns = if grid {
+            ((inner / (icon + 2.0 * TILE_PADDING)).floor() as usize).max(1)
+        } else {
+            0
+        };
         // The tiles share the line's width, so the grid has no gap at its end.
-        let tile_width = if grid { (inner / columns as f32).floor() } else { 0.0 };
+        let tile_width = if grid {
+            (inner / columns as f32).floor()
+        } else {
+            0.0
+        };
         let row_height = (icon + ROW_PADDING).max(ROW_MIN);
 
         let (rows, selected, lit_any, query_empty, previewing) = {
@@ -1107,7 +1371,10 @@ pub(crate) trait PaletteBox: PaletteHost {
             )
         };
         let enter_hint = self.palette_enter_hint();
-        let tab_count = rows.iter().filter(|row| matches!(row, Row::Tab { .. })).count();
+        let tab_count = rows
+            .iter()
+            .filter(|row| matches!(row, Row::Tab { .. }))
+            .count();
         let hit_count = rows.iter().filter(|row| row.is_hit()).count();
 
         // The scrolled list, as lines: headings, rows, and lines of tiles.
@@ -1126,7 +1393,17 @@ pub(crate) trait PaletteBox: PaletteHost {
             let lit = lit_any && index == selected;
             line_of[index] = lines.len();
             let media = self.palette_media(&rows[index], 16.0, scale, cx);
-            lines.push(render_row(&rows[index], index, lit, media, PLAIN_ROW, 16.0, inner, enter_hint, cx));
+            lines.push(render_row(
+                &rows[index],
+                index,
+                lit,
+                media,
+                PLAIN_ROW,
+                16.0,
+                inner,
+                enter_hint,
+                cx,
+            ));
             index += 1;
         }
         if hit_count > 0 {
@@ -1140,19 +1417,45 @@ pub(crate) trait PaletteBox: PaletteHost {
                 for &at in chunk {
                     line_of[at] = line;
                     let media = self.palette_media(&rows[at], icon, scale, cx);
-                    tiles.push(render_tile(&rows[at], at, lit_any && at == selected, media, icon, tile_width, cx));
+                    tiles.push(render_tile(
+                        &rows[at],
+                        at,
+                        lit_any && at == selected,
+                        media,
+                        icon,
+                        tile_width,
+                        cx,
+                    ));
                 }
-                lines.push(div().flex().items_start().children(tiles).into_any_element());
+                lines.push(
+                    div()
+                        .flex()
+                        .items_start()
+                        .children(tiles)
+                        .into_any_element(),
+                );
             }
         } else {
             for at in hits {
                 line_of[at] = lines.len();
                 let media = self.palette_media(&rows[at], icon, scale, cx);
-                lines.push(render_row(&rows[at], at, lit_any && at == selected, media, row_height, icon, inner, enter_hint, cx));
+                lines.push(render_row(
+                    &rows[at],
+                    at,
+                    lit_any && at == selected,
+                    media,
+                    row_height,
+                    icon,
+                    inner,
+                    enter_hint,
+                    cx,
+                ));
             }
         }
         let empty = rows.is_empty() && !previewing;
-        let preview_height = PREVIEW_HEIGHT.min(list_max).max(PREVIEW_TITLE + PREVIEW_CONTROLS + PREVIEW_ACTIONS + 80.0);
+        let preview_height = PREVIEW_HEIGHT
+            .min(list_max)
+            .max(PREVIEW_TITLE + PREVIEW_CONTROLS + PREVIEW_ACTIONS + 80.0);
         // The list's height, as the lines above lay it out: what a window
         // that is only the box is sized to.
         let list_height: f32 = {
@@ -1168,20 +1471,32 @@ pub(crate) trait PaletteBox: PaletteHost {
             if hit_count > 0 {
                 height += HEADING;
                 height += if grid {
-                    hit_count.div_ceil(columns.max(1)) as f32 * (icon + 2.0 * TILE_PADDING + TILE_NAME)
+                    hit_count.div_ceil(columns.max(1)) as f32
+                        * (icon + 2.0 * TILE_PADDING + TILE_NAME)
                 } else {
                     hit_count as f32 * row_height
                 };
             }
-            if previewing { preview_height } else { (height + 12.0).min(list_max) }
+            if previewing {
+                preview_height
+            } else {
+                (height + 12.0).min(list_max)
+            }
         };
-        let preview_element = if previewing { self.render_hit_preview(width - 2.0, preview_height, cx) } else { None };
+        let preview_element = if previewing {
+            self.render_hit_preview(width - 2.0, preview_height, cx)
+        } else {
+            None
+        };
 
         let palette = self.palette_slot().as_mut()?;
         let relaid = palette.line_of.is_empty() && !line_of.is_empty();
         palette.line_of = line_of;
         palette.columns = columns;
-        if relaid && palette.chose && let Some(&line) = palette.line_of.get(palette.selected) {
+        if relaid
+            && palette.chose
+            && let Some(&line) = palette.line_of.get(palette.selected)
+        {
             palette.scroll.scroll_to_item(line);
         }
         let searching = !query_empty && hit_count == 0 && !previewing;
@@ -1199,188 +1514,222 @@ pub(crate) trait PaletteBox: PaletteHost {
             .and_then(|state| state.building.as_ref())
             .map(|found| found.load(Ordering::Relaxed));
 
-        let card = div()
-            .id("palette")
-            .absolute()
-            .left(px(left))
-            .top(px(top))
-            .w(px(width))
-            // A window that is only the box: the card reaches its bottom
-            // edge, so a window a few pixels taller than the estimate below
-            // shows card, not a strip of the window under the footer.
-            .when(fills, |card| card.bottom(px(0.0)))
-            .flex()
-            .flex_col()
-            .rounded(px(if fills { 0.0 } else { 14.0 }))
-            .border_1()
-            .border_color(rgb(theme::border()))
-            .bg(rgb(theme::bg_secondary()))
-            .when(!fills, |card| card.shadow_2xl())
-            .overflow_hidden()
-            .occlude()
-            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-            .capture_key_down(cx.listener(|page, event: &KeyDownEvent, window, cx| {
-                let keys = &event.keystroke;
-                let ctrl = keys.modifiers.control || keys.modifiers.platform;
-                let choosing = page.palette_ref().is_some_and(|palette| palette.chose && palette.columns > 1);
-                match keys.key.as_str() {
-                    "=" | "+" if ctrl => page.zoom_palette(Some(ZOOM_STEP), cx),
-                    "-" if ctrl => page.zoom_palette(Some(-ZOOM_STEP), cx),
-                    "0" if ctrl => page.zoom_palette(None, cx),
-                    "down" => page.move_palette_selection(1, true, cx),
-                    "up" => page.move_palette_selection(-1, true, cx),
-                    "right" if choosing => page.move_palette_selection(1, false, cx),
-                    "left" if choosing => page.move_palette_selection(-1, false, cx),
-                    "pagedown" => page.move_palette_selection(6, true, cx),
-                    "pageup" => page.move_palette_selection(-6, true, cx),
-                    "escape" => page.close_palette(window, cx),
-                    "enter" if ctrl => page.activate_palette_row(None, true, window, cx),
-                    _ => return,
-                }
-                cx.stop_propagation();
-            }))
-            // With a preview open its keys come first: Esc goes back to the
-            // list, Enter opens the file, Space plays or pauses, the arrows
-            // move through it.
-            .capture_key_down(cx.listener(|page, event: &KeyDownEvent, window, cx| {
-                let Some(path) = page.palette_ref().and_then(|palette| palette.preview.as_ref()).map(|preview| preview.path.clone())
-                else {
-                    return;
-                };
-                let keys = &event.keystroke;
-                if keys.modifiers.control || keys.modifiers.alt || keys.modifiers.platform {
-                    return;
-                }
-                match keys.key.as_str() {
-                    "escape" => {
-                        page.close_hit_preview(cx);
+        let card =
+            div()
+                .id("palette")
+                .absolute()
+                .left(px(left))
+                .top(px(top))
+                .w(px(width))
+                // A window that is only the box: the card reaches its bottom
+                // edge, so a window a few pixels taller than the estimate below
+                // shows card, not a strip of the window under the footer.
+                .when(fills, |card| card.bottom(px(0.0)))
+                .flex()
+                .flex_col()
+                .rounded(px(if fills { 0.0 } else { 14.0 }))
+                .border_1()
+                .border_color(rgb(theme::border()))
+                .bg(rgb(theme::bg_secondary()))
+                .when(!fills, |card| card.shadow_2xl())
+                .overflow_hidden()
+                .occlude()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .capture_key_down(cx.listener(|page, event: &KeyDownEvent, window, cx| {
+                    let keys = &event.keystroke;
+                    let ctrl = keys.modifiers.control || keys.modifiers.platform;
+                    let choosing = page
+                        .palette_ref()
+                        .is_some_and(|palette| palette.chose && palette.columns > 1);
+                    match keys.key.as_str() {
+                        "=" | "+" if ctrl => page.zoom_palette(Some(ZOOM_STEP), cx),
+                        "-" if ctrl => page.zoom_palette(Some(-ZOOM_STEP), cx),
+                        "0" if ctrl => page.zoom_palette(None, cx),
+                        "down" => page.move_palette_selection(1, true, cx),
+                        "up" => page.move_palette_selection(-1, true, cx),
+                        "right" if choosing => page.move_palette_selection(1, false, cx),
+                        "left" if choosing => page.move_palette_selection(-1, false, cx),
+                        "pagedown" => page.move_palette_selection(6, true, cx),
+                        "pageup" => page.move_palette_selection(-6, true, cx),
+                        "escape" => page.close_palette(window, cx),
+                        "enter" if ctrl => page.activate_palette_row(None, true, window, cx),
+                        _ => return,
                     }
-                    "enter" => page.hit_action(HitAction::Open, path, false, None, window, cx),
-                    "space" | " " => page.toggle_hit_preview(cx),
-                    "left" => page.nudge_hit_preview(-5.0, cx),
-                    "right" => page.nudge_hit_preview(5.0, cx),
-                    "up" | "down" | "pageup" | "pagedown" => {}
-                    _ => return,
-                }
-                cx.stop_propagation();
-            }))
-            // Ctrl+wheel changes the size, as in the listing; the wheel alone
-            // scrolls.
-            .on_scroll_wheel(cx.listener(|page, event: &ScrollWheelEvent, window, cx| {
-                if !(event.modifiers.control || event.modifiers.platform) {
-                    return;
-                }
-                let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
-                if delta.abs() < 0.5 {
-                    return;
-                }
-                page.zoom_palette(Some(if delta > 0.0 { ZOOM_STEP / 2.0 } else { -ZOOM_STEP / 2.0 }), cx);
-                cx.stop_propagation();
-            }))
-            .on_mouse_move(cx.listener(|page, event: &MouseMoveEvent, window, cx| {
-                page.palette_drag_moved(event, window, cx);
-            }))
-            .on_mouse_up(
-                MouseButton::Left,
-                cx.listener(|page, _: &MouseUpEvent, _, _| {
-                    if let Some(palette) = page.palette_slot().as_mut() {
-                        palette.press = None;
+                    cx.stop_propagation();
+                }))
+                // With a preview open its keys come first: Esc goes back to the
+                // list, Enter opens the file, Space plays or pauses, the arrows
+                // move through it.
+                .capture_key_down(cx.listener(|page, event: &KeyDownEvent, window, cx| {
+                    let Some(path) = page
+                        .palette_ref()
+                        .and_then(|palette| palette.preview.as_ref())
+                        .map(|preview| preview.path.clone())
+                    else {
+                        return;
+                    };
+                    let keys = &event.keystroke;
+                    if keys.modifiers.control || keys.modifiers.alt || keys.modifiers.platform {
+                        return;
                     }
-                }),
-            )
-            .child(
-                div()
-                    .h(px(56.0))
-                    .px(px(16.0))
-                    .flex()
-                    .items_center()
-                    .gap(px(12.0))
-                    .child(Icon::new(IconName::Search).size_5().text_color(rgb(if query_empty {
-                        theme::muted()
-                    } else {
-                        theme::accent()
-                    })))
-                    .child(div().flex_1().min_w(px(0.0)).text_base().child(Input::new(&palette.input).appearance(false)))
-                    .when(!plain, |this| this.child(zoom_control(zoom, cx))),
-            )
-            .when_some(preview_element, |card, preview| card.child(div().h(px(1.0)).bg(rgb(theme::border()))).child(preview))
-            .when(!empty && !previewing, |card| {
-                card.child(div().h(px(1.0)).bg(rgb(theme::border()))).child(
-                    div()
-                        .id("palette-rows")
-                        .max_h(px(list_max))
-                        .px(px(6.0))
-                        .py(px(6.0))
-                        .overflow_y_scroll()
-                        .track_scroll(&palette.scroll)
-                        .children(lines),
+                    match keys.key.as_str() {
+                        "escape" => {
+                            page.close_hit_preview(cx);
+                        }
+                        "enter" => page.hit_action(HitAction::Open, path, false, None, window, cx),
+                        "space" | " " => page.toggle_hit_preview(cx),
+                        "left" => page.nudge_hit_preview(-5.0, cx),
+                        "right" => page.nudge_hit_preview(5.0, cx),
+                        "up" | "down" | "pageup" | "pagedown" => {}
+                        _ => return,
+                    }
+                    cx.stop_propagation();
+                }))
+                // Ctrl+wheel changes the size, as in the listing; the wheel alone
+                // scrolls.
+                .on_scroll_wheel(cx.listener(|page, event: &ScrollWheelEvent, window, cx| {
+                    if !(event.modifiers.control || event.modifiers.platform) {
+                        return;
+                    }
+                    let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
+                    if delta.abs() < 0.5 {
+                        return;
+                    }
+                    page.zoom_palette(
+                        Some(if delta > 0.0 {
+                            ZOOM_STEP / 2.0
+                        } else {
+                            -ZOOM_STEP / 2.0
+                        }),
+                        cx,
+                    );
+                    cx.stop_propagation();
+                }))
+                .on_mouse_move(cx.listener(|page, event: &MouseMoveEvent, window, cx| {
+                    page.palette_drag_moved(event, window, cx);
+                }))
+                .on_mouse_up(
+                    MouseButton::Left,
+                    cx.listener(|page, _: &MouseUpEvent, _, _| {
+                        if let Some(palette) = page.palette_slot().as_mut() {
+                            palette.press = None;
+                        }
+                    }),
                 )
-            })
-            .when(searching, |card| {
-                card.child(
+                .child(
                     div()
-                        .px(px(18.0))
-                        .py(px(10.0))
+                        .h(px(56.0))
+                        .px(px(16.0))
                         .flex()
                         .items_center()
-                        .gap(px(8.0))
+                        .gap(px(12.0))
+                        .child(Icon::new(IconName::Search).size_5().text_color(rgb(
+                            if query_empty {
+                                theme::muted()
+                            } else {
+                                theme::accent()
+                            },
+                        )))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.0))
+                                .text_base()
+                                .child(Input::new(&palette.input).appearance(false)),
+                        )
+                        .when(!plain, |this| this.child(zoom_control(zoom, cx))),
+                )
+                .when_some(preview_element, |card, preview| {
+                    card.child(div().h(px(1.0)).bg(rgb(theme::border())))
+                        .child(preview)
+                })
+                .when(!empty && !previewing, |card| {
+                    card.child(div().h(px(1.0)).bg(rgb(theme::border()))).child(
+                        div()
+                            .id("palette-rows")
+                            .max_h(px(list_max))
+                            .px(px(6.0))
+                            .py(px(6.0))
+                            .overflow_y_scroll()
+                            .track_scroll(&palette.scroll)
+                            .children(lines),
+                    )
+                })
+                .when(searching, |card| {
+                    card.child(
+                        div()
+                            .px(px(18.0))
+                            .py(px(10.0))
+                            .flex()
+                            .items_center()
+                            .gap(px(8.0))
+                            .text_xs()
+                            .text_color(rgb(theme::muted()))
+                            .child(Icon::new(Icon::empty()).path("icons/loader.svg").size_3())
+                            .child(match indexing {
+                                Some(found) => tf!("Indexando o computador… {n} itens", n = found),
+                                None => t!("Buscando no computador…").to_string(),
+                            }),
+                    )
+                })
+                .child(
+                    div()
+                        .px(px(14.0))
+                        .py(px(8.0))
+                        .flex()
+                        .items_center()
+                        .gap(px(14.0))
+                        // Kept on the window's bottom edge, whatever is left over.
+                        .when(fills, |footer| footer.mt_auto())
+                        .border_t_1()
+                        .border_color(rgb(theme::border()))
+                        .bg(rgb(theme::bg()))
                         .text_xs()
                         .text_color(rgb(theme::muted()))
-                        .child(Icon::new(Icon::empty()).path("icons/loader.svg").size_3())
-                        .child(match indexing {
-                            Some(found) => tf!("Indexando o computador… {n} itens", n = found),
-                            None => t!("Buscando no computador…").to_string(),
+                        .when(previewing, |this| {
+                            this.child(key_hint("Enter", t!("Abrir")))
+                                .child(key_hint("Esc", t!("Voltar")))
+                        })
+                        .when(!previewing, |this| {
+                            this.child(key_hint("↑↓", t!("Escolher")))
+                                .child(key_hint("Enter", enter_hint))
+                                .when_some(ctrl_enter_hint, |this, hint| {
+                                    this.child(key_hint("Ctrl+Enter", hint))
+                                })
+                                .child(key_hint("Ctrl+roda", t!("Tamanho")))
+                                .child(key_hint("Esc", t!("Fechar")))
+                        })
+                        .child(div().flex_1())
+                        .child(match notice {
+                            Some(notice) => div().text_color(rgb(theme::accent())).child(notice),
+                            None if previewing => div(),
+                            None => div()
+                                .text_color(rgb(theme::muted()))
+                                .child(t!("Arraste para levar o arquivo")),
                         }),
-                )
-            })
-            .child(
-                div()
-                    .px(px(14.0))
-                    .py(px(8.0))
-                    .flex()
-                    .items_center()
-                    .gap(px(14.0))
-                    // Kept on the window's bottom edge, whatever is left over.
-                    .when(fills, |footer| footer.mt_auto())
-                    .border_t_1()
-                    .border_color(rgb(theme::border()))
-                    .bg(rgb(theme::bg()))
-                    .text_xs()
-                    .text_color(rgb(theme::muted()))
-                    .when(previewing, |this| {
-                        this.child(key_hint("Enter", t!("Abrir")))
-                            .child(key_hint("Esc", t!("Voltar")))
-                    })
-                    .when(!previewing, |this| {
-                        this.child(key_hint("↑↓", t!("Escolher")))
-                            .child(key_hint("Enter", enter_hint))
-                            .when_some(ctrl_enter_hint, |this, hint| this.child(key_hint("Ctrl+Enter", hint)))
-                            .child(key_hint("Ctrl+roda", t!("Tamanho")))
-                            .child(key_hint("Esc", t!("Fechar")))
-                    })
-                    .child(div().flex_1())
-                    .child(match notice {
-                        Some(notice) => div().text_color(rgb(theme::accent())).child(notice),
-                        None if previewing => div(),
-                        None => div().text_color(rgb(theme::muted())).child(t!("Arraste para levar o arquivo")),
-                    }),
-            );
+                );
 
         if fills {
             return Some(card.into_any_element());
         }
         Some(
             deferred(
-                anchored().position_mode(AnchoredPositionMode::Window).position(point(px(0.0), px(0.0))).child(
-                    div()
-                        .id("palette-backdrop")
-                        .w(px(vw))
-                        .h(px(vh))
-                        .bg(rgba(0x0000_0059))
-                        .occlude()
-                        .on_mouse_down(MouseButton::Left, cx.listener(|page, _, window, cx| page.close_palette(window, cx)))
-                        .child(card),
-                ),
+                anchored()
+                    .position_mode(AnchoredPositionMode::Window)
+                    .position(point(px(0.0), px(0.0)))
+                    .child(
+                        div()
+                            .id("palette-backdrop")
+                            .w(px(vw))
+                            .h(px(vh))
+                            .bg(rgba(0x0000_0059))
+                            .occlude()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|page, _, window, cx| page.close_palette(window, cx)),
+                            )
+                            .child(card),
+                    ),
             )
             .with_priority(20)
             .into_any_element(),
@@ -1416,7 +1765,11 @@ impl PaletteHost for ExplorerPage {
         self.tabs(cx)
             .into_iter()
             .filter_map(|(id, folder, _)| {
-                let tab = self.group.all_tabs().into_iter().find(|tab| tab.entity_id().as_u64() == id)?;
+                let tab = self
+                    .group
+                    .all_tabs()
+                    .into_iter()
+                    .find(|tab| tab.entity_id().as_u64() == id)?;
                 let title = crate::pane_group::PaneItem::tab_title(tab.read(cx), cx);
                 Some((id, title, folder))
             })
@@ -1434,7 +1787,11 @@ impl PaletteHost for ExplorerPage {
     fn palette_chose(&mut self, chosen: Chosen, window: &mut Window, cx: &mut Context<Self>) {
         match chosen {
             Chosen::Tab(id) => {
-                if let Some(tab) = self.group.all_tabs().into_iter().find(|tab| tab.entity_id().as_u64() == id)
+                if let Some(tab) = self
+                    .group
+                    .all_tabs()
+                    .into_iter()
+                    .find(|tab| tab.entity_id().as_u64() == id)
                     && let Some((pane, index)) = self.group.locate_tab(tab.entity_id())
                 {
                     self.group.set_active_tab(pane, index, window, cx);
@@ -1480,7 +1837,11 @@ impl PaletteHost for ExplorerPage {
     }
 
     fn palette_enter_hint(&self) -> &'static str {
-        if crate::file_dialog::picking().is_some() { t!("Enviar") } else { t!("Abrir em nova aba") }
+        if crate::file_dialog::picking().is_some() {
+            t!("Enviar")
+        } else {
+            t!("Abrir em nova aba")
+        }
     }
 }
 
@@ -1497,7 +1858,11 @@ impl ExplorerPage {
     }
 
     /// The box over the window, when it is open.
-    pub(crate) fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_palette(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         PaletteBox::render_palette(self, window, cx)
     }
 }
@@ -1515,7 +1880,10 @@ fn folder_and_selection(path: &str, dir: bool) -> (String, Option<String>) {
         return (path.to_string(), None);
     }
     match Path::new(path).parent() {
-        Some(parent) => (parent.to_string_lossy().into_owned(), Some(path.to_string())),
+        Some(parent) => (
+            parent.to_string_lossy().into_owned(),
+            Some(path.to_string()),
+        ),
         None => (path.to_string(), None),
     }
 }
@@ -1533,7 +1901,11 @@ fn heading(label: &str, count: usize) -> AnyElement {
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(rgb(theme::muted()))
         .child(label.to_string())
-        .child(div().font_weight(FontWeight::NORMAL).child(count.to_string()))
+        .child(
+            div()
+                .font_weight(FontWeight::NORMAL)
+                .child(count.to_string()),
+        )
         .into_any_element()
 }
 
@@ -1567,9 +1939,16 @@ fn zoom_control<H: PaletteBox>(zoom: f32, cx: &mut Context<H>) -> impl IntoEleme
             .items_center()
             .justify_center()
             .rounded(px(6.0))
-            .when(enabled, |this| this.cursor_pointer().hover(|style| style.bg(rgb(theme::bg_hover()))))
+            .when(enabled, |this| {
+                this.cursor_pointer()
+                    .hover(|style| style.bg(rgb(theme::bg_hover())))
+            })
             .when(!enabled, |this| this.opacity(0.35))
-            .child(Icon::new(icon).size_3().text_color(rgb(theme::fg_secondary())))
+            .child(
+                Icon::new(icon)
+                    .size_3()
+                    .text_color(rgb(theme::fg_secondary())),
+            )
     };
     div()
         .flex_shrink_0()
@@ -1603,7 +1982,12 @@ fn zoom_control<H: PaletteBox>(zoom: f32, cx: &mut Context<H>) -> impl IntoEleme
 
 // A button of the preview's row: an icon and its label; `primary` in the
 // accent colour.
-fn action_button(id: &'static str, icon: &'static str, label: &str, primary: bool) -> Stateful<Div> {
+fn action_button(
+    id: &'static str,
+    icon: &'static str,
+    label: &str,
+    primary: bool,
+) -> Stateful<Div> {
     div()
         .id(id)
         .flex_shrink_0()
@@ -1639,12 +2023,20 @@ fn timeline(fraction: f32, width: f32, track: Rc<Cell<Bounds<Pixels>>>) -> AnyEl
         move |bounds, _, _| track.set(bounds),
         move |bounds, (), window, _| {
             let middle = bounds.origin.y + bounds.size.height / 2.0;
-            let full = Bounds::new(point(bounds.origin.x, middle - px(2.0)), size(bounds.size.width, px(4.0)));
+            let full = Bounds::new(
+                point(bounds.origin.x, middle - px(2.0)),
+                size(bounds.size.width, px(4.0)),
+            );
             window.paint_quad(fill(full, rest).corner_radii(px(2.0)));
             let played = Bounds::new(full.origin, size(bounds.size.width * fraction, px(4.0)));
             window.paint_quad(fill(played, done).corner_radii(px(2.0)));
-            let knob = point(bounds.origin.x + bounds.size.width * fraction - px(6.0), middle - px(6.0));
-            window.paint_quad(fill(Bounds::new(knob, size(px(12.0), px(12.0))), done).corner_radii(px(6.0)));
+            let knob = point(
+                bounds.origin.x + bounds.size.width * fraction - px(6.0),
+                middle - px(6.0),
+            );
+            window.paint_quad(
+                fill(Bounds::new(knob, size(px(12.0), px(12.0))), done).corner_radii(px(6.0)),
+            );
         },
     )
     .w(px(width))
@@ -1655,7 +2047,13 @@ fn timeline(fraction: f32, width: f32, track: Rc<Cell<Bounds<Pixels>>>) -> AnyEl
 // A sound's wave, `width` by `height`, from the player's bars (`None` for a
 // stretch not read yet); what was played in the accent colour. Its bounds go
 // to `track` as it paints, for a click to seek.
-fn wave(bars: Vec<Option<f32>>, fraction: f32, width: f32, height: f32, track: Rc<Cell<Bounds<Pixels>>>) -> AnyElement {
+fn wave(
+    bars: Vec<Option<f32>>,
+    fraction: f32,
+    width: f32,
+    height: f32,
+    track: Rc<Cell<Bounds<Pixels>>>,
+) -> AnyElement {
     let (done, rest) = (rgb(theme::accent()), rgb(theme::fg_secondary()));
     canvas(
         move |bounds, _, _| track.set(bounds),
@@ -1687,15 +2085,28 @@ fn wave(bars: Vec<Option<f32>>, fraction: f32, width: f32, height: f32, track: R
 
 // The square a row or tile draws its picture in.
 fn media_square(row: &Row, media: Media, icon: f32, selected: bool) -> AnyElement {
-    let square = div().size(px(icon)).flex_shrink_0().flex().items_center().justify_center();
+    let square = div()
+        .size(px(icon))
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_center();
     match media {
         Media::Image(image) => square
-            .child(img(ImageSource::Render(image)).size_full().object_fit(ObjectFit::Contain))
+            .child(
+                img(ImageSource::Render(image))
+                    .size_full()
+                    .object_fit(ObjectFit::Contain),
+            )
             .into_any_element(),
         Media::Waveform(bars) => square
             .rounded(px(6.0))
             .bg(rgb(theme::bg()))
-            .child(div().size_full().child(super::waveforms::canvas(bars, icon, selected, None)))
+            .child(
+                div()
+                    .size_full()
+                    .child(super::waveforms::canvas(bars, icon, selected, None)),
+            )
             .into_any_element(),
         Media::None => {
             let (path, color) = match row {
@@ -1705,7 +2116,12 @@ fn media_square(row: &Row, media: Media, icon: f32, selected: bool) -> AnyElemen
                 _ => ("icons/file.svg", theme::fg_secondary()),
             };
             square
-                .child(Icon::new(Icon::empty()).path(path).size(px((icon * 0.8).clamp(16.0, 96.0))).text_color(rgb(color)))
+                .child(
+                    Icon::new(Icon::empty())
+                        .path(path)
+                        .size(px((icon * 0.8).clamp(16.0, 96.0)))
+                        .text_color(rgb(color)),
+                )
                 .into_any_element()
         }
     }
@@ -1760,7 +2176,10 @@ fn render_row<H: PaletteBox>(
         Row::Typed { path, .. } => (path.clone(), String::new(), hint),
         Row::Hit { name, path, .. } => (
             name.clone(),
-            Path::new(path).parent().map(|parent| parent.to_string_lossy().into_owned()).unwrap_or_default(),
+            Path::new(path)
+                .parent()
+                .map(|parent| parent.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             hint,
         ),
     };
@@ -1771,7 +2190,8 @@ fn render_row<H: PaletteBox>(
     // as nothing in the stacked layout and showed only "…". About 6.5 px a
     // character at the size it is drawn; the hint takes ~150 px when shown.
     let hinted = selected || matches!(row, Row::Tab { .. });
-    let room = width - icon - 60.0 - if stacked { 0.0 } else { 180.0 } - if hinted { 150.0 } else { 0.0 };
+    let room =
+        width - icon - 60.0 - if stacked { 0.0 } else { 180.0 } - if hinted { 150.0 } else { 0.0 };
     let detail = super::view::listing::truncate_middle(&detail, ((room / 6.5) as usize).max(12));
     let draggable = row.path().is_some();
     let element = div()
@@ -1785,7 +2205,9 @@ fn render_row<H: PaletteBox>(
         .rounded(px(8.0))
         .cursor_pointer()
         .when(selected, |this| this.bg(rgb(theme::bg_hover())))
-        .when(!selected, |this| this.hover(|this| this.bg(rgb(theme::bg_hover()))))
+        .when(!selected, |this| {
+            this.hover(|this| this.bg(rgb(theme::bg_hover())))
+        })
         // A bar of the accent at the selected row's edge.
         .when(selected, |this| {
             this.child(
@@ -1888,10 +2310,18 @@ fn render_tile<H: PaletteBox>(
         .rounded(px(10.0))
         .border_1()
         .cursor_pointer()
-        .border_color(if selected { rgb(theme::accent()) } else { rgba(0x0000_0000) })
+        .border_color(if selected {
+            rgb(theme::accent())
+        } else {
+            rgba(0x0000_0000)
+        })
         .when(selected, |this| this.bg(rgb(theme::bg_hover())))
-        .when(!selected, |this| this.hover(|this| this.bg(rgb(theme::bg_hover()))))
-        .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+        .when(!selected, |this| {
+            this.hover(|this| this.bg(rgb(theme::bg_hover())))
+        })
+        .tooltip(move |window, cx| {
+            gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+        })
         .child(media_square(row, media, icon, selected))
         .child(
             div()
@@ -1911,7 +2341,10 @@ fn render_tile<H: PaletteBox>(
 #[cfg(test)]
 mod tests {
     // Not `super::*`: it brings gpui's `test` attribute over the std one.
-    use super::{GRID_FROM, HitAction, PICTURES_FROM, ZOOM_DEFAULT, folder_and_selection, icon_size, plays_in_box, zoom_percent};
+    use super::{
+        GRID_FROM, HitAction, PICTURES_FROM, ZOOM_DEFAULT, folder_and_selection, icon_size,
+        plays_in_box, zoom_percent,
+    };
 
     #[test]
     fn a_click_plays_videos_and_sounds_in_the_box_and_opens_the_rest() {
@@ -1935,18 +2368,37 @@ mod tests {
 
     #[test]
     fn the_box_turns_into_a_grid_past_the_list_sizes() {
-        assert!(icon_size(0.0) < PICTURES_FROM, "the smallest size is plain icons");
-        assert!(icon_size(ZOOM_DEFAULT) >= PICTURES_FROM, "the default shows pictures");
+        assert!(
+            icon_size(0.0) < PICTURES_FROM,
+            "the smallest size is plain icons"
+        );
+        assert!(
+            icon_size(ZOOM_DEFAULT) >= PICTURES_FROM,
+            "the default shows pictures"
+        );
         assert!(icon_size(ZOOM_DEFAULT) < GRID_FROM, "the default is a list");
         assert!(icon_size(1.0) > GRID_FROM, "the largest size is a grid");
         assert_eq!(zoom_percent(ZOOM_DEFAULT), 100);
     }
 
+    #[cfg(windows)]
     #[test]
     fn a_file_opens_its_folder_with_it_selected() {
         let (folder, select) = folder_and_selection(r"C:\a\b.txt", false);
         assert_eq!(folder, r"C:\a");
         assert_eq!(select.as_deref(), Some(r"C:\a\b.txt"));
-        assert_eq!(folder_and_selection(r"C:\a", true), (r"C:\a".to_string(), None));
+        assert_eq!(
+            folder_and_selection(r"C:\a", true),
+            (r"C:\a".to_string(), None)
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_file_opens_its_folder_with_it_selected() {
+        let (folder, select) = folder_and_selection("/a/b.txt", false);
+        assert_eq!(folder, "/a");
+        assert_eq!(select.as_deref(), Some("/a/b.txt"));
+        assert_eq!(folder_and_selection("/a", true), ("/a".to_string(), None));
     }
 }

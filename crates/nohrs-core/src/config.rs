@@ -16,12 +16,16 @@ pub mod paths;
 pub mod settings;
 pub mod watcher;
 
-pub use loader::{backup, ensure_exists, needs_migration, remove_value, reset, set_value, write_default};
+pub use loader::{
+    backup, ensure_exists, needs_migration, remove_value, reset, set_value, write_default,
+};
 pub use settings::{
-    CURRENT_SCHEMA_VERSION, Compact, Config, ConfigOverride, Diagnostic, DiagnosticLevel, Diagnostics, DockSide, Layout, Menu, MENU_ITEMS_ALL, MENU_ITEMS_DEFAULT, MENU_QUICK_ALL, MENU_QUICK_DEFAULT,
-    DiagnosticsStore, Explorer, Indexing, IndexingExclude, IndexingMode, Keybindings, Launcher,
-    Plugins, SCHEMA_URL, Search, SearchBackend, OpenFromOtherApps, SortOrder, SplitDirection, Theme, ThemeMode, Ui, Updates,
-    json_schema_string, load_from_path, report_diagnostics,
+    CURRENT_SCHEMA_VERSION, Compact, Config, ConfigOverride, Diagnostic, DiagnosticLevel,
+    Diagnostics, DiagnosticsStore, DockSide, Explorer, Indexing, IndexingExclude, IndexingMode,
+    Keybindings, Launcher, Layout, MENU_ITEMS_ALL, MENU_ITEMS_DEFAULT, MENU_QUICK_ALL,
+    MENU_QUICK_DEFAULT, Menu, OpenFromOtherApps, Plugins, SCHEMA_URL, Search, SearchBackend,
+    SortOrder, SplitDirection, Theme, ThemeMode, Ui, Updates, json_schema_string, load_from_path,
+    report_diagnostics,
 };
 pub use watcher::ConfigWatcher;
 

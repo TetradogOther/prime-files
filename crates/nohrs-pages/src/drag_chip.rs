@@ -11,9 +11,9 @@ use std::cell::RefCell;
 use std::time::Duration;
 
 use gpui::{
-    AnyWindowHandle, App, AppContext as _, Bounds, Context, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Task, Window, WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions, div, point, px,
-    rgb, size,
+    AnyWindowHandle, App, AppContext as _, Bounds, Context, IntoElement, ParentElement as _,
+    Render, SharedString, Styled as _, Task, Window, WindowBackgroundAppearance, WindowBounds,
+    WindowKind, WindowOptions, div, point, px, rgb, size,
 };
 use nohrs_ui::theme::theme;
 
@@ -27,22 +27,28 @@ struct Chip {
 
 impl Render for Chip {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().px(px(3.0)).py(px(4.0)).flex().items_center().child(
-            div()
-                .w_full()
-                .h_full()
-                .px(px(12.0))
-                .rounded(px(8.0))
-                .flex()
-                .items_center()
-                .bg(rgb(theme::toolbar_active_bg()))
-                .text_color(rgb(theme::toolbar_active_text()))
-                .text_sm()
-                .whitespace_nowrap()
-                .overflow_hidden()
-                .text_ellipsis()
-                .child(self.title.clone()),
-        )
+        div()
+            .size_full()
+            .px(px(3.0))
+            .py(px(4.0))
+            .flex()
+            .items_center()
+            .child(
+                div()
+                    .w_full()
+                    .h_full()
+                    .px(px(12.0))
+                    .rounded(px(8.0))
+                    .flex()
+                    .items_center()
+                    .bg(rgb(theme::toolbar_active_bg()))
+                    .text_color(rgb(theme::toolbar_active_text()))
+                    .text_sm()
+                    .whitespace_nowrap()
+                    .overflow_hidden()
+                    .text_ellipsis()
+                    .child(self.title.clone()),
+            )
     }
 }
 
@@ -55,9 +61,15 @@ pub fn show(title: SharedString, cx: &mut App) {
     // Wide enough for the name; the chip's own box is drawn inside it.
     let width = (title.chars().count() as f32 * 8.5 + 34.0).clamp(72.0, 360.0);
     let scale = platform::scale_at(cursor).max(1.0);
-    let origin = point(px(cursor.0 as f32 / scale + 14.0), px(cursor.1 as f32 / scale + 10.0));
+    let origin = point(
+        px(cursor.0 as f32 / scale + 14.0),
+        px(cursor.1 as f32 / scale + 10.0),
+    );
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds::new(origin, size(px(width), px(38.0))))),
+        window_bounds: Some(WindowBounds::Windowed(Bounds::new(
+            origin,
+            size(px(width), px(38.0)),
+        ))),
         titlebar: None,
         focus: false,
         show: true,
@@ -83,7 +95,9 @@ pub fn show(title: SharedString, cx: &mut App) {
     let handle: AnyWindowHandle = handle.into();
     let follow = cx.spawn(async move |cx| {
         loop {
-            cx.background_executor().timer(Duration::from_millis(12)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(12))
+                .await;
             if !platform::left_button_down() {
                 cx.update(hide).ok();
                 return;
@@ -102,7 +116,10 @@ pub fn hide(cx: &mut App) {
     let Some((handle, _follow)) = CHIP.with(|chip| chip.borrow_mut().take()) else {
         return;
     };
-    if handle.update(cx, |_, window, _| window.remove_window()).is_err() {
+    if handle
+        .update(cx, |_, window, _| window.remove_window())
+        .is_err()
+    {
         tracing::debug!("the drag chip was already closed");
     }
 }
@@ -127,9 +144,18 @@ mod platform {
     // The scale of the monitor under `cursor`, to turn its device pixels
     // into the logical ones gpui places windows in.
     pub fn scale_at(cursor: (i32, i32)) -> f32 {
-        let monitor = unsafe { MonitorFromPoint(POINT { x: cursor.0, y: cursor.1 }, MONITOR_DEFAULTTONEAREST) };
+        let monitor = unsafe {
+            MonitorFromPoint(
+                POINT {
+                    x: cursor.0,
+                    y: cursor.1,
+                },
+                MONITOR_DEFAULTTONEAREST,
+            )
+        };
         let (mut dpi_x, mut dpi_y) = (96u32, 96u32);
-        if unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) }.is_err() {
+        if unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) }.is_err()
+        {
             return 1.0;
         }
         dpi_x as f32 / 96.0
@@ -145,7 +171,17 @@ mod platform {
 
     pub fn keep_on_top(window: &gpui::Window) {
         let Some(hwnd) = hwnd(window) else { return };
-        if let Err(error) = unsafe { SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE) } {
+        if let Err(error) = unsafe {
+            SetWindowPos(
+                hwnd,
+                Some(HWND_TOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        } {
             tracing::debug!("drag chip on top: {error}");
         }
     }
@@ -158,9 +194,17 @@ mod platform {
         };
         let scale = scale_at((x, y));
         let (dx, dy) = ((14.0 * scale) as i32, (10.0 * scale) as i32);
-        if let Err(error) =
-            unsafe { SetWindowPos(hwnd, Some(HWND_TOPMOST), x + dx, y + dy, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE) }
-        {
+        if let Err(error) = unsafe {
+            SetWindowPos(
+                hwnd,
+                Some(HWND_TOPMOST),
+                x + dx,
+                y + dy,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        } {
             tracing::debug!("drag chip move: {error}");
         }
     }

@@ -76,7 +76,8 @@ pub fn disable() -> io::Result<()> {
 // was running. `edit` says whether it changed anything: nothing changed means
 // Listary is not bothered at all.
 fn change(edit: impl Fn(&mut Value) -> io::Result<bool>) -> io::Result<()> {
-    let file = preferences_file().ok_or_else(|| io::Error::other(t!("o Listary não está instalado")))?;
+    let file =
+        preferences_file().ok_or_else(|| io::Error::other(t!("o Listary não está instalado")))?;
     let mut preferences = read(&file)?;
     if !edit(&mut preferences)? {
         return Ok(());
@@ -84,11 +85,20 @@ fn change(edit: impl Fn(&mut Value) -> io::Result<bool>) -> io::Result<()> {
     let running = platform::running_listary();
     if let Some(exe) = &running {
         close_listary()?;
-        tracing::info!("closed Listary ({}) to change its preferences", exe.display());
+        tracing::info!(
+            "closed Listary ({}) to change its preferences",
+            exe.display()
+        );
     }
     // Read again: closing Listary is what writes its latest state to disk.
     let mut preferences = read(&file)?;
-    let written = edit(&mut preferences).and_then(|changed| if changed { write(&file, &preferences) } else { Ok(()) });
+    let written = edit(&mut preferences).and_then(|changed| {
+        if changed {
+            write(&file, &preferences)
+        } else {
+            Ok(())
+        }
+    });
     if let Some(exe) = running {
         restart_listary(&exe)?;
     }
@@ -100,7 +110,9 @@ fn read(file: &Path) -> io::Result<Value> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     let preferences: Value = serde_json::from_str(text).map_err(io::Error::other)?;
     if !preferences.is_object() {
-        return Err(io::Error::other(t!("Preferences.json do Listary não é um objeto")));
+        return Err(io::Error::other(t!(
+            "Preferences.json do Listary não é um objeto"
+        )));
     }
     Ok(preferences)
 }
@@ -132,10 +144,13 @@ fn is_ours(opener: &str) -> bool {
         .file_name()
         .map(|name| name.to_string_lossy().to_ascii_lowercase())
         .unwrap_or_default();
-    let running = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.file_name().map(|name| name.to_string_lossy().to_ascii_lowercase()));
-    name == "primefiles.exe" || name == "nohrs.exe" || running.is_some_and(|running| running == name)
+    let running = std::env::current_exe().ok().and_then(|exe| {
+        exe.file_name()
+            .map(|name| name.to_string_lossy().to_ascii_lowercase())
+    });
+    name == "primefiles.exe"
+        || name == "nohrs.exe"
+        || running.is_some_and(|running| running == name)
 }
 
 fn set_opener(preferences: &mut Value, exe: &Path) -> io::Result<bool> {
@@ -158,7 +173,10 @@ fn set_opener(preferences: &mut Value, exe: &Path) -> io::Result<bool> {
 }
 
 fn remove_opener(preferences: &mut Value) -> io::Result<bool> {
-    let Some(settings) = preferences.get_mut("Settings").and_then(Value::as_object_mut) else {
+    let Some(settings) = preferences
+        .get_mut("Settings")
+        .and_then(Value::as_object_mut)
+    else {
         return Ok(false);
     };
     // `shift_remove`: the rest of the file keeps Listary's own order.
@@ -210,7 +228,12 @@ fn wait_until_gone(limit: Duration) -> bool {
 // for an end of output that never came.
 fn restart_listary(exe: &Path) -> io::Result<()> {
     use std::process::Stdio;
-    Command::new(exe).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map(|_| ())
+    Command::new(exe)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
 }
 
 #[cfg(windows)]
@@ -220,10 +243,12 @@ mod platform {
 
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
+        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+        TH32CS_SNAPPROCESS,
     };
     use windows::Win32::System::Threading::{
-        OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+        OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+        QueryFullProcessImageNameW,
     };
     use windows::core::PWSTR;
 
@@ -240,8 +265,13 @@ mod platform {
             let mut found = None;
             let mut more = Process32FirstW(snapshot, &mut entry).is_ok();
             while more {
-                let length = entry.szExeFile.iter().position(|&unit| unit == 0).unwrap_or(entry.szExeFile.len());
-                let name = String::from_utf16_lossy(entry.szExeFile.get(..length).unwrap_or_default());
+                let length = entry
+                    .szExeFile
+                    .iter()
+                    .position(|&unit| unit == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let name =
+                    String::from_utf16_lossy(entry.szExeFile.get(..length).unwrap_or_default());
                 if name.eq_ignore_ascii_case("Listary.exe") {
                     found = Some(image_path(entry.th32ProcessID).unwrap_or_else(default_path));
                     break;
@@ -262,8 +292,12 @@ mod platform {
             let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id).ok()?;
             let mut buffer = [0u16; 1024];
             let mut length = buffer.len() as u32;
-            let queried =
-                QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, PWSTR(buffer.as_mut_ptr()), &mut length);
+            let queried = QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                PWSTR(buffer.as_mut_ptr()),
+                &mut length,
+            );
             if let Err(error) = CloseHandle(process) {
                 tracing::debug!("closing the Listary process handle: {error}");
             }
@@ -297,6 +331,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg(windows)]
     #[test]
     fn enabling_adds_both_keys_and_keeps_the_order_of_the_rest() {
         let mut preferences = sample();
@@ -304,12 +339,19 @@ mod tests {
         assert!(set_opener(&mut preferences, exe).unwrap());
         assert!(opens_with_us(&preferences));
         let keys: Vec<_> = settings(&preferences).unwrap().keys().cloned().collect();
-        assert_eq!(keys, ["Hotkey.QuickSwitch", "General.X", PATH_KEY, PARAM_KEY]);
+        assert_eq!(
+            keys,
+            ["Hotkey.QuickSwitch", "General.X", PATH_KEY, PARAM_KEY]
+        );
         let top: Vec<_> = preferences.as_object().unwrap().keys().cloned().collect();
         assert_eq!(top, ["AppConfigs", "Settings", "Extensions"]);
-        assert!(!set_opener(&mut preferences, exe).unwrap(), "already set: nothing to write");
+        assert!(
+            !set_opener(&mut preferences, exe).unwrap(),
+            "already set: nothing to write"
+        );
     }
 
+    #[cfg(windows)]
     #[test]
     fn disabling_removes_only_our_opener() {
         let mut preferences = sample();
@@ -322,6 +364,7 @@ mod tests {
         assert!(!opens_with_us(&other));
     }
 
+    #[cfg(windows)]
     #[test]
     fn a_development_build_counts_as_ours() {
         assert!(is_ours(r"C:\src\nohrs\target\release\nohrs.exe"));

@@ -15,7 +15,9 @@ use std::time::Duration;
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use gpui_component::resizable::ResizableState;
-use nohrs_core::config::{Compact, DockSide, Explorer as ExplorerConfig, Layout, SplitDirection, Ui};
+use nohrs_core::config::{
+    Compact, DockSide, Explorer as ExplorerConfig, Layout, SplitDirection, Ui,
+};
 use nohrs_core::telemetry::LogErr;
 use nohrs_services::fs::trash::Ledger as TrashLedger;
 use nohrs_services::search::SearchService;
@@ -134,11 +136,17 @@ pub fn rebind_shortcuts(cx: &mut App) {
     ];
     let wanted: Vec<(String, Action)> = page_actions
         .into_iter()
-        .flat_map(|action| chords(action).into_iter().map(move |chord| (chord.to_config(), action)))
+        .flat_map(|action| {
+            chords(action)
+                .into_iter()
+                .map(move |chord| (chord.to_config(), action))
+        })
         // A key gpui cannot read would panic in `KeyBinding::new`.
         .filter(|(keys, _)| Keystroke::parse(keys).is_ok())
         .collect();
-    let mut bound = BOUND_SHORTCUTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut bound = BOUND_SHORTCUTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let context = Some(PANES_CONTEXT);
     let mut bindings: Vec<KeyBinding> = bound
         .iter()
@@ -260,7 +268,10 @@ impl ExplorerPage {
         bind_pane_keys(cx);
         // The Ctrl+T box searches again when the index arrives or changes,
         // and shows how far a first indexing has got.
-        cx.observe_global::<super::everything::Everything>(|page, cx| page.palette_index_changed(cx)).detach();
+        cx.observe_global::<super::everything::Everything>(|page, cx| {
+            page.palette_index_changed(cx)
+        })
+        .detach();
         // Before any tab reads a folder, so the first one already opens as it
         // was left.
         super::folder_views::FolderViews::install(store.clone(), cx);
@@ -420,7 +431,12 @@ impl ExplorerPage {
     }
 
     /// Opens a new tab in `pane_index`, rooted at home (§4), and activates it.
-    pub(crate) fn new_tab_in_pane(&mut self, pane_index: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn new_tab_in_pane(
+        &mut self,
+        pane_index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         // Inherit the sidebar visibility of the pane's currently active tab so the
         // new tab looks continuous with what the user was just seeing.
         let sidebar_visible = self
@@ -501,7 +517,11 @@ impl ExplorerPage {
                 self.open_terminal_at(*side, *size, cx);
                 return;
             }
-            PaneEvent::OpenInNewTab { folder, select, middle } => {
+            PaneEvent::OpenInNewTab {
+                folder,
+                select,
+                middle,
+            } => {
                 let background = *middle && self.background_tabs;
                 self.open_in_new_tab_later(folder.clone(), select.clone(), background, cx);
                 return;
@@ -561,7 +581,11 @@ impl ExplorerPage {
         let Some(window) = cx.windows().into_iter().next() else {
             return;
         };
-        let direction = if side.is_column() { SplitDirection::Vertical } else { SplitDirection::Horizontal };
+        let direction = if side.is_column() {
+            SplitDirection::Vertical
+        } else {
+            SplitDirection::Horizontal
+        };
         let first = matches!(side, DockSide::Left | DockSide::Top);
         let this = cx.entity().downgrade();
         // The event arrives inside the pane's update; the new pane is built
@@ -580,7 +604,8 @@ impl ExplorerPage {
                         page.configure_tab(&tab, Some(cwd), false, cx);
                         // Without its own preview, as `add_explorer_pane` opens one.
                         tab.update(cx, |pane, _| pane.preview_visible = false);
-                        page.group.set_ratio(if first { fraction } else { 1.0 - fraction });
+                        page.group
+                            .set_ratio(if first { fraction } else { 1.0 - fraction });
                         page.group.set_active(index, window, cx);
                         page.schedule_save(cx);
                         cx.notify();
@@ -737,7 +762,11 @@ impl ExplorerPage {
     pub fn listing_counts(&self, cx: &App) -> (usize, usize, usize) {
         let pane = self.group.active_pane().read(cx);
         let is_file = |entry: &&nohrs_services::fs::listing::FileEntryDto| entry.kind != "dir";
-        let folders = pane.filtered_entries.iter().filter(|entry| entry.kind == "dir").count();
+        let folders = pane
+            .filtered_entries
+            .iter()
+            .filter(|entry| entry.kind == "dir")
+            .count();
         let shown = pane.filtered_entries.iter().filter(is_file).count();
         // Search results come from other folders too: compared with this
         // folder's files they read as "1121 of 272".
@@ -867,7 +896,13 @@ impl ExplorerPage {
 
     // The event arrives inside the pane's update, and a tab is built with the
     // window, which is reached from a task of its own (as for a split).
-    fn open_in_new_tab_later(&mut self, folder: String, select: Option<String>, background: bool, cx: &mut Context<Self>) {
+    fn open_in_new_tab_later(
+        &mut self,
+        folder: String,
+        select: Option<String>,
+        background: bool,
+        cx: &mut Context<Self>,
+    ) {
         let Some(window) = cx.windows().into_iter().next() else {
             return;
         };
@@ -875,7 +910,10 @@ impl ExplorerPage {
         cx.spawn(async move |_, cx| {
             window
                 .update(cx, |_, window, cx| {
-                    this.update(cx, |page, cx| page.open_in_new_tab(folder, select, background, window, cx)).log_err();
+                    this.update(cx, |page, cx| {
+                        page.open_in_new_tab(folder, select, background, window, cx)
+                    })
+                    .log_err();
                 })
                 .log_err();
         })
@@ -1033,11 +1071,16 @@ struct TerminalSet {
 
 impl TerminalSet {
     fn active(&self) -> Option<&Entity<TerminalView>> {
-        self.terminals.get(self.active).or(self.terminals.last()).map(|(terminal, _)| terminal)
+        self.terminals
+            .get(self.active)
+            .or(self.terminals.last())
+            .map(|(terminal, _)| terminal)
     }
 
     fn index_of(&self, id: EntityId) -> Option<usize> {
-        self.terminals.iter().position(|(terminal, _)| terminal.entity_id() == id)
+        self.terminals
+            .iter()
+            .position(|(terminal, _)| terminal.entity_id() == id)
     }
 }
 
@@ -1070,19 +1113,30 @@ impl ExplorerPage {
     // has none.
     fn focused_terminal(&mut self, cx: &mut Context<Self>) -> Entity<TerminalView> {
         let tab = self.group.active_pane().clone();
-        if let Some(terminal) = self.terminals.get(&tab.entity_id()).and_then(TerminalSet::active) {
+        if let Some(terminal) = self
+            .terminals
+            .get(&tab.entity_id())
+            .and_then(TerminalSet::active)
+        {
             return terminal.clone();
         }
         self.add_terminal(&tab, cx)
     }
 
     // A new terminal in the tab's folder, shown.
-    fn add_terminal(&mut self, tab: &Entity<ExplorerPane>, cx: &mut Context<Self>) -> Entity<TerminalView> {
+    fn add_terminal(
+        &mut self,
+        tab: &Entity<ExplorerPane>,
+        cx: &mut Context<Self>,
+    ) -> Entity<TerminalView> {
         let (terminal, subscription) = self.spawn_terminal(tab, cx);
         let set = self
             .terminals
             .entry(tab.entity_id())
-            .or_insert_with(|| TerminalSet { terminals: Vec::new(), active: 0 });
+            .or_insert_with(|| TerminalSet {
+                terminals: Vec::new(),
+                active: 0,
+            });
         set.terminals.push((terminal.clone(), subscription));
         set.active = set.terminals.len() - 1;
         terminal
@@ -1096,23 +1150,48 @@ impl ExplorerPage {
         let directory = terminal_directory(&tab.read(cx).cwd);
         let terminal = cx.new(|cx| TerminalView::new(directory, cx));
         let tab_id = tab.entity_id();
-        let subscription = cx.subscribe(&terminal, move |page: &mut Self, terminal, event, cx| match event {
-            TerminalEvent::RestartRequested => page.replace_terminal(tab_id, terminal.entity_id(), true, cx),
-        });
+        let subscription =
+            cx.subscribe(
+                &terminal,
+                move |page: &mut Self, terminal, event, cx| match event {
+                    TerminalEvent::RestartRequested => {
+                        page.replace_terminal(tab_id, terminal.entity_id(), true, cx)
+                    }
+                },
+            );
         (terminal, subscription)
     }
 
     // A new shell in the folder the tab is in now, in place of `terminal_id`.
-    fn replace_terminal(&mut self, tab_id: EntityId, terminal_id: EntityId, take_focus: bool, cx: &mut Context<Self>) {
-        let Some(tab) = self.group.all_tabs().into_iter().find(|tab| tab.entity_id() == tab_id) else {
+    fn replace_terminal(
+        &mut self,
+        tab_id: EntityId,
+        terminal_id: EntityId,
+        take_focus: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(tab) = self
+            .group
+            .all_tabs()
+            .into_iter()
+            .find(|tab| tab.entity_id() == tab_id)
+        else {
             return;
         };
-        let Some(index) = self.terminals.get(&tab_id).and_then(|set| set.index_of(terminal_id)) else {
+        let Some(index) = self
+            .terminals
+            .get(&tab_id)
+            .and_then(|set| set.index_of(terminal_id))
+        else {
             return;
         };
         let replacement = self.spawn_terminal(&tab, cx);
         let terminal = replacement.0.clone();
-        if let Some(slot) = self.terminals.get_mut(&tab_id).and_then(|set| set.terminals.get_mut(index)) {
+        if let Some(slot) = self
+            .terminals
+            .get_mut(&tab_id)
+            .and_then(|set| set.terminals.get_mut(index))
+        {
             // Dropping the old view ends its shell.
             *slot = replacement;
         }
@@ -1122,7 +1201,13 @@ impl ExplorerPage {
         cx.notify();
     }
 
-    fn close_terminal(&mut self, tab_id: EntityId, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_terminal(
+        &mut self,
+        tab_id: EntityId,
+        index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(set) = self.terminals.get_mut(&tab_id) else {
             return;
         };
@@ -1148,7 +1233,12 @@ impl ExplorerPage {
     // the tab is now in another folder, moves there: a fresh shell, after the
     // folder has stayed put a moment. Asked on every render of the panel, so
     // navigating, switching tabs and opening the panel all land here.
-    fn follow_tab_folder(&mut self, terminal: &Entity<TerminalView>, window: &Window, cx: &mut Context<Self>) {
+    fn follow_tab_folder(
+        &mut self,
+        terminal: &Entity<TerminalView>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
         let tab = self.group.active_pane().clone();
         let wanted = terminal_directory(&tab.read(cx).cwd);
         let view = terminal.read(cx);
@@ -1167,8 +1257,14 @@ impl ExplorerPage {
                 page.terminal_follow = None;
                 // Still the shown one, still unused: a key pressed during the
                 // wait keeps it.
-                let shown = page.terminals.get(&tab_id).and_then(TerminalSet::active).cloned();
-                if shown.is_some_and(|shown| shown.entity_id() == terminal_id && !shown.read(cx).is_used()) {
+                let shown = page
+                    .terminals
+                    .get(&tab_id)
+                    .and_then(TerminalSet::active)
+                    .cloned();
+                if shown.is_some_and(|shown| {
+                    shown.entity_id() == terminal_id && !shown.read(cx).is_used()
+                }) {
                     page.replace_terminal(tab_id, terminal_id, take_focus, cx);
                 }
             })
@@ -1219,9 +1315,12 @@ impl ExplorerPage {
                 .rounded(px(4.0))
                 .text_xs()
                 .cursor_pointer()
-                .when(shown, |tab| tab.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg())))
+                .when(shown, |tab| {
+                    tab.bg(rgb(theme::bg_hover())).text_color(rgb(theme::fg()))
+                })
                 .when(!shown, |tab| {
-                    tab.text_color(rgb(theme::fg_secondary())).hover(|tab| tab.bg(rgb(theme::bg_hover())))
+                    tab.text_color(rgb(theme::fg_secondary()))
+                        .hover(|tab| tab.bg(rgb(theme::bg_hover())))
                 })
                 .on_click(cx.listener(move |page, _, window, cx| {
                     if let Some(set) = page.terminals.get_mut(&tab_id) {
@@ -1232,7 +1331,14 @@ impl ExplorerPage {
                     }
                     cx.notify();
                 }))
-                .child(div().max_w(px(140.0)).whitespace_nowrap().text_ellipsis().overflow_hidden().child(name))
+                .child(
+                    div()
+                        .max_w(px(140.0))
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .overflow_hidden()
+                        .child(name),
+                )
                 .child(
                     div()
                         .id(("terminal-tab-close", index))
@@ -1253,7 +1359,9 @@ impl ExplorerPage {
 
         let side = self.terminal_side;
         let size = self.fitted_terminal_size();
-        let carrying = self.terminal_drag.is_some_and(|drag| drag.gesture == Gesture::Move);
+        let carrying = self
+            .terminal_drag
+            .is_some_and(|drag| drag.gesture == Gesture::Move);
         let resizing = self
             .terminal_drag
             .is_some_and(|drag| matches!(drag.gesture, Gesture::Resize { .. }));
@@ -1346,7 +1454,9 @@ impl ExplorerPage {
                             .rounded(px(4.0))
                             .cursor_pointer()
                             .hover(|button| button.bg(rgb(theme::bg_hover())))
-                            .on_click(cx.listener(|page, _, window, cx| page.toggle_terminal(window, cx)))
+                            .on_click(
+                                cx.listener(|page, _, window, cx| page.toggle_terminal(window, cx)),
+                            )
                             .child(
                                 gpui_component::Icon::new(gpui_component::IconName::Close)
                                     .size_4()
@@ -1359,26 +1469,27 @@ impl ExplorerPage {
                 // The inner edge: drag to change the size (past half the
                 // smallest it closes), double click for the default. Last
                 // so it lies over the header.
-                dock::place_on_inner_edge(dock::strip("terminal-resize", side, resizing), side).on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(|page, event: &MouseDownEvent, _window, cx| {
-                        if event.click_count >= 2 {
-                            page.set_terminal_size(page.terminal_default_size());
-                            page.terminal_drag = None;
-                        } else {
-                            page.terminal_drag = Some(TerminalDrag {
-                                gesture: Gesture::Resize {
-                                    start: dock::along(page.terminal_side, event.position),
-                                    start_size: page.fitted_terminal_size(),
-                                },
-                                pointer: event.position,
-                                collapsing: false,
-                            });
-                        }
-                        cx.stop_propagation();
-                        cx.notify();
-                    }),
-                ),
+                dock::place_on_inner_edge(dock::strip("terminal-resize", side, resizing), side)
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|page, event: &MouseDownEvent, _window, cx| {
+                            if event.click_count >= 2 {
+                                page.set_terminal_size(page.terminal_default_size());
+                                page.terminal_drag = None;
+                            } else {
+                                page.terminal_drag = Some(TerminalDrag {
+                                    gesture: Gesture::Resize {
+                                        start: dock::along(page.terminal_side, event.position),
+                                        start_size: page.fitted_terminal_size(),
+                                    },
+                                    pointer: event.position,
+                                    collapsing: false,
+                                });
+                            }
+                            cx.stop_propagation();
+                            cx.notify();
+                        }),
+                    ),
             )
             .into_any_element()
     }
@@ -1400,12 +1511,19 @@ impl ExplorerPage {
         if self.terminal_side.is_column() {
             (TERMINAL_MIN_WIDTH, f32::from(bounds.size.width) - PANES_MIN)
         } else {
-            (TERMINAL_MIN_HEIGHT, f32::from(bounds.size.height) - PANES_MIN.min(TERMINAL_MIN_HEIGHT * 2.0))
+            (
+                TERMINAL_MIN_HEIGHT,
+                f32::from(bounds.size.height) - PANES_MIN.min(TERMINAL_MIN_HEIGHT * 2.0),
+            )
         }
     }
 
     fn terminal_size(&self) -> f32 {
-        f32::from(if self.terminal_side.is_column() { self.terminal_width } else { self.terminal_height })
+        f32::from(if self.terminal_side.is_column() {
+            self.terminal_width
+        } else {
+            self.terminal_height
+        })
     }
 
     fn set_terminal_size(&mut self, size: f32) {
@@ -1417,7 +1535,11 @@ impl ExplorerPage {
     }
 
     fn terminal_default_size(&self) -> f32 {
-        if self.terminal_side.is_column() { TERMINAL_DEFAULT_WIDTH } else { TERMINAL_DEFAULT_HEIGHT }
+        if self.terminal_side.is_column() {
+            TERMINAL_DEFAULT_WIDTH
+        } else {
+            TERMINAL_DEFAULT_HEIGHT
+        }
     }
 
     // The size the terminal is drawn at: the one it was left at, within the
@@ -1425,7 +1547,11 @@ impl ExplorerPage {
     fn fitted_terminal_size(&self) -> f32 {
         let (min, max) = self.terminal_range();
         let size = self.terminal_size();
-        if self.page_bounds.get().size.width <= px(0.0) { size } else { size.clamp(min, max.max(min)) }
+        if self.page_bounds.get().size.width <= px(0.0) {
+            size
+        } else {
+            size.clamp(min, max.max(min))
+        }
     }
 
     // Follows a terminal drag. Returns whether one is under way.
@@ -1473,7 +1599,9 @@ impl ExplorerPage {
             || position.y < px(0.0)
             || position.x > viewport.width
             || position.y > viewport.height;
-        let tabs: usize = (0..self.group.pane_count()).map(|index| self.group.tab_count(index)).sum();
+        let tabs: usize = (0..self.group.pane_count())
+            .map(|index| self.group.tab_count(index))
+            .sum();
         if !outside || tabs <= 1 {
             return;
         }
@@ -1507,7 +1635,11 @@ impl ExplorerPage {
                     let target = dock::nearest_side(self.page_bounds.get(), drag.pointer);
                     if target != self.terminal_side {
                         self.terminal_side = target;
-                        super::view::panels::save_layout("terminal", format!("\"{}\"", target.as_str()), cx);
+                        super::view::panels::save_layout(
+                            "terminal",
+                            format!("\"{}\"", target.as_str()),
+                            cx,
+                        );
                     }
                 }
                 _ => {}
@@ -1518,13 +1650,23 @@ impl ExplorerPage {
 
     // While the terminal is carried, where it would land.
     fn render_terminal_landing(&self) -> Option<AnyElement> {
-        let drag = self.terminal_drag.filter(|drag| drag.gesture == Gesture::Move)?;
+        let drag = self
+            .terminal_drag
+            .filter(|drag| drag.gesture == Gesture::Move)?;
         let bounds = self.page_bounds.get();
         let target = dock::nearest_side(bounds, drag.pointer);
         let (room, size, min) = if target.is_column() {
-            (f32::from(bounds.size.width), f32::from(self.terminal_width), TERMINAL_MIN_WIDTH)
+            (
+                f32::from(bounds.size.width),
+                f32::from(self.terminal_width),
+                TERMINAL_MIN_WIDTH,
+            )
         } else {
-            (f32::from(bounds.size.height), f32::from(self.terminal_height), TERMINAL_MIN_HEIGHT)
+            (
+                f32::from(bounds.size.height),
+                f32::from(self.terminal_height),
+                TERMINAL_MIN_HEIGHT,
+            )
         };
         Some(dock::landing(target, size.min(room * 0.45).max(min.min(room))).into_any_element())
     }
@@ -1534,7 +1676,11 @@ impl ExplorerPage {
 // network have no folder a shell can start in.
 fn terminal_directory(cwd: &str) -> std::path::PathBuf {
     let path = std::path::PathBuf::from(cwd);
-    if path.is_dir() { path } else { std::path::PathBuf::from(home_dir()) }
+    if path.is_dir() {
+        path
+    } else {
+        std::path::PathBuf::from(home_dir())
+    }
 }
 
 impl Render for ExplorerPage {
@@ -1548,9 +1694,16 @@ impl Render for ExplorerPage {
         }
         let body = self.group.render(window, cx, &callbacks);
         let collapsing = self.terminal_drag.is_some_and(|drag| drag.collapsing);
-        let terminal_panel = (self.terminal_open && !collapsing).then(|| self.render_terminal_panel(window, cx));
+        let terminal_panel =
+            (self.terminal_open && !collapsing).then(|| self.render_terminal_panel(window, cx));
         let side = self.terminal_side;
-        let panes = div().flex_1().min_h(px(0.0)).min_w(px(0.0)).flex().flex_col().child(body);
+        let panes = div()
+            .flex_1()
+            .min_h(px(0.0))
+            .min_w(px(0.0))
+            .flex()
+            .flex_col()
+            .child(body);
         // The panes and the terminal on its side of them, first in the row
         // or column when it docks left or above.
         let (before, after) = if matches!(side, DockSide::Left | DockSide::Top) {
@@ -1621,7 +1774,9 @@ impl Render for ExplorerPage {
             // as a browser tab torn off; let go inside, it was a reorder.
             .on_mouse_up_out(
                 MouseButton::Left,
-                cx.listener(|page, event: &MouseUpEvent, window, cx| page.tear_off_tab(event, window, cx)),
+                cx.listener(|page, event: &MouseUpEvent, window, cx| {
+                    page.tear_off_tab(event, window, cx)
+                }),
             )
             .on_mouse_up(
                 MouseButton::Left,
@@ -1629,30 +1784,37 @@ impl Render for ExplorerPage {
                     crate::pane_group::take_dragged_tab();
                 }),
             )
-            .when(self.terminal_drag.is_some() || self.group.dragging(), |this| {
-                this.on_mouse_move(cx.listener(|page, event: &MouseMoveEvent, window, cx| {
-                    if event.pressed_button != Some(MouseButton::Left) {
-                        // The button came up outside the window.
-                        page.finish_page_drags(window, cx);
-                        return;
-                    }
-                    if page.group.drag_to(event.position) {
-                        cx.notify();
-                    }
-                    if page.update_terminal_drag(event.position) {
-                        cx.notify();
-                    }
-                }))
-                .on_mouse_up(
-                    MouseButton::Left,
-                    cx.listener(|page, _: &MouseUpEvent, window, cx| page.finish_page_drags(window, cx)),
-                )
-                // Let go over the title bar, which is the root's, not the page's.
-                .on_mouse_up_out(
-                    MouseButton::Left,
-                    cx.listener(|page, _: &MouseUpEvent, window, cx| page.finish_page_drags(window, cx)),
-                )
-            })
+            .when(
+                self.terminal_drag.is_some() || self.group.dragging(),
+                |this| {
+                    this.on_mouse_move(cx.listener(|page, event: &MouseMoveEvent, window, cx| {
+                        if event.pressed_button != Some(MouseButton::Left) {
+                            // The button came up outside the window.
+                            page.finish_page_drags(window, cx);
+                            return;
+                        }
+                        if page.group.drag_to(event.position) {
+                            cx.notify();
+                        }
+                        if page.update_terminal_drag(event.position) {
+                            cx.notify();
+                        }
+                    }))
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|page, _: &MouseUpEvent, window, cx| {
+                            page.finish_page_drags(window, cx)
+                        }),
+                    )
+                    // Let go over the title bar, which is the root's, not the page's.
+                    .on_mouse_up_out(
+                        MouseButton::Left,
+                        cx.listener(|page, _: &MouseUpEvent, window, cx| {
+                            page.finish_page_drags(window, cx)
+                        }),
+                    )
+                },
+            )
             .on_action(cx.listener(|this, _: &ToggleSidebar, _window, cx| {
                 let pane = this.group.active();
                 let tab_index = this.group.active_tab(pane);

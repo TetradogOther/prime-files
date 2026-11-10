@@ -16,8 +16,8 @@
 //! away; Settings sets it back to false to bring it again.
 
 use gpui::{
-    AnyElement, Context, Div, ElementId, FocusHandle, IntoElement, KeyDownEvent, Render, ScrollHandle, SharedString,
-    Stateful, Window, div, point, prelude::*, px, rgb,
+    AnyElement, Context, Div, ElementId, FocusHandle, IntoElement, KeyDownEvent, Render,
+    ScrollHandle, SharedString, Stateful, Window, div, point, prelude::*, px, rgb,
 };
 use gpui_component::Icon;
 use nohrs_core::config::{self, Config, DockSide, OpenFromOtherApps, SortOrder, ThemeMode};
@@ -46,7 +46,15 @@ enum Step {
     Done,
 }
 
-const STEPS: [Step; 7] = [Step::Look, Step::Window, Step::Files, Step::Sound, Step::System, Step::Search, Step::Done];
+const STEPS: [Step; 7] = [
+    Step::Look,
+    Step::Window,
+    Step::Files,
+    Step::Sound,
+    Step::System,
+    Step::Search,
+    Step::Done,
+];
 
 /// What the step of the system's own parts is called: on Windows it is
 /// Windows, on the other systems it is the desktop.
@@ -94,13 +102,23 @@ impl Step {
 
     fn text(self) -> &'static str {
         match self {
-            Self::Look => t!("Um explorador de arquivos rápido para o Windows. Vamos deixá-lo do seu jeito em menos de um minuto: cada escolha vale na hora, e a janela de exemplo mostra como fica."),
-            Self::Window => t!("Onde ficam a barra lateral e o visualizador, e se as barras somem para deixar só os arquivos na tela."),
+            Self::Look => t!(
+                "Um explorador de arquivos rápido para o Windows. Vamos deixá-lo do seu jeito em menos de um minuto: cada escolha vale na hora, e a janela de exemplo mostra como fica."
+            ),
+            Self::Window => t!(
+                "Onde ficam a barra lateral e o visualizador, e se as barras somem para deixar só os arquivos na tela."
+            ),
             Self::Files => t!("A ordem dos arquivos, os itens ocultos, as abas e o botão direito."),
             Self::Sound => t!("Ouça um som sem abrir: deixe o mouse parado em cima dele."),
-            Self::System => t!("Escolha se as pastas do Windows abrem aqui. Dá para desfazer a qualquer momento, e nada muda para os outros usuários do computador."),
-            Self::Search => t!("Um atalho que abre a busca de qualquer programa, e um índice do computador inteiro."),
-            Self::Done => t!("Você pode mudar qualquer uma destas escolhas depois, em Configurações."),
+            Self::System => t!(
+                "Escolha se as pastas do Windows abrem aqui. Dá para desfazer a qualquer momento, e nada muda para os outros usuários do computador."
+            ),
+            Self::Search => t!(
+                "Um atalho que abre a busca de qualquer programa, e um índice do computador inteiro."
+            ),
+            Self::Done => {
+                t!("Você pode mudar qualquer uma destas escolhas depois, em Configurações.")
+            }
         }
     }
 
@@ -192,13 +210,25 @@ impl WelcomePage {
         .detach();
     }
 
-    fn write(&mut self, section: &'static str, key: &'static str, value: String, cx: &mut Context<Self>) {
+    fn write(
+        &mut self,
+        section: &'static str,
+        key: &'static str,
+        value: String,
+        cx: &mut Context<Self>,
+    ) {
         let path = config::paths::config_file();
-        let write = cx.background_spawn(async move { config::set_value(&path, section, key, &value) });
+        let write =
+            cx.background_spawn(async move { config::set_value(&path, section, key, &value) });
         cx.spawn(async move |this: gpui::WeakEntity<Self>, cx| {
             if let Err(error) = write.await {
                 this.update(cx, |page, cx| {
-                    page.error = Some(tf!("Não foi possível salvar {section}.{key}: {error}", section = section, key = key, error = error));
+                    page.error = Some(tf!(
+                        "Não foi possível salvar {section}.{key}: {error}",
+                        section = section,
+                        key = key,
+                        error = error
+                    ));
                     cx.notify();
                 })
                 .log_err();
@@ -209,11 +239,18 @@ impl WelcomePage {
 
     // Runs a system change (registry, Listary) in the background, then reads
     // everything again so the switches show what really happened.
-    fn change(&mut self, run: impl FnOnce(&std::path::Path) -> std::io::Result<()> + Send + 'static, cx: &mut Context<Self>) {
+    fn change(
+        &mut self,
+        run: impl FnOnce(&std::path::Path) -> std::io::Result<()> + Send + 'static,
+        cx: &mut Context<Self>,
+    ) {
         let exe = match std::env::current_exe() {
             Ok(exe) => exe,
             Err(error) => {
-                self.error = Some(tf!("Não foi possível achar o executável do Prime Files: {error}", error = error));
+                self.error = Some(tf!(
+                    "Não foi possível achar o executável do Prime Files: {error}",
+                    error = error
+                ));
                 cx.notify();
                 return;
             }
@@ -263,9 +300,17 @@ impl WelcomePage {
         (section, key): (&'static str, &'static str),
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        option_card(id, icon, title, text, Some(on), false, cx.listener(move |page, _, _, cx| {
-            page.write(section, key, (!on).to_string(), cx);
-        }))
+        option_card(
+            id,
+            icon,
+            title,
+            text,
+            Some(on),
+            false,
+            cx.listener(move |page, _, _, cx| {
+                page.write(section, key, (!on).to_string(), cx);
+            }),
+        )
     }
 
     // Exclusive options, each writing its TOML `value` to `[section] key`.
@@ -276,13 +321,23 @@ impl WelcomePage {
         options: Vec<(SharedString, bool, String)>,
         cx: &mut Context<Self>,
     ) -> Div {
-        div().w_full().flex().flex_wrap().gap(px(6.0)).children(options.into_iter().enumerate().map(
-            |(ix, (label, selected, value))| {
-                pill(ElementId::NamedInteger(id.into(), ix as u64), label, selected).when(!selected, |this| {
-                    this.on_click(cx.listener(move |page, _, _, cx| page.write(section, key, value.clone(), cx)))
-                })
-            },
-        ))
+        div().w_full().flex().flex_wrap().gap(px(6.0)).children(
+            options
+                .into_iter()
+                .enumerate()
+                .map(|(ix, (label, selected, value))| {
+                    pill(
+                        ElementId::NamedInteger(id.into(), ix as u64),
+                        label,
+                        selected,
+                    )
+                    .when(!selected, |this| {
+                        this.on_click(cx.listener(move |page, _, _, cx| {
+                            page.write(section, key, value.clone(), cx)
+                        }))
+                    })
+                }),
+        )
     }
 
     fn static_choices(
@@ -292,12 +347,22 @@ impl WelcomePage {
         options: &[(&'static str, bool, &'static str)],
         cx: &mut Context<Self>,
     ) -> Div {
-        let options =
-            options.iter().map(|&(label, selected, value)| (SharedString::from(label), selected, value.to_string())).collect();
+        let options = options
+            .iter()
+            .map(|&(label, selected, value)| {
+                (SharedString::from(label), selected, value.to_string())
+            })
+            .collect();
         self.choices(id, target, options, cx)
     }
 
-    fn dock_choices(&self, id: &'static str, key: &'static str, side: DockSide, cx: &mut Context<Self>) -> Div {
+    fn dock_choices(
+        &self,
+        id: &'static str,
+        key: &'static str,
+        side: DockSide,
+        cx: &mut Context<Self>,
+    ) -> Div {
         self.static_choices(
             id,
             ("layout", key),
@@ -316,10 +381,17 @@ impl WelcomePage {
 
     fn step_look(&self, cx: &mut Context<Self>) -> Div {
         let chosen = Lang::parse(&self.config.ui.language);
-        let mut languages: Vec<(SharedString, bool, String)> =
-            vec![(t!("Automático").into(), chosen.is_none(), "\"auto\"".to_string())];
+        let mut languages: Vec<(SharedString, bool, String)> = vec![(
+            t!("Automático").into(),
+            chosen.is_none(),
+            "\"auto\"".to_string(),
+        )];
         for lang in Lang::ALL {
-            languages.push((lang.native_name().into(), chosen == Some(lang), format!("\"{}\"", lang.code())));
+            languages.push((
+                lang.native_name().into(),
+                chosen == Some(lang),
+                format!("\"{}\"", lang.code()),
+            ));
         }
         let mode = self.config.theme.mode;
         steps_column()
@@ -356,29 +428,43 @@ impl WelcomePage {
     // colour set there shows first, chosen.
     fn accents(&self, cx: &mut Context<Self>) -> Div {
         let accent = self.config.theme.accent.trim().to_string();
-        let custom = accent.starts_with('#').then(|| theme::parse_accent(&accent)).flatten();
+        let custom = accent
+            .starts_with('#')
+            .then(|| theme::parse_accent(&accent))
+            .flatten();
         div()
             .w_full()
             .flex()
             .flex_wrap()
             .gap(px(4.0))
-            .children(custom.map(|color| swatch("welcome-accent-custom".into(), color, t!("Personalizada"), true)))
-            .children(theme::NAMED_ACCENTS.iter().zip(crate::settings::ACCENT_LABELS).enumerate().map(
-                |(index, (&(name, color), &label))| {
-                    let selected = accent.eq_ignore_ascii_case(name);
-                    swatch(
-                        ElementId::NamedInteger("welcome-accent".into(), index as u64),
-                        color.unwrap_or_else(theme::palette_accent),
-                        i18n::tr(label),
-                        selected,
-                    )
-                    .when(!selected, |this| {
-                        this.on_click(cx.listener(move |page, _, _, cx| {
-                            page.write("theme", "accent", format!("\"{name}\""), cx);
-                        }))
-                    })
-                },
-            ))
+            .children(custom.map(|color| {
+                swatch(
+                    "welcome-accent-custom".into(),
+                    color,
+                    t!("Personalizada"),
+                    true,
+                )
+            }))
+            .children(
+                theme::NAMED_ACCENTS
+                    .iter()
+                    .zip(crate::settings::ACCENT_LABELS)
+                    .enumerate()
+                    .map(|(index, (&(name, color), &label))| {
+                        let selected = accent.eq_ignore_ascii_case(name);
+                        swatch(
+                            ElementId::NamedInteger("welcome-accent".into(), index as u64),
+                            color.unwrap_or_else(theme::palette_accent),
+                            i18n::tr(label),
+                            selected,
+                        )
+                        .when(!selected, |this| {
+                            this.on_click(cx.listener(move |page, _, _, cx| {
+                                page.write("theme", "accent", format!("\"{name}\""), cx);
+                            }))
+                        })
+                    }),
+            )
     }
 
     fn step_window(&self, cx: &mut Context<Self>) -> Div {
@@ -670,8 +756,11 @@ impl WelcomePage {
 
     fn step_search(&self, cx: &mut Context<Self>) -> Div {
         let mft_on = mft::state() == mft::State::On;
-        let (mft_busy, mft_error) =
-            cx.try_global::<Everything>().map_or((false, None), |state| (state.mft_busy, state.mft_error.clone()));
+        let (mft_busy, mft_error) = cx
+            .try_global::<Everything>()
+            .map_or((false, None), |state| {
+                (state.mft_busy, state.mft_error.clone())
+            });
         let listary_card: AnyElement = match self.listary {
             Some(crate::listary::State::NotInstalled) => info_card(
                 "icons/search.svg",
@@ -745,7 +834,13 @@ impl WelcomePage {
             cx.notify();
             return;
         }
-        match crate::quick_keys::from_keystroke(modifiers.control, modifiers.shift, modifiers.alt, modifiers.platform, &key) {
+        match crate::quick_keys::from_keystroke(
+            modifiers.control,
+            modifiers.shift,
+            modifiers.alt,
+            modifiers.platform,
+            &key,
+        ) {
             Some(setting) => {
                 self.error = None;
                 self.write("launcher", "hotkey", format!("\"{setting}\""), cx);
@@ -763,10 +858,19 @@ impl WelcomePage {
     // recorded, as in Settings.
     fn quick_search_card(&self, cx: &mut Context<Self>) -> Div {
         let current = crate::quick_keys::resolve(&self.config.launcher.hotkey);
-        let listary_installed = !matches!(self.listary, Some(crate::listary::State::NotInstalled) | None);
+        let listary_installed = !matches!(
+            self.listary,
+            Some(crate::listary::State::NotInstalled) | None
+        );
         let presets: Vec<(SharedString, bool, String)> = quick_presets()
             .into_iter()
-            .map(|(value, label)| (SharedString::from(label), value == current, format!("\"{value}\"")))
+            .map(|(value, label)| {
+                (
+                    SharedString::from(label),
+                    value == current,
+                    format!("\"{value}\""),
+                )
+            })
             .collect();
         let custom = !quick_presets().iter().any(|(value, _)| *value == current);
         let recording = self.recording_quick;
@@ -777,15 +881,19 @@ impl WelcomePage {
         } else {
             t!("Gravar outro…").into()
         };
-        let record = pill("welcome-quick-record".into(), record_label, custom || recording)
-            .cursor_pointer()
-            .on_click(cx.listener(|page, _, window, cx| {
-                page.recording_quick = !page.recording_quick;
-                if page.recording_quick {
-                    window.focus(&page.focus);
-                }
-                cx.notify();
-            }));
+        let record = pill(
+            "welcome-quick-record".into(),
+            record_label,
+            custom || recording,
+        )
+        .cursor_pointer()
+        .on_click(cx.listener(|page, _, window, cx| {
+            page.recording_quick = !page.recording_quick;
+            if page.recording_quick {
+                window.focus(&page.focus);
+            }
+            cx.notify();
+        }));
         choice_card(
             "icons/keyboard.svg",
             t!("Busca rápida, o Listary do Prime Files"),
@@ -879,25 +987,47 @@ impl WelcomePage {
                     SortOrder::Size => t!("Tamanho"),
                     SortOrder::Kind => t!("Tipo"),
                 };
-                let direction = if config.ui.default_sort_descending { t!("Decrescente") } else { t!("Crescente") };
+                let direction = if config.ui.default_sort_descending {
+                    t!("Decrescente")
+                } else {
+                    t!("Crescente")
+                };
                 vec![
-                    (t!("Ordenação padrão"), Value::Text(format!("{sort} · {direction}"))),
+                    (
+                        t!("Ordenação padrão"),
+                        Value::Text(format!("{sort} · {direction}")),
+                    ),
                     (t!("Mostrar itens ocultos"), on(config.ui.show_hidden)),
-                    (t!("Reabrir as abas ao iniciar"), on(config.explorer.restore_tabs)),
-                    (t!("Ir para a aba nova"), on(!config.explorer.background_tabs)),
+                    (
+                        t!("Reabrir as abas ao iniciar"),
+                        on(config.explorer.restore_tabs),
+                    ),
+                    (
+                        t!("Ir para a aba nova"),
+                        on(!config.explorer.background_tabs),
+                    ),
                     (t!("Menu clássico do Windows"), on(config.menu.classic)),
                 ]
             }
             Step::Sound => {
                 let hover = if config.ui.hover_audio {
-                    Value::Text(tf!("Ligado, depois de {time}", time = delay_label(config.ui.hover_audio_delay_ms)))
+                    Value::Text(tf!(
+                        "Ligado, depois de {time}",
+                        time = delay_label(config.ui.hover_audio_delay_ms)
+                    ))
                 } else {
                     on(false)
                 };
                 vec![
                     (t!("Tocar ao passar o mouse"), hover),
-                    (t!("Tocar ao abrir no visualizador"), on(config.ui.preview_autoplay)),
-                    (t!("Forma de onda nos ícones"), on(config.ui.audio_waveforms)),
+                    (
+                        t!("Tocar ao abrir no visualizador"),
+                        on(config.ui.preview_autoplay),
+                    ),
+                    (
+                        t!("Forma de onda nos ícones"),
+                        on(config.ui.audio_waveforms),
+                    ),
                 ]
             }
             Step::System => {
@@ -907,16 +1037,34 @@ impl WelcomePage {
                     OpenFromOtherApps::NewWindow => t!("Nova janela"),
                 };
                 vec![
-                    (t!("Explorador padrão do Windows"), Value::Switch(self.default_explorer)),
-                    (t!("\"Mostrar na pasta\" abre aqui"), on(config.explorer.reveal_from_other_apps)),
-                    (t!("Pastas abertas de outros programas"), Value::Text(opens.to_string())),
-                    (t!("Iniciar com o Windows"), Value::Switch(self.starts_with_windows)),
-                    (t!("Atualizar automaticamente"), on(config.updates.automatic)),
+                    (
+                        t!("Explorador padrão do Windows"),
+                        Value::Switch(self.default_explorer),
+                    ),
+                    (
+                        t!("\"Mostrar na pasta\" abre aqui"),
+                        on(config.explorer.reveal_from_other_apps),
+                    ),
+                    (
+                        t!("Pastas abertas de outros programas"),
+                        Value::Text(opens.to_string()),
+                    ),
+                    (
+                        t!("Iniciar com o Windows"),
+                        Value::Switch(self.starts_with_windows),
+                    ),
+                    (
+                        t!("Atualizar automaticamente"),
+                        on(config.updates.automatic),
+                    ),
                 ]
             }
             Step::Search => {
                 let current = crate::quick_keys::resolve(&config.launcher.hotkey);
-                let quick = match quick_presets().into_iter().find(|(value, _)| *value == current) {
+                let quick = match quick_presets()
+                    .into_iter()
+                    .find(|(value, _)| *value == current)
+                {
                     Some(("off", _)) => on(false),
                     Some((_, label)) => Value::Text(label.to_string()),
                     None => Value::Text(crate::quick_keys::describe(&current)),
@@ -929,7 +1077,10 @@ impl WelcomePage {
                 };
                 vec![
                     (t!("Busca rápida"), quick),
-                    (t!("Indexação instantânea"), on(mft::state() == mft::State::On)),
+                    (
+                        t!("Indexação instantânea"),
+                        on(mft::state() == mft::State::On),
+                    ),
                     ("Listary", listary),
                 ]
             }
@@ -1012,19 +1163,28 @@ impl WelcomePage {
     // The steps by name, done ones checked; any of them can be clicked. On a
     // narrow window only the current one keeps its name.
     fn step_bar(&self, named: bool, narrow: bool, pad: f32, cx: &mut Context<Self>) -> Div {
-        let current = STEPS.iter().position(|step| *step == self.step).unwrap_or(0);
+        let current = STEPS
+            .iter()
+            .position(|step| *step == self.step)
+            .unwrap_or(0);
         // Seven circles, their links and one name fit 360 px only this tight.
         let gap = if narrow { 4.0 } else { 8.0 };
-        let mut row = div().w_full().max_w(px(1100.0)).mx_auto().flex().items_center().gap(px(gap));
+        let mut row = div()
+            .w_full()
+            .max_w(px(1100.0))
+            .mx_auto()
+            .flex()
+            .items_center()
+            .gap(px(gap));
         for (ix, step) in STEPS.into_iter().enumerate() {
             if ix > 0 {
-                row = row.child(
-                    div()
-                        .flex_1()
-                        .min_w(px(6.0))
-                        .h(px(1.0))
-                        .bg(rgb(if ix <= current { theme::accent() } else { theme::border() })),
-                );
+                row = row.child(div().flex_1().min_w(px(6.0)).h(px(1.0)).bg(rgb(
+                    if ix <= current {
+                        theme::accent()
+                    } else {
+                        theme::border()
+                    },
+                )));
             }
             let done = ix < current;
             let here = ix == current;
@@ -1053,16 +1213,23 @@ impl WelcomePage {
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .map(|this| {
                                 if done {
-                                    this.bg(rgb(theme::accent())).text_color(rgb(theme::accent_fg()))
+                                    this.bg(rgb(theme::accent()))
+                                        .text_color(rgb(theme::accent_fg()))
                                 } else if here {
-                                    this.border_2().border_color(rgb(theme::accent())).text_color(rgb(theme::accent()))
+                                    this.border_2()
+                                        .border_color(rgb(theme::accent()))
+                                        .text_color(rgb(theme::accent()))
                                 } else {
-                                    this.border_1().border_color(rgb(theme::border_hover())).text_color(rgb(theme::muted()))
+                                    this.border_1()
+                                        .border_color(rgb(theme::border_hover()))
+                                        .text_color(rgb(theme::muted()))
                                 }
                             })
                             .map(|this| {
                                 if done {
-                                    this.child(Icon::new(Icon::empty()).path("icons/check.svg").size_3())
+                                    this.child(
+                                        Icon::new(Icon::empty()).path("icons/check.svg").size_3(),
+                                    )
                                 } else {
                                     this.child((ix + 1).to_string())
                                 }
@@ -1073,7 +1240,11 @@ impl WelcomePage {
                             div()
                                 .text_sm()
                                 .whitespace_nowrap()
-                                .text_color(rgb(if here { theme::fg() } else { theme::fg_secondary() }))
+                                .text_color(rgb(if here {
+                                    theme::fg()
+                                } else {
+                                    theme::fg_secondary()
+                                }))
                                 .when(here, |text| text.font_weight(gpui::FontWeight::SEMIBOLD))
                                 .child(step.label()),
                         )
@@ -1092,7 +1263,10 @@ impl WelcomePage {
     }
 
     fn footer(&self, narrow: bool, pad: f32, cx: &mut Context<Self>) -> Div {
-        let index = STEPS.iter().position(|step| *step == self.step).unwrap_or(0);
+        let index = STEPS
+            .iter()
+            .position(|step| *step == self.step)
+            .unwrap_or(0);
         let last = index == STEPS.len() - 1;
         let next = STEPS.get(index + 1).copied();
         let previous = index.checked_sub(1).and_then(|ix| STEPS.get(ix)).copied();
@@ -1192,7 +1366,11 @@ impl Render for WelcomePage {
         let panel_width = if width >= 1240.0 { 440.0 } else { 410.0 };
         // What the previews fit in: the side column inside its padding, or
         // the choices' column.
-        let preview_width = if wide { panel_width - 2.0 * panel_pad } else { (width - 2.0 * pad).min(660.0) };
+        let preview_width = if wide {
+            panel_width - 2.0 * panel_pad
+        } else {
+            (width - 2.0 * pad).min(660.0)
+        };
 
         let body = match step {
             Step::Look => self.step_look(cx),
@@ -1203,8 +1381,10 @@ impl Render for WelcomePage {
             Step::Search => self.step_search(cx),
             Step::Done => self.step_done(cx),
         };
-        let inline_preview = (!wide && step.has_preview()).then(|| self.preview(step, preview_width, cx));
-        let side_preview = (wide && step.has_preview()).then(|| self.preview(step, preview_width, cx));
+        let inline_preview =
+            (!wide && step.has_preview()).then(|| self.preview(step, preview_width, cx));
+        let side_preview =
+            (wide && step.has_preview()).then(|| self.preview(step, preview_width, cx));
 
         // The scrolling column needs a height of its own (the row's, not its
         // content's): without `h_full` the last card ran under the footer and
@@ -1233,10 +1413,21 @@ impl Render for WelcomePage {
                     .flex_col()
                     .gap(px(22.0))
                     .child(hero(step.icon(), step.title(), step.text(), narrow))
-                    .children(inline_preview.map(|preview| div().w_full().min_w(px(0.0)).overflow_hidden().child(preview)))
+                    .children(inline_preview.map(|preview| {
+                        div()
+                            .w_full()
+                            .min_w(px(0.0))
+                            .overflow_hidden()
+                            .child(preview)
+                    }))
                     .child(body)
                     .when_some(self.error.clone(), |this, error| {
-                        this.child(div().text_sm().text_color(rgb(theme::danger())).child(error))
+                        this.child(
+                            div()
+                                .text_sm()
+                                .text_color(rgb(theme::danger()))
+                                .child(error),
+                        )
                     }),
             );
 
@@ -1254,7 +1445,9 @@ impl Render for WelcomePage {
             .overflow_hidden()
             .bg(rgb(theme::bg()))
             .track_focus(&self.focus)
-            .on_key_down(cx.listener(|page, event: &KeyDownEvent, _window, cx| page.record_quick_key(event, cx)))
+            .on_key_down(cx.listener(|page, event: &KeyDownEvent, _window, cx| {
+                page.record_quick_key(event, cx)
+            }))
             .child(self.step_bar(width >= NAMED_STEPS, narrow, pad, cx))
             .child(
                 div()
@@ -1355,12 +1548,24 @@ fn hero(icon: &'static str, title: &'static str, text: &'static str, narrow: boo
                 .gap(px(6.0))
                 .child(
                     div()
-                        .map(|this| if narrow { this.text_xl() } else { this.text_2xl() })
+                        .map(|this| {
+                            if narrow {
+                                this.text_xl()
+                            } else {
+                                this.text_2xl()
+                            }
+                        })
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(rgb(theme::fg()))
                         .child(title),
                 )
-                .child(div().text_sm().line_height(px(20.0)).text_color(rgb(theme::fg_secondary())).child(text)),
+                .child(
+                    div()
+                        .text_sm()
+                        .line_height(px(20.0))
+                        .text_color(rgb(theme::fg_secondary()))
+                        .child(text),
+                ),
         )
 }
 
@@ -1379,8 +1584,20 @@ fn preview_caption(title: &'static str, text: &'static str) -> Div {
         .flex()
         .flex_col()
         .gap(px(2.0))
-        .child(div().text_sm().font_weight(gpui::FontWeight::SEMIBOLD).text_color(rgb(theme::fg())).child(title))
-        .child(div().text_xs().line_height(px(17.0)).text_color(rgb(theme::fg_secondary())).child(text))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(rgb(theme::fg()))
+                .child(title),
+        )
+        .child(
+            div()
+                .text_xs()
+                .line_height(px(17.0))
+                .text_color(rgb(theme::fg_secondary()))
+                .child(text),
+        )
 }
 
 fn icon_box(icon: &'static str, lit: bool) -> Div {
@@ -1391,8 +1608,16 @@ fn icon_box(icon: &'static str, lit: bool) -> Div {
         .items_center()
         .justify_center()
         .rounded(px(9.0))
-        .bg(rgb(if lit { theme::accent_subtle() } else { theme::bg() }))
-        .text_color(rgb(if lit { theme::accent() } else { theme::fg_secondary() }))
+        .bg(rgb(if lit {
+            theme::accent_subtle()
+        } else {
+            theme::bg()
+        }))
+        .text_color(rgb(if lit {
+            theme::accent()
+        } else {
+            theme::fg_secondary()
+        }))
         .child(Icon::new(Icon::empty()).path(icon).size_4())
 }
 
@@ -1414,8 +1639,20 @@ fn card_text(title: &'static str, text: SharedString) -> Div {
         .flex()
         .flex_col()
         .gap(px(3.0))
-        .child(div().text_sm().font_weight(gpui::FontWeight::SEMIBOLD).text_color(rgb(theme::fg())).child(title))
-        .child(div().text_xs().line_height(px(17.0)).text_color(rgb(theme::fg_secondary())).child(text))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(rgb(theme::fg()))
+                .child(title),
+        )
+        .child(
+            div()
+                .text_xs()
+                .line_height(px(17.0))
+                .text_color(rgb(theme::fg_secondary()))
+                .child(text),
+        )
 }
 
 // A choice with its options under the text, where a row of them always has
@@ -1425,7 +1662,14 @@ fn choice_card(icon: &'static str, title: &'static str, text: String, control: D
         .flex()
         .flex_col()
         .gap(px(12.0))
-        .child(div().flex().items_center().gap(px(12.0)).child(icon_box(icon, false)).child(card_text(title, text.into())))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(12.0))
+                .child(icon_box(icon, false))
+                .child(card_text(title, text.into())),
+        )
         .child(control)
 }
 
@@ -1448,18 +1692,32 @@ fn option_card(
         .items_center()
         .gap(px(12.0))
         .border_color(rgb(if on { theme::accent() } else { theme::border() }))
-        .when(known && !busy, |this| this.cursor_pointer().hover(|style| style.bg(rgb(theme::bg_hover()))).on_click(toggle))
+        .when(known && !busy, |this| {
+            this.cursor_pointer()
+                .hover(|style| style.bg(rgb(theme::bg_hover())))
+                .on_click(toggle)
+        })
         .child(icon_box(icon, on))
         .child(card_text(title, text.into()))
         .child(if known && !busy {
             switch(on).into_any_element()
         } else {
-            div().flex_shrink_0().text_xs().text_color(rgb(theme::muted())).child(t!("Verificando…")).into_any_element()
+            div()
+                .flex_shrink_0()
+                .text_xs()
+                .text_color(rgb(theme::muted()))
+                .child(t!("Verificando…"))
+                .into_any_element()
         })
 }
 
 fn info_card(icon: &'static str, title: &'static str, text: &'static str) -> Div {
-    card_frame().flex().items_center().gap(px(12.0)).child(icon_box(icon, false)).child(card_text(title, text.into()))
+    card_frame()
+        .flex()
+        .items_center()
+        .gap(px(12.0))
+        .child(icon_box(icon, false))
+        .child(card_text(title, text.into()))
 }
 
 // A step's choices as they are now, one per line.
@@ -1476,8 +1734,19 @@ fn summary_card(title: &'static str, icon: &'static str, rows: Vec<(&'static str
                 .flex()
                 .items_center()
                 .gap(px(8.0))
-                .child(Icon::new(Icon::empty()).path(icon).size_4().text_color(rgb(theme::accent())))
-                .child(div().text_sm().font_weight(gpui::FontWeight::SEMIBOLD).text_color(rgb(theme::fg())).child(title)),
+                .child(
+                    Icon::new(Icon::empty())
+                        .path(icon)
+                        .size_4()
+                        .text_color(rgb(theme::accent())),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(rgb(theme::fg()))
+                        .child(title),
+                ),
         )
         .children(rows.into_iter().map(|(label, value)| {
             let (color, text): (u32, SharedString) = match value {
@@ -1495,8 +1764,21 @@ fn summary_card(title: &'static str, icon: &'static str, rows: Vec<(&'static str
                 .gap(px(12.0))
                 .border_t_1()
                 .border_color(rgb(theme::border()))
-                .child(div().flex_1().min_w(px(0.0)).text_sm().text_color(rgb(theme::fg_secondary())).child(label))
-                .child(div().flex_shrink_0().text_sm().text_color(rgb(color)).child(text))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.0))
+                        .text_sm()
+                        .text_color(rgb(theme::fg_secondary()))
+                        .child(label),
+                )
+                .child(
+                    div()
+                        .flex_shrink_0()
+                        .text_sm()
+                        .text_color(rgb(color))
+                        .child(text),
+                )
         }))
 }
 
@@ -1514,8 +1796,22 @@ fn note_text(text: String) -> Div {
         .rounded(px(10.0))
         .border_1()
         .border_color(rgb(theme::border()))
-        .child(Icon::new(Icon::empty()).path("icons/info.svg").size_4().flex_shrink_0().text_color(rgb(theme::muted())))
-        .child(div().flex_1().min_w(px(0.0)).text_xs().line_height(px(18.0)).text_color(rgb(theme::fg_secondary())).child(text))
+        .child(
+            Icon::new(Icon::empty())
+                .path("icons/info.svg")
+                .size_4()
+                .flex_shrink_0()
+                .text_color(rgb(theme::muted())),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_w(px(0.0))
+                .text_xs()
+                .line_height(px(18.0))
+                .text_color(rgb(theme::fg_secondary()))
+                .child(text),
+        )
 }
 
 fn pill(id: ElementId, label: SharedString, selected: bool) -> Stateful<Div> {
@@ -1532,7 +1828,9 @@ fn pill(id: ElementId, label: SharedString, selected: bool) -> Stateful<Div> {
         .whitespace_nowrap()
         .map(|this| {
             if selected {
-                this.bg(rgb(theme::accent())).border_color(rgb(theme::accent())).text_color(rgb(theme::accent_fg()))
+                this.bg(rgb(theme::accent()))
+                    .border_color(rgb(theme::accent()))
+                    .text_color(rgb(theme::accent_fg()))
             } else {
                 this.cursor_pointer()
                     .border_color(rgb(theme::border_hover()))
@@ -1561,13 +1859,23 @@ fn toggle_pill(id: ElementId, label: &'static str, on: bool) -> Stateful<Div> {
         .whitespace_nowrap()
         .map(|this| {
             if on {
-                this.bg(rgb(theme::accent_subtle())).border_color(rgb(theme::accent())).text_color(rgb(theme::fg()))
+                this.bg(rgb(theme::accent_subtle()))
+                    .border_color(rgb(theme::accent()))
+                    .text_color(rgb(theme::fg()))
             } else {
-                this.border_color(rgb(theme::border_hover())).text_color(rgb(theme::fg_secondary()))
+                this.border_color(rgb(theme::border_hover()))
+                    .text_color(rgb(theme::fg_secondary()))
             }
         })
         .hover(|style| style.bg(rgb(theme::bg_hover())))
-        .when(on, |this| this.child(Icon::new(Icon::empty()).path("icons/check.svg").size_3().text_color(rgb(theme::accent()))))
+        .when(on, |this| {
+            this.child(
+                Icon::new(Icon::empty())
+                    .path("icons/check.svg")
+                    .size_3()
+                    .text_color(rgb(theme::accent())),
+            )
+        })
         .child(label)
 }
 
@@ -1582,7 +1890,10 @@ fn swatch(id: ElementId, color: u32, label: &'static str, selected: bool) -> Sta
         .items_center()
         .gap(px(5.0))
         .rounded(px(8.0))
-        .when(!selected, |this| this.cursor_pointer().hover(|style| style.bg(rgb(theme::bg_hover()))))
+        .when(!selected, |this| {
+            this.cursor_pointer()
+                .hover(|style| style.bg(rgb(theme::bg_hover())))
+        })
         .child(
             div()
                 .size(px(26.0))
@@ -1592,16 +1903,29 @@ fn swatch(id: ElementId, color: u32, label: &'static str, selected: bool) -> Sta
                 .rounded_full()
                 .bg(rgb(color))
                 .border_2()
-                .border_color(rgb(if selected { theme::fg() } else { theme::bg_secondary() }))
+                .border_color(rgb(if selected {
+                    theme::fg()
+                } else {
+                    theme::bg_secondary()
+                }))
                 .when(selected, |this| {
-                    this.child(Icon::new(Icon::empty()).path("icons/check.svg").size_3().text_color(rgb(0xFFFFFF)))
+                    this.child(
+                        Icon::new(Icon::empty())
+                            .path("icons/check.svg")
+                            .size_3()
+                            .text_color(rgb(0xFFFFFF)),
+                    )
                 }),
         )
         .child(
             div()
                 .text_xs()
                 .whitespace_nowrap()
-                .text_color(rgb(if selected { theme::fg() } else { theme::fg_secondary() }))
+                .text_color(rgb(if selected {
+                    theme::fg()
+                } else {
+                    theme::fg_secondary()
+                }))
                 .child(label),
         )
 }
@@ -1626,9 +1950,15 @@ fn theme_tile(
         .rounded(px(10.0))
         .border_2()
         .cursor_pointer()
-        .border_color(rgb(if selected { theme::accent() } else { theme::border() }))
+        .border_color(rgb(if selected {
+            theme::accent()
+        } else {
+            theme::border()
+        }))
         .hover(|style| style.bg(rgb(theme::bg_hover())))
-        .on_click(cx.listener(move |page, _, _, cx| page.write("theme", "mode", value.to_string(), cx)))
+        .on_click(
+            cx.listener(move |page, _, _, cx| page.write("theme", "mode", value.to_string(), cx)),
+        )
         .child(
             div()
                 .h(px(56.0))
@@ -1642,7 +1972,13 @@ fn theme_tile(
                 .p(px(6.0))
                 .child(div().h(px(8.0)).rounded(px(3.0)).bg(rgb(bar)))
                 .child(div().w(px(40.0)).h(px(5.0)).rounded(px(3.0)).bg(rgb(text)))
-                .child(div().w(px(26.0)).h(px(5.0)).rounded(px(3.0)).bg(rgb(theme::accent()))),
+                .child(
+                    div()
+                        .w(px(26.0))
+                        .h(px(5.0))
+                        .rounded(px(3.0))
+                        .bg(rgb(theme::accent())),
+                ),
         )
         .child(
             div()
@@ -1652,7 +1988,13 @@ fn theme_tile(
                 .text_sm()
                 .text_color(rgb(theme::fg()))
                 .when(selected, |this| {
-                    this.child(Icon::new(Icon::empty()).path("icons/check.svg").size_3().flex_shrink_0().text_color(rgb(theme::accent())))
+                    this.child(
+                        Icon::new(Icon::empty())
+                            .path("icons/check.svg")
+                            .size_3()
+                            .flex_shrink_0()
+                            .text_color(rgb(theme::accent())),
+                    )
                 })
                 .child(div().flex_1().min_w(px(0.0)).child(label)),
         )
@@ -1672,19 +2014,31 @@ fn switch(on: bool) -> Div {
         .border_1()
         .map(|track| {
             if on {
-                track.bg(rgb(theme::accent())).border_color(rgb(theme::accent()))
+                track
+                    .bg(rgb(theme::accent()))
+                    .border_color(rgb(theme::accent()))
             } else {
-                track.bg(rgb(theme::bg())).border_color(rgb(theme::border_hover()))
+                track
+                    .bg(rgb(theme::bg()))
+                    .border_color(rgb(theme::border_hover()))
             }
         })
         .child(
             div()
                 .absolute()
                 .top(px(inset))
-                .left(px(if on { WIDTH - KNOB - inset - 2.0 } else { inset }))
+                .left(px(if on {
+                    WIDTH - KNOB - inset - 2.0
+                } else {
+                    inset
+                }))
                 .size(px(KNOB))
                 .rounded_full()
-                .bg(rgb(if on { theme::accent_fg() } else { theme::fg_secondary() })),
+                .bg(rgb(if on {
+                    theme::accent_fg()
+                } else {
+                    theme::fg_secondary()
+                })),
         )
 }
 
@@ -1705,7 +2059,13 @@ fn primary_button(id: &'static str, label: &'static str, arrow: bool) -> Statefu
         .font_weight(gpui::FontWeight::SEMIBOLD)
         .hover(|style| style.bg(rgb(theme::accent_hover())))
         .child(label)
-        .when(arrow, |this| this.child(Icon::new(Icon::empty()).path("icons/arrow-right.svg").size_4()))
+        .when(arrow, |this| {
+            this.child(
+                Icon::new(Icon::empty())
+                    .path("icons/arrow-right.svg")
+                    .size_4(),
+            )
+        })
 }
 
 fn secondary_button(id: &'static str, label: &'static str) -> Stateful<Div> {
@@ -1741,33 +2101,104 @@ struct Sample {
 }
 
 const SAMPLE_FOLDER: [Sample; 8] = [
-    Sample { name: "Projetos", folder: true, hidden: false, age: 1, size: 0, kind: "" },
-    Sample { name: "Fotos", folder: true, hidden: false, age: 9, size: 0, kind: "" },
-    Sample { name: ".cache", folder: true, hidden: true, age: 0, size: 0, kind: "" },
-    Sample { name: "relatório.pdf", folder: false, hidden: false, age: 3, size: 2_400_000, kind: "PDF" },
-    Sample { name: "notas.txt", folder: false, hidden: false, age: 0, size: 4_000, kind: "TXT" },
-    Sample { name: "trilha.wav", folder: false, hidden: false, age: 6, size: 38_000_000, kind: "WAV" },
-    Sample { name: "capa.png", folder: false, hidden: false, age: 12, size: 820_000, kind: "PNG" },
-    Sample { name: "desktop.ini", folder: false, hidden: true, age: 30, size: 1_000, kind: "INI" },
+    Sample {
+        name: "Projetos",
+        folder: true,
+        hidden: false,
+        age: 1,
+        size: 0,
+        kind: "",
+    },
+    Sample {
+        name: "Fotos",
+        folder: true,
+        hidden: false,
+        age: 9,
+        size: 0,
+        kind: "",
+    },
+    Sample {
+        name: ".cache",
+        folder: true,
+        hidden: true,
+        age: 0,
+        size: 0,
+        kind: "",
+    },
+    Sample {
+        name: "relatório.pdf",
+        folder: false,
+        hidden: false,
+        age: 3,
+        size: 2_400_000,
+        kind: "PDF",
+    },
+    Sample {
+        name: "notas.txt",
+        folder: false,
+        hidden: false,
+        age: 0,
+        size: 4_000,
+        kind: "TXT",
+    },
+    Sample {
+        name: "trilha.wav",
+        folder: false,
+        hidden: false,
+        age: 6,
+        size: 38_000_000,
+        kind: "WAV",
+    },
+    Sample {
+        name: "capa.png",
+        folder: false,
+        hidden: false,
+        age: 12,
+        size: 820_000,
+        kind: "PNG",
+    },
+    Sample {
+        name: "desktop.ini",
+        folder: false,
+        hidden: true,
+        age: 30,
+        size: 1_000,
+        kind: "INI",
+    },
 ];
 
 /// A folder of example sorted as `ui.default_sort` says, folders first, its
 /// hidden items shown faded when `ui.show_hidden` is on.
 fn sort_preview(config: &Config) -> Div {
     let ui = &config.ui;
-    let mut rows: Vec<&Sample> = SAMPLE_FOLDER.iter().filter(|sample| ui.show_hidden || !sample.hidden).collect();
+    let mut rows: Vec<&Sample> = SAMPLE_FOLDER
+        .iter()
+        .filter(|sample| ui.show_hidden || !sample.hidden)
+        .collect();
     rows.sort_by(|a, b| {
         let key = match ui.default_sort {
-            SortOrder::Name => a.name.trim_start_matches('.').to_lowercase().cmp(&b.name.trim_start_matches('.').to_lowercase()),
+            SortOrder::Name => a
+                .name
+                .trim_start_matches('.')
+                .to_lowercase()
+                .cmp(&b.name.trim_start_matches('.').to_lowercase()),
             // Newest first is "descending" in the listing too.
             SortOrder::Modified => b.age.cmp(&a.age),
             SortOrder::Size => a.size.cmp(&b.size),
             SortOrder::Kind => a.kind.cmp(b.kind).then(a.name.cmp(b.name)),
         };
-        let key = if ui.default_sort_descending { key.reverse() } else { key };
+        let key = if ui.default_sort_descending {
+            key.reverse()
+        } else {
+            key
+        };
         b.folder.cmp(&a.folder).then(key)
     });
-    let arrow = if ui.default_sort_descending { "icons/chevron-down.svg" } else { "icons/chevron-up.svg" };
+    let arrow = if ui.default_sort_descending {
+        "icons/chevron-down.svg"
+    } else {
+        "icons/chevron-up.svg"
+    };
     let column = |label: &'static str, order: SortOrder, width: Option<f32>| {
         let sorted = ui.default_sort == order;
         div()
@@ -1778,10 +2209,16 @@ fn sort_preview(config: &Config) -> Div {
             .flex()
             .items_center()
             .gap(px(3.0))
-            .text_color(rgb(if sorted { theme::accent() } else { theme::muted() }))
+            .text_color(rgb(if sorted {
+                theme::accent()
+            } else {
+                theme::muted()
+            }))
             .when(sorted, |this| this.font_weight(gpui::FontWeight::SEMIBOLD))
             .child(label)
-            .when(sorted, |this| this.child(Icon::new(Icon::empty()).path(arrow).size_3()))
+            .when(sorted, |this| {
+                this.child(Icon::new(Icon::empty()).path(arrow).size_3())
+            })
     };
     let header = div()
         .h(px(26.0))
@@ -1823,14 +2260,35 @@ fn sort_preview(config: &Config) -> Div {
                         .gap(px(7.0))
                         .child(
                             Icon::new(Icon::empty())
-                                .path(if sample.folder { "icons/folder.svg" } else { "icons/file.svg" })
+                                .path(if sample.folder {
+                                    "icons/folder.svg"
+                                } else {
+                                    "icons/file.svg"
+                                })
                                 .size_4()
                                 .flex_shrink_0()
-                                .text_color(rgb(if sample.folder { preview::FOLDER } else { theme::fg_secondary() })),
+                                .text_color(rgb(if sample.folder {
+                                    preview::FOLDER
+                                } else {
+                                    theme::fg_secondary()
+                                })),
                         )
-                        .child(div().text_color(rgb(theme::fg())).whitespace_nowrap().child(sample.name)),
+                        .child(
+                            div()
+                                .text_color(rgb(theme::fg()))
+                                .whitespace_nowrap()
+                                .child(sample.name),
+                        ),
                 )
-                .child(div().w(px(36.0)).flex_shrink_0().flex().justify_end().text_color(rgb(theme::fg_secondary())).child(sample.kind))
+                .child(
+                    div()
+                        .w(px(36.0))
+                        .flex_shrink_0()
+                        .flex()
+                        .justify_end()
+                        .text_color(rgb(theme::fg_secondary()))
+                        .child(sample.kind),
+                )
                 .child(
                     div()
                         .w(px(58.0))
@@ -1838,7 +2296,11 @@ fn sort_preview(config: &Config) -> Div {
                         .flex()
                         .justify_end()
                         .text_color(rgb(theme::fg_secondary()))
-                        .child(if sample.folder { String::new() } else { size_label(sample.size) }),
+                        .child(if sample.folder {
+                            String::new()
+                        } else {
+                            size_label(sample.size)
+                        }),
                 )
         }))
 }
@@ -1857,7 +2319,11 @@ fn icons_preview(waveforms: bool) -> Div {
     let tile = |name: &'static str, sound: Option<u32>, icon: &'static str| {
         let picture: AnyElement = match sound {
             Some(seed) if waveforms => waveform(seed).into_any_element(),
-            _ => Icon::new(Icon::empty()).path(icon).size_6().text_color(rgb(theme::fg_secondary())).into_any_element(),
+            _ => Icon::new(Icon::empty())
+                .path(icon)
+                .size_6()
+                .text_color(rgb(theme::fg_secondary()))
+                .into_any_element(),
         };
         div()
             .flex_1()
@@ -1905,12 +2371,22 @@ fn icons_preview(waveforms: bool) -> Div {
 // Bars of a made-up sound, the same for the same seed.
 fn waveform(seed: u32) -> Div {
     let mut state = 0x9E37_79B9u32.wrapping_mul(seed) | 1;
-    div().h(px(44.0)).px(px(6.0)).flex().items_center().gap(px(1.0)).children((0..16).map(move |ix| {
-        state ^= state << 13;
-        state ^= state >> 17;
-        state ^= state << 5;
-        let envelope = 1.0 - ((ix as f32 - 6.0).abs() / 10.0).min(0.8);
-        let height = 4.0 + (state % 100) as f32 / 100.0 * 36.0 * envelope;
-        div().w(px(2.0)).h(px(height)).rounded(px(1.0)).bg(rgb(theme::accent()))
-    }))
+    div()
+        .h(px(44.0))
+        .px(px(6.0))
+        .flex()
+        .items_center()
+        .gap(px(1.0))
+        .children((0..16).map(move |ix| {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            let envelope = 1.0 - ((ix as f32 - 6.0).abs() / 10.0).min(0.8);
+            let height = 4.0 + (state % 100) as f32 / 100.0 * 36.0 * envelope;
+            div()
+                .w(px(2.0))
+                .h(px(height))
+                .rounded(px(1.0))
+                .bg(rgb(theme::accent()))
+        }))
 }

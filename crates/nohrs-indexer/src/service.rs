@@ -17,24 +17,30 @@ use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::time::Instant;
 
 use windows::Win32::Foundation::{
-    ERROR_CALL_NOT_IMPLEMENTED, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, HLOCAL, LocalFree, NO_ERROR,
+    ERROR_CALL_NOT_IMPLEMENTED, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, HLOCAL, LocalFree,
+    NO_ERROR,
 };
-use windows::Win32::Security::Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1};
+use windows::Win32::Security::Authorization::{
+    ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+};
 use windows::Win32::Security::{PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES};
 use windows::Win32::Storage::FileSystem::{
-    FILE_FLAG_FIRST_PIPE_INSTANCE, FlushFileBuffers, GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW,
-    PIPE_ACCESS_DUPLEX,
+    FILE_FLAG_FIRST_PIPE_INSTANCE, FlushFileBuffers, GetDriveTypeW, GetLogicalDrives,
+    GetVolumeInformationW, PIPE_ACCESS_DUPLEX,
 };
 use windows::Win32::System::Pipes::{
-    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
-    PIPE_TYPE_BYTE, PIPE_WAIT,
+    ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_READMODE_BYTE,
+    PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT,
 };
-use windows::Win32::System::Registry::{HKEY_LOCAL_MACHINE, RRF_RT_REG_EXPAND_SZ, RRF_RT_REG_SZ, RegGetValueW};
+use windows::Win32::System::Registry::{
+    HKEY_LOCAL_MACHINE, RRF_RT_REG_EXPAND_SZ, RRF_RT_REG_SZ, RegGetValueW,
+};
 use windows::Win32::System::Services::{
-    RegisterServiceCtrlHandlerExW, SERVICE_ACCEPT_SHUTDOWN, SERVICE_ACCEPT_STOP, SERVICE_CONTROL_INTERROGATE,
-    SERVICE_CONTROL_SHUTDOWN, SERVICE_CONTROL_STOP, SERVICE_RUNNING, SERVICE_STATUS, SERVICE_STATUS_CURRENT_STATE,
-    SERVICE_STATUS_HANDLE, SERVICE_STOP_PENDING, SERVICE_STOPPED, SERVICE_TABLE_ENTRYW, SERVICE_WIN32_OWN_PROCESS,
-    SetServiceStatus, StartServiceCtrlDispatcherW,
+    RegisterServiceCtrlHandlerExW, SERVICE_ACCEPT_SHUTDOWN, SERVICE_ACCEPT_STOP,
+    SERVICE_CONTROL_INTERROGATE, SERVICE_CONTROL_SHUTDOWN, SERVICE_CONTROL_STOP, SERVICE_RUNNING,
+    SERVICE_STATUS, SERVICE_STATUS_CURRENT_STATE, SERVICE_STATUS_HANDLE, SERVICE_STOP_PENDING,
+    SERVICE_STOPPED, SERVICE_TABLE_ENTRYW, SERVICE_WIN32_OWN_PROCESS, SetServiceStatus,
+    StartServiceCtrlDispatcherW,
 };
 use windows::core::{HSTRING, PWSTR};
 
@@ -52,7 +58,10 @@ pub fn run(allowed_sid: String) -> io::Result<()> {
     }
     let name: Vec<u16> = SERVICE_NAME.encode_utf16().chain([0]).collect();
     let table = [
-        SERVICE_TABLE_ENTRYW { lpServiceName: PWSTR(name.as_ptr().cast_mut()), lpServiceProc: Some(service_main) },
+        SERVICE_TABLE_ENTRYW {
+            lpServiceName: PWSTR(name.as_ptr().cast_mut()),
+            lpServiceProc: Some(service_main),
+        },
         SERVICE_TABLE_ENTRYW::default(),
     ];
     unsafe { StartServiceCtrlDispatcherW(table.as_ptr()) }.map_err(io::Error::from)
@@ -66,11 +75,19 @@ fn set_state(state: SERVICE_STATUS_CURRENT_STATE) {
     let status = SERVICE_STATUS {
         dwServiceType: SERVICE_WIN32_OWN_PROCESS,
         dwCurrentState: state,
-        dwControlsAccepted: if state == SERVICE_RUNNING { SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN } else { 0 },
+        dwControlsAccepted: if state == SERVICE_RUNNING {
+            SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN
+        } else {
+            0
+        },
         dwWin32ExitCode: 0,
         dwServiceSpecificExitCode: 0,
         dwCheckPoint: 0,
-        dwWaitHint: if state == SERVICE_STOP_PENDING { 5_000 } else { 0 },
+        dwWaitHint: if state == SERVICE_STOP_PENDING {
+            5_000
+        } else {
+            0
+        },
     };
     if let Err(error) = unsafe { SetServiceStatus(handle, &status) } {
         log(&format!("SetServiceStatus failed: {error}"));
@@ -93,14 +110,23 @@ unsafe extern "system" fn service_main(_count: u32, _arguments: *mut PWSTR) {
     set_state(SERVICE_STOPPED);
 }
 
-unsafe extern "system" fn control(code: u32, _kind: u32, _data: *mut c_void, _context: *mut c_void) -> u32 {
+unsafe extern "system" fn control(
+    code: u32,
+    _kind: u32,
+    _data: *mut c_void,
+    _context: *mut c_void,
+) -> u32 {
     match code {
         SERVICE_CONTROL_STOP | SERVICE_CONTROL_SHUTDOWN => {
             STOPPING.store(true, Ordering::SeqCst);
             set_state(SERVICE_STOP_PENDING);
             // The loop waits in ConnectNamedPipe: a connection wakes it.
             std::thread::spawn(|| {
-                if let Err(error) = std::fs::OpenOptions::new().read(true).write(true).open(PIPE_NAME) {
+                if let Err(error) = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(PIPE_NAME)
+                {
                     log(&format!("could not wake the pipe to stop: {error}"));
                 }
             });
@@ -119,9 +145,14 @@ fn serve() {
     // write (its request) and nothing else. "P": no inherited entries.
     let sddl = HSTRING::from(format!("D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;{sid})"));
     let mut descriptor = PSECURITY_DESCRIPTOR::default();
-    if let Err(error) =
-        unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(&sddl, SDDL_REVISION_1, &mut descriptor, None) }
-    {
+    if let Err(error) = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            &sddl,
+            SDDL_REVISION_1,
+            &mut descriptor,
+            None,
+        )
+    } {
         log(&format!("bad security descriptor: {error}"));
         return;
     }
@@ -147,13 +178,17 @@ fn serve() {
             )
         };
         if pipe.is_invalid() {
-            log(&format!("CreateNamedPipeW failed: {:?}", unsafe { GetLastError() }));
+            log(&format!("CreateNamedPipeW failed: {:?}", unsafe {
+                GetLastError()
+            }));
             std::thread::sleep(std::time::Duration::from_secs(2));
             continue;
         }
-        let connected = unsafe { ConnectNamedPipe(pipe, None) }.is_ok() || unsafe { GetLastError() } == ERROR_PIPE_CONNECTED;
+        let connected = unsafe { ConnectNamedPipe(pipe, None) }.is_ok()
+            || unsafe { GetLastError() } == ERROR_PIPE_CONNECTED;
         let file = unsafe { File::from_raw_handle(pipe.0) };
-        if connected && !STOPPING.load(Ordering::SeqCst)
+        if connected
+            && !STOPPING.load(Ordering::SeqCst)
             && let Err(error) = answer(&file)
         {
             log(&format!("request failed: {error}"));
@@ -204,7 +239,11 @@ pub fn snapshot() -> Vec<protocol::Volume> {
             Ok(table) => {
                 let policy = policy_for(&root, profile.as_deref());
                 let volume = mft::tree(&table, &root, &policy);
-                log(&format!("{root}: {} names in {} ms", volume.len(), started.elapsed().as_millis()));
+                log(&format!(
+                    "{root}: {} names in {} ms",
+                    volume.len(),
+                    started.elapsed().as_millis()
+                ));
                 volumes.push(volume);
             }
             Err(error) => log(&format!("{root}: {error}")),
@@ -220,22 +259,41 @@ fn policy_for(root: &str, profile: Option<&str>) -> mft::Policy {
     let (holder, own) = match profile {
         Some(profile) => {
             let lowered = profile.to_lowercase();
-            let mut parts: Vec<&str> = lowered.split('\\').filter(|part| !part.is_empty()).collect();
-            let drive = parts.first().map(|drive| drive.to_string()).unwrap_or_default();
+            let mut parts: Vec<&str> = lowered
+                .split('\\')
+                .filter(|part| !part.is_empty())
+                .collect();
+            let drive = parts
+                .first()
+                .map(|drive| drive.to_string())
+                .unwrap_or_default();
             let own = parts.pop().map(str::to_string);
             let holder: Vec<String> = parts.iter().skip(1).map(|part| part.to_string()).collect();
             (drive.eq_ignore_ascii_case(root).then_some(holder), own)
         }
-        None => (system_drive.eq_ignore_ascii_case(root).then(|| vec!["users".to_string()]), None),
+        None => (
+            system_drive
+                .eq_ignore_ascii_case(root)
+                .then(|| vec!["users".to_string()]),
+            None,
+        ),
     };
     match holder {
-        Some(profiles) => mft::Policy { profiles, allowed: own.into_iter().chain(["public".to_string()]).collect() },
-        None => mft::Policy { profiles: Vec::new(), allowed: Vec::new() },
+        Some(profiles) => mft::Policy {
+            profiles,
+            allowed: own.into_iter().chain(["public".to_string()]).collect(),
+        },
+        None => mft::Policy {
+            profiles: Vec::new(),
+            allowed: Vec::new(),
+        },
     }
 }
 
 fn profile_path(sid: &str) -> Option<String> {
-    let key = HSTRING::from(format!(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}"));
+    let key = HSTRING::from(format!(
+        r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}"
+    ));
     let value = HSTRING::from("ProfileImagePath");
     let mut buffer = vec![0u16; 1024];
     let mut size = (buffer.len() * 2) as u32;
@@ -252,7 +310,10 @@ fn profile_path(sid: &str) -> Option<String> {
     }
     .ok()
     .ok()?;
-    let length = buffer.iter().position(|&unit| unit == 0).unwrap_or(buffer.len());
+    let length = buffer
+        .iter()
+        .position(|&unit| unit == 0)
+        .unwrap_or(buffer.len());
     Some(String::from_utf16_lossy(&buffer[..length]))
 }
 
@@ -269,14 +330,16 @@ pub fn ntfs_volumes() -> Vec<String> {
                 return false;
             }
             let mut file_system = [0u16; 32];
-            unsafe { GetVolumeInformationW(&wide, None, None, None, None, Some(&mut file_system)) }.is_ok()
+            unsafe { GetVolumeInformationW(&wide, None, None, None, None, Some(&mut file_system)) }
+                .is_ok()
                 && String::from_utf16_lossy(&file_system).trim_end_matches('\0') == "NTFS"
         })
         .collect()
 }
 
 fn log_file() -> PathBuf {
-    let data = std::env::var_os("ProgramData").map_or_else(|| PathBuf::from(r"C:\ProgramData"), PathBuf::from);
+    let data = std::env::var_os("ProgramData")
+        .map_or_else(|| PathBuf::from(r"C:\ProgramData"), PathBuf::from);
     data.join("Prime Files Indexer").join("indexer.log")
 }
 
@@ -290,7 +353,12 @@ pub fn log(line: &str) {
         return;
     }
     let append = std::fs::metadata(&path).map_or(true, |metadata| metadata.len() < 1 << 20);
-    let file = std::fs::OpenOptions::new().create(true).append(append).write(true).truncate(!append).open(&path);
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(append)
+        .write(true)
+        .truncate(!append)
+        .open(&path);
     if let Ok(mut file) = file {
         let seconds = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

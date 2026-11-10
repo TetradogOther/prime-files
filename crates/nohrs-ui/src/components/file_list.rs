@@ -1,8 +1,8 @@
-use nohrs_core::t;
 use crate::theme::theme;
 use gpui::{ParentElement, Styled, Window, div, px, rgb};
 use gpui_component::list::{ListDelegate, ListItem, ListState};
 use gpui_component::{Icon, IconName, IndexPath};
+use nohrs_core::t;
 use nohrs_models::file_entry::FileEntryDto;
 use std::sync::Arc;
 

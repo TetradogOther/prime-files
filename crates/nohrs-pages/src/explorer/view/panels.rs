@@ -125,25 +125,37 @@ pub(crate) fn load_sizes() {
         let Ok(text) = std::fs::read_to_string(sizes_file()) else {
             return;
         };
-        let numbers: Vec<f32> = text.split_whitespace().filter_map(|word| word.parse().ok()).collect();
+        let numbers: Vec<f32> = text
+            .split_whitespace()
+            .filter_map(|word| word.parse().ok())
+            .collect();
         let [sidebar_column, sidebar_band, preview_column, preview_band] = numbers[..] else {
             return;
         };
         let mut arrangement = ARRANGEMENT.get();
-        arrangement.sizes = [[sidebar_column, sidebar_band], [preview_column, preview_band]];
+        arrangement.sizes = [
+            [sidebar_column, sidebar_band],
+            [preview_column, preview_band],
+        ];
         ARRANGEMENT.set(arrangement);
     });
 }
 
 fn save_sizes(cx: &mut App) {
-    let [[sidebar_column, sidebar_band], [preview_column, preview_band]] = ARRANGEMENT.get().sizes;
+    let [
+        [sidebar_column, sidebar_band],
+        [preview_column, preview_band],
+    ] = ARRANGEMENT.get().sizes;
     let text = format!("{sidebar_column} {sidebar_band} {preview_column} {preview_band}");
     cx.background_spawn(async move {
         let path = sizes_file();
-        let written = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| {
-            #[allow(clippy::disallowed_methods)]
-            std::fs::write(&path, text)
-        });
+        let written = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| {
+                #[allow(clippy::disallowed_methods)]
+                std::fs::write(&path, text)
+            });
         if let Err(error) = written {
             tracing::warn!("could not keep the panel sizes: {error}");
         }
@@ -327,7 +339,11 @@ fn band(side: DockSide, bounds: Bounds<Pixels>, pointer: Point<Pixels>, count: u
 
 /// How deep an edge drag reaches into the area, leaving the listing a strip.
 fn pull_depth(side: DockSide, bounds: Bounds<Pixels>, pointer: Point<Pixels>) -> f32 {
-    let span = f32::from(if side.is_column() { bounds.size.width } else { bounds.size.height });
+    let span = f32::from(if side.is_column() {
+        bounds.size.width
+    } else {
+        bounds.size.height
+    });
     dock::depth(side, bounds, pointer).clamp(0.0, (span - 60.0).max(0.0))
 }
 
@@ -363,7 +379,12 @@ impl ExplorerPane {
 
     /// Starts carrying `panel` by its grip.
     pub(crate) fn start_panel_move(&mut self, panel: Panel, pointer: Point<Pixels>) {
-        self.dock_drag = Some(DockDrag::new(Some(panel), side(panel), Gesture::Move, pointer));
+        self.dock_drag = Some(DockDrag::new(
+            Some(panel),
+            side(panel),
+            Gesture::Move,
+            pointer,
+        ));
     }
 
     /// Esc during a drag: nothing happens.
@@ -380,7 +401,8 @@ impl ExplorerPane {
         match (drag.gesture, drag.panel) {
             (Gesture::Resize { start, start_size }, Some(panel)) => {
                 let (min, max) = range(panel);
-                let raw = start_size + (dock::along(drag.side, pointer) - start) * dock::growth(drag.side);
+                let raw = start_size
+                    + (dock::along(drag.side, pointer) - start) * dock::growth(drag.side);
                 match dock::resized(raw, min, max) {
                     Resized::Size(value) => {
                         drag.collapsing = false;
@@ -390,10 +412,16 @@ impl ExplorerPane {
                 }
             }
             (Gesture::Open, _) => {
-                let moved = (dock::along(drag.side, pointer) - dock::along(drag.side, drag.origin)).abs();
+                let moved =
+                    (dock::along(drag.side, pointer) - dock::along(drag.side, drag.origin)).abs();
                 drag.committed |= moved >= dock::OPEN_PULL;
                 if drag.committed {
-                    drag.choice = band(drag.side, self.columns_bounds.get(), pointer, openings(self).len());
+                    drag.choice = band(
+                        drag.side,
+                        self.columns_bounds.get(),
+                        pointer,
+                        openings(self).len(),
+                    );
                 }
             }
             _ => {}
@@ -436,7 +464,11 @@ impl ExplorerPane {
                 }
                 match opening {
                     Opening::Split => {
-                        let across = f32::from(if column { bounds.size.width } else { bounds.size.height });
+                        let across = f32::from(if column {
+                            bounds.size.width
+                        } else {
+                            bounds.size.height
+                        });
                         if across > 0.0 {
                             cx.emit(PaneEvent::SplitRequested {
                                 side: drag.side,
@@ -485,9 +517,12 @@ pub(crate) fn dock_panel(panel: Panel, side: DockSide, cx: &mut App) {
 /// Writes `layout.<key> = value` to the config file in the background.
 pub(crate) fn save_layout(key: &'static str, value: String, cx: &mut App) {
     cx.background_spawn(async move {
-        if let Err(error) =
-            nohrs_core::config::set_value(&nohrs_core::config::paths::config_file(), "layout", key, &value)
-        {
+        if let Err(error) = nohrs_core::config::set_value(
+            &nohrs_core::config::paths::config_file(),
+            "layout",
+            key,
+            &value,
+        ) {
             tracing::warn!("could not save layout.{key}: {error}");
         }
     })
@@ -512,7 +547,10 @@ pub(crate) fn render(
     cx: &mut Context<ExplorerPane>,
 ) -> AnyElement {
     let bounds = page.columns_bounds.get();
-    let collapsing = page.dock_drag.filter(|drag| drag.collapsing).and_then(|drag| drag.panel);
+    let collapsing = page
+        .dock_drag
+        .filter(|drag| drag.collapsing)
+        .and_then(|drag| drag.panel);
     let resizing = page
         .dock_drag
         .filter(|drag| matches!(drag.gesture, Gesture::Resize { .. }))
@@ -526,7 +564,10 @@ pub(crate) fn render(
             .iter()
             .filter(|item| side(item.panel).is_column() == column && collapsing != Some(item.panel))
             .collect();
-        let mut sizes: Vec<(f32, f32)> = mine.iter().map(|item| (size(item.panel) * item.amount, 0.0)).collect();
+        let mut sizes: Vec<(f32, f32)> = mine
+            .iter()
+            .map(|item| (size(item.panel) * item.amount, 0.0))
+            .collect();
         let ranges: Vec<(f32, f32)> = mine
             .iter()
             .map(|item| {
@@ -541,7 +582,13 @@ pub(crate) fn render(
         };
         dock::fit(&mut sizes, &ranges, total, keep);
         for (item, (fitted_size, _)) in mine.iter().zip(sizes) {
-            fitted.push((item.panel, side(item.panel), fitted_size, item.amount, div().into_any_element()));
+            fitted.push((
+                item.panel,
+                side(item.panel),
+                fitted_size,
+                item.amount,
+                div().into_any_element(),
+            ));
         }
     }
     // The elements themselves, moved into their fitted places.
@@ -554,7 +601,9 @@ pub(crate) fn render(
     let dragging = page.dock_drag;
     // The columns beside the listing, which a band above or below it does
     // not reach: the landing of a panel carried there is drawn between them.
-    let carried = dragging.filter(|drag| drag.gesture == Gesture::Move).and_then(|drag| drag.panel);
+    let carried = dragging
+        .filter(|drag| drag.gesture == Gesture::Move)
+        .and_then(|drag| drag.panel);
     let beside = |wanted: DockSide| -> f32 {
         fitted
             .iter()
@@ -566,10 +615,17 @@ pub(crate) fn render(
     let mut boxes: [Vec<AnyElement>; 4] = Default::default();
     for (panel, panel_side, fitted_size, amount, element) in fitted {
         // `amount` already shrank the size compact mode is sliding.
-        let frame = dock::frame(panel_side, fitted_size, 1.0).when(amount <= 0.0, |frame| frame.border_0());
+        let frame =
+            dock::frame(panel_side, fitted_size, 1.0).when(amount <= 0.0, |frame| frame.border_0());
         let frame = frame.child(element);
         let frame = if amount >= 1.0 {
-            frame.child(edge_strip(page, panel, panel_side, resizing == Some(panel), cx))
+            frame.child(edge_strip(
+                page,
+                panel,
+                panel_side,
+                resizing == Some(panel),
+                cx,
+            ))
         } else {
             frame
         };
@@ -603,30 +659,37 @@ pub(crate) fn render(
     // Every edge of the listing opens whatever is closed (a second pane, the
     // hidden panels, the terminal), chosen from bubbles as it is pulled.
     let offered = !openings(page).is_empty();
-    for edge in [DockSide::Left, DockSide::Right, DockSide::Top, DockSide::Bottom] {
+    for edge in [
+        DockSide::Left,
+        DockSide::Right,
+        DockSide::Top,
+        DockSide::Bottom,
+    ] {
         if !offered {
             break;
         }
         // A hidden panel docked here opens on a double click, at its size.
-        let claimant = Panel::ALL
-            .into_iter()
-            .find(|&panel| side(panel) == edge && !page.panel_visible(panel) && collapsing != Some(panel));
+        let claimant = Panel::ALL.into_iter().find(|&panel| {
+            side(panel) == edge && !page.panel_visible(panel) && collapsing != Some(panel)
+        });
         let id = SharedString::from(format!("dock-edge-{}", edge.as_str()));
-        let pulling = dragging.is_some_and(|drag| drag.side == edge && drag.gesture == Gesture::Open);
-        let strip = dock::place_on_edge(dock::strip(id, edge, pulling), edge, dock::EDGE).on_mouse_down(
-            MouseButton::Left,
-            cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
-                cx.stop_propagation();
-                match claimant {
-                    Some(panel) if event.click_count >= 2 => {
-                        this.set_panel_visible(panel, true);
-                        this.dock_drag = None;
+        let pulling =
+            dragging.is_some_and(|drag| drag.side == edge && drag.gesture == Gesture::Open);
+        let strip = dock::place_on_edge(dock::strip(id, edge, pulling), edge, dock::EDGE)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+                    cx.stop_propagation();
+                    match claimant {
+                        Some(panel) if event.click_count >= 2 => {
+                            this.set_panel_visible(panel, true);
+                            this.dock_drag = None;
+                        }
+                        _ => this.start_edge_pull(edge, event.position),
                     }
-                    _ => this.start_edge_pull(edge, event.position),
-                }
-                cx.notify();
-            }),
-        );
+                    cx.notify();
+                }),
+            );
         edges.push(strip.into_any_element());
     }
 
@@ -635,10 +698,20 @@ pub(crate) fn render(
         (Gesture::Move, Some(panel)) => {
             let target = dock::nearest_side(bounds, drag.pointer);
             let (min, _) = panel.range(target.is_column());
-            let room = if target.is_column() { bounds.size.width } else { bounds.size.height };
-            let depth = panel_size_on(panel, target).min(f32::from(room) * 0.45).max(min.min(f32::from(room)));
+            let room = if target.is_column() {
+                bounds.size.width
+            } else {
+                bounds.size.height
+            };
+            let depth = panel_size_on(panel, target)
+                .min(f32::from(room) * 0.45)
+                .max(min.min(f32::from(room)));
             let landing = dock::landing(target, depth);
-            let landing = if target.is_column() { landing } else { landing.left(px(left_room)).right(px(right_room)) };
+            let landing = if target.is_column() {
+                landing
+            } else {
+                landing.left(px(left_room)).right(px(right_room))
+            };
             Some(landing.into_any_element())
         }
         (Gesture::Open, _) if drag.committed => Some(chooser(page, &drag, bounds)),
@@ -681,7 +754,8 @@ fn chooser(page: &ExplorerPane, drag: &DockDrag, bounds: Bounds<Pixels>) -> AnyE
     let height = f32::from(bounds.size.height);
     let depth = pull_depth(side, bounds, drag.pointer);
     let chosen = options.get(drag.choice).copied();
-    let too_near = chosen.is_none_or(|opening| depth < opening.min(column) * dock::COLLAPSE_FRACTION);
+    let too_near =
+        chosen.is_none_or(|opening| depth < opening.min(column) * dock::COLLAPSE_FRACTION);
     let tone = if too_near { TOO_NEAR } else { theme::accent() };
     let glow = |alpha: f32| -> Hsla {
         let mut color: Hsla = rgb(tone).into();
@@ -743,12 +817,20 @@ fn chooser(page: &ExplorerPane, drag: &DockDrag, bounds: Bounds<Pixels>) -> AnyE
     for (index, opening) in options.iter().enumerate() {
         let picked = Some(*opening) == chosen && !too_near;
         let (x, y) = at(inward, (index as f32 + 0.5) / count as f32 * length);
-        layers.push(bubble(*opening, picked, index, drag.choice, too_near).left(px(x - 60.0)).top(px(y - GROWN_HALF)).into_any_element());
+        layers.push(
+            bubble(*opening, picked, index, drag.choice, too_near)
+                .left(px(x - 60.0))
+                .top(px(y - GROWN_HALF))
+                .into_any_element(),
+        );
     }
 
     // The size it would open at, on the line, facing the room; never closer
     // to the edge than its own half width, where the window would cut it.
-    let (x, y) = at((depth + 18.0).max(if column { 78.0 } else { 18.0 }), length / 2.0);
+    let (x, y) = at(
+        (depth + 18.0).max(if column { 78.0 } else { 18.0 }),
+        length / 2.0,
+    );
     let readout = if too_near {
         nohrs_core::t!("Solte mais para dentro").to_string()
     } else {
@@ -783,23 +865,19 @@ fn chooser(page: &ExplorerPane, drag: &DockDrag, bounds: Bounds<Pixels>) -> AnyE
         } else {
             nohrs_core::t!("Vá para os lados para escolher")
         };
-        let hint = div()
-            .absolute()
-            .flex()
-            .justify_center()
-            .child(
-                div()
-                    .px(px(10.0))
-                    .py(px(3.0))
-                    .rounded_full()
-                    .bg(rgba((theme::bg() << 8) | 0xD0))
-                    .border_1()
-                    .border_color(rgb(theme::border()))
-                    .text_xs()
-                    .text_color(rgb(theme::muted()))
-                    .whitespace_nowrap()
-                    .child(hint),
-            );
+        let hint = div().absolute().flex().justify_center().child(
+            div()
+                .px(px(10.0))
+                .py(px(3.0))
+                .rounded_full()
+                .bg(rgba((theme::bg() << 8) | 0xD0))
+                .border_1()
+                .border_color(rgb(theme::border()))
+                .text_xs()
+                .text_color(rgb(theme::muted()))
+                .whitespace_nowrap()
+                .child(hint),
+        );
         let hint = match side {
             DockSide::Left => hint.left_0().w(px(depth)).bottom(px(12.0)),
             DockSide::Right => hint.right_0().w(px(depth)).bottom(px(12.0)),
@@ -808,7 +886,11 @@ fn chooser(page: &ExplorerPane, drag: &DockDrag, bounds: Bounds<Pixels>) -> AnyE
         };
         layers.push(hint.into_any_element());
     }
-    div().absolute().inset_0().children(layers).into_any_element()
+    div()
+        .absolute()
+        .inset_0()
+        .children(layers)
+        .into_any_element()
 }
 
 // One bubble: a disc with the thing's icon and its name under it. The chosen
@@ -820,7 +902,11 @@ fn bubble(opening: Opening, picked: bool, index: usize, choice: usize, too_near:
     let icon = Icon::new(Icon::empty())
         .path(opening.icon())
         .size(px(if picked { 24.0 } else { 20.0 }))
-        .text_color(rgb(if picked { 0xFFFFFF } else { theme::fg_secondary() }));
+        .text_color(rgb(if picked {
+            0xFFFFFF
+        } else {
+            theme::fg_secondary()
+        }));
     let disc = div()
         .flex()
         .items_center()
@@ -875,8 +961,16 @@ fn bubble(opening: Opening, picked: bool, index: usize, choice: usize, too_near:
         .text_xs()
         .font_weight(FontWeight::SEMIBOLD)
         .whitespace_nowrap()
-        .when(picked, |label| label.bg(rgba((theme::accent() << 8) | 0xE0)).text_color(rgb(0xFFFFFF)))
-        .when(!picked, |label| label.bg(rgba((theme::bg() << 8) | 0xC8)).text_color(rgb(theme::muted())))
+        .when(picked, |label| {
+            label
+                .bg(rgba((theme::accent() << 8) | 0xE0))
+                .text_color(rgb(0xFFFFFF))
+        })
+        .when(!picked, |label| {
+            label
+                .bg(rgba((theme::bg() << 8) | 0xC8))
+                .text_color(rgb(theme::muted()))
+        })
         .child(opening.label());
     // A fixed box centred on the bubble's place, so the swell grows about
     // its centre and the name keeps its line.
@@ -888,7 +982,14 @@ fn bubble(opening: Opening, picked: bool, index: usize, choice: usize, too_near:
         .items_center()
         .gap(px(6.0))
         .when(too_near, |this| this.opacity(0.45))
-        .child(div().size(px(GROWN)).flex().items_center().justify_center().child(disc))
+        .child(
+            div()
+                .size(px(GROWN))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(disc),
+        )
         .child(label)
 }
 
@@ -920,16 +1021,21 @@ fn edge_strip(
     let carrying = page
         .dock_drag
         .is_some_and(|drag| drag.panel == Some(panel) && drag.gesture == Gesture::Move);
-    let grip = dock::grip(SharedString::from(format!("dock-grip-{}", panel.config_key())), side)
-        .when(carrying, |grip| grip.bg(gpui::rgb(nohrs_ui::theme::theme::accent())))
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
-                cx.stop_propagation();
-                this.start_panel_move(panel, event.position);
-                cx.notify();
-            }),
-        );
+    let grip = dock::grip(
+        SharedString::from(format!("dock-grip-{}", panel.config_key())),
+        side,
+    )
+    .when(carrying, |grip| {
+        grip.bg(gpui::rgb(nohrs_ui::theme::theme::accent()))
+    })
+    .on_mouse_down(
+        MouseButton::Left,
+        cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+            cx.stop_propagation();
+            this.start_panel_move(panel, event.position);
+            cx.notify();
+        }),
+    );
     dock::place_on_inner_edge(dock::strip(id, side, held), side)
         .on_mouse_down(
             MouseButton::Left,

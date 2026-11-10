@@ -160,9 +160,9 @@ fn is_cloud_placeholder(path: &Path) -> bool {
     use std::os::windows::ffi::OsStrExt;
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::Storage::FileSystem::{
-        CreateFileW, FILE_ATTRIBUTE_TAG_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-        FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FileAttributeTagInfo,
-        GetFileInformationByHandleEx, OPEN_EXISTING,
+        CreateFileW, FILE_ATTRIBUTE_TAG_INFO, FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        FileAttributeTagInfo, GetFileInformationByHandleEx, OPEN_EXISTING,
     };
     use windows::core::PCWSTR;
 
@@ -248,7 +248,15 @@ mod tests {
         junction("ligacao", &target);
         junction("quebrada", &dir.path().join("sumiu"));
         let listed = list(dir.path().to_str().unwrap(), 100, None);
-        let kind = |name: &str| listed.entries.iter().find(|entry| entry.name == name).unwrap().kind.clone();
+        let kind = |name: &str| {
+            listed
+                .entries
+                .iter()
+                .find(|entry| entry.name == name)
+                .unwrap()
+                .kind
+                .clone()
+        };
         assert_eq!(kind("ligacao"), "dir");
         assert_eq!(kind("quebrada"), "symlink");
     }

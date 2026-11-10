@@ -5,12 +5,12 @@ use gpui::{AppContext as _, AsyncWindowContext, Context, Pixels, Point, WeakEnti
 use nohrs_core::config::{self, ThemeMode};
 use nohrs_core::telemetry::LogErr;
 
-use crate::explorer::commands::{OpenIn, interned, keys_of};
-use nohrs_core::shortcuts::Action;
 use super::ExplorerPane;
 use super::grouping::GroupBy;
 use super::types::{SortKey, StatusLevel, ViewMode};
+use crate::explorer::commands::{OpenIn, interned, keys_of};
 use crate::shell_menu::{self, Choice, Entry, MenuItem, Request, Session, Target};
+use nohrs_core::shortcuts::Action;
 
 // Nohrs's own menu entries. The values are the menu ids, so they stay below
 // the range the Shell's entries are numbered from.
@@ -155,7 +155,10 @@ pub(crate) fn note_menu(menu: &config::Menu) {
 }
 
 fn menu_config() -> config::Menu {
-    MENU.lock().ok().and_then(|menu| menu.clone()).unwrap_or_default()
+    MENU.lock()
+        .ok()
+        .and_then(|menu| menu.clone())
+        .unwrap_or_default()
 }
 
 /// The label and icon of an id `[menu]` may hold, for the menu and for the
@@ -183,7 +186,15 @@ pub(crate) fn menu_entry_info(id: &str) -> Option<(&'static str, &'static str)> 
 /// navigates here instead of opening another window.
 fn intercepted(target_is_one_folder: bool) -> &'static [&'static str] {
     if target_is_one_folder {
-        &["copy", "cut", "delete", "rename", "open", "explore", "opencontaining"]
+        &[
+            "copy",
+            "cut",
+            "delete",
+            "rename",
+            "open",
+            "explore",
+            "opencontaining",
+        ]
     } else {
         &["copy", "cut", "delete", "rename", "opencontaining"]
     }
@@ -237,7 +248,6 @@ const TAG_IDS: u32 = 0x400;
 // A colour in a tag's menu: this plus its place in `tags::COLORS`.
 const FIRST_TAG_COLOR: u32 = 0x8F0;
 
-
 impl ExplorerPane {
     /// Opens the right-click menu: for the row `row` (selecting it first if
     /// it is not part of the selection), or for the folder's empty space.
@@ -257,7 +267,11 @@ impl ExplorerPane {
         let Some(hwnd) = crate::ipc::window_hwnd(window) else {
             return;
         };
-        let paths = if row.is_some() { self.selected_paths() } else { Vec::new() };
+        let paths = if row.is_some() {
+            self.selected_paths()
+        } else {
+            Vec::new()
+        };
         let one_folder = match paths.as_slice() {
             [path] => self
                 .filtered_entries
@@ -279,14 +293,18 @@ impl ExplorerPane {
         if super::recycle_bin::is_recycle_bin(&self.cwd) {
             let own = if row.is_some() {
                 vec![
-                    Entry::command(Command::RestoreFromBin as u32, t!("Restaurar")).with_icon("icons/undo-2.svg"),
+                    Entry::command(Command::RestoreFromBin as u32, t!("Restaurar"))
+                        .with_icon("icons/undo-2.svg"),
                     Entry::Separator,
-                    Entry::command(Command::PurgeFromBin as u32, t!("Excluir para sempre")).with_icon("icons/trash-2.svg"),
+                    Entry::command(Command::PurgeFromBin as u32, t!("Excluir para sempre"))
+                        .with_icon("icons/trash-2.svg"),
                 ]
             } else {
                 vec![
-                    Entry::command(Command::EmptyBin as u32, t!("Esvaziar a Lixeira")).with_icon("icons/trash-2.svg"),
-                    Entry::command(Command::Refresh as u32, t!("Atualizar")).with_icon("icons/refresh-cw.svg"),
+                    Entry::command(Command::EmptyBin as u32, t!("Esvaziar a Lixeira"))
+                        .with_icon("icons/trash-2.svg"),
+                    Entry::command(Command::Refresh as u32, t!("Atualizar"))
+                        .with_icon("icons/refresh-cw.svg"),
                 ]
             };
             self.show_menu_with(purpose, Vec::new(), own, false, hwnd, window, cx);
@@ -304,18 +322,28 @@ impl ExplorerPane {
     // below them, whether the Windows entries are shown at all): the view and
     // sort submenus on the folder's empty space; on files, what `[menu]`
     // lists, in its order.
-    fn listing_entries(&self, purpose: &MenuPurpose, cx: &mut Context<Self>) -> (Vec<Entry>, Vec<Entry>, bool) {
+    fn listing_entries(
+        &self,
+        purpose: &MenuPurpose,
+        cx: &mut Context<Self>,
+    ) -> (Vec<Entry>, Vec<Entry>, bool) {
         let more = Entry::command(Command::MoreOptions as u32, t!("Mostrar mais opções"))
             .with_icon("icons/ellipsis.svg")
             .with_shortcut("Shift+F10");
         match purpose {
-            MenuPurpose::Listing { target: Target::Background(_), .. } => {
+            MenuPurpose::Listing {
+                target: Target::Background(_),
+                ..
+            } => {
                 let mut entries = self.background_entries(cx);
                 entries.push(Entry::Separator);
                 entries.push(more);
                 (Vec::new(), entries, true)
             }
-            MenuPurpose::Listing { target: Target::Items(paths), .. } => {
+            MenuPurpose::Listing {
+                target: Target::Items(paths),
+                ..
+            } => {
                 let menu = menu_config();
                 let mut before = Vec::new();
                 let mut after = Vec::new();
@@ -326,14 +354,20 @@ impl ExplorerPane {
                             windows = true;
                             continue;
                         }
-                        "new_tab" => Entry::command(Command::OpenInNewTab as u32, t!("Abrir em nova aba"))
-                            .with_icon("icons/plus.svg")
-                            .with_shortcut(t!("Botão do meio")),
-                        "copy_path" => Entry::command(Command::CopyPath as u32, t!("Copiar como caminho"))
-                            .with_icon("icons/link.svg")
-                            .with_shortcut(keys_of(Action::CopyPath)),
-                        "properties" => Entry::command(Command::Properties as u32, t!("Propriedades"))
-                            .with_icon("icons/info.svg"),
+                        "new_tab" => {
+                            Entry::command(Command::OpenInNewTab as u32, t!("Abrir em nova aba"))
+                                .with_icon("icons/plus.svg")
+                                .with_shortcut(t!("Botão do meio"))
+                        }
+                        "copy_path" => {
+                            Entry::command(Command::CopyPath as u32, t!("Copiar como caminho"))
+                                .with_icon("icons/link.svg")
+                                .with_shortcut(keys_of(Action::CopyPath))
+                        }
+                        "properties" => {
+                            Entry::command(Command::Properties as u32, t!("Propriedades"))
+                                .with_icon("icons/info.svg")
+                        }
                         "tags" => {
                             // Ticked when every selected item has it; a click
                             // puts it on all of them, or takes it off all.
@@ -341,16 +375,25 @@ impl ExplorerPane {
                                 .into_iter()
                                 .filter(|tag| tag.id < TAG_IDS)
                                 .map(|tag| {
-                                    Entry::check(FIRST_TAG + tag.id, &tag.name, super::tags::Tags::all_have(paths, tag.id, cx))
+                                    Entry::check(
+                                        FIRST_TAG + tag.id,
+                                        &tag.name,
+                                        super::tags::Tags::all_have(paths, tag.id, cx),
+                                    )
                                 })
                                 .collect();
                             tags.push(Entry::Separator);
-                            tags.push(Entry::command(Command::NewTag as u32, t!("Nova tag…")).with_icon("icons/plus.svg"));
+                            tags.push(
+                                Entry::command(Command::NewTag as u32, t!("Nova tag…"))
+                                    .with_icon("icons/plus.svg"),
+                            );
                             Entry::submenu(t!("Tags"), tags).with_icon("icons/tag.svg")
                         }
                         "more_options" => more.clone(),
-                        "customize" => Entry::command(Command::Customize as u32, t!("Personalizar este menu…"))
-                            .with_icon("icons/settings.svg"),
+                        "customize" => {
+                            Entry::command(Command::Customize as u32, t!("Personalizar este menu…"))
+                                .with_icon("icons/settings.svg")
+                        }
                         _ => continue,
                     };
                     if windows {
@@ -364,7 +407,8 @@ impl ExplorerPane {
                 if super::tags::tag_of_location(&self.cwd).is_some() {
                     before.insert(
                         0,
-                        Entry::command(Command::RemoveFromTag as u32, t!("Remover desta tag")).with_icon("icons/tag.svg"),
+                        Entry::command(Command::RemoveFromTag as u32, t!("Remover desta tag"))
+                            .with_icon("icons/tag.svg"),
                     );
                 }
                 (before, after, windows)
@@ -408,10 +452,19 @@ impl ExplorerPane {
         // A Windows verb leaves the list only while the row above has it: take
         // Cut out of the row and Windows' Cut comes back.
         let shell_hidden: Vec<&'static str> = std::iter::once("paste")
-            .chain(["cut", "copy", "rename", "delete"].into_iter().filter(|verb| menu.quick.iter().any(|id| id == verb)))
+            .chain(
+                ["cut", "copy", "rename", "delete"]
+                    .into_iter()
+                    .filter(|verb| menu.quick.iter().any(|id| id == verb)),
+            )
             // Windows 11 has its own "Copy as path"; ours stands for it.
             .chain(
-                (menu.quick.iter().chain(menu.items.iter()).any(|id| id == "copy_path")).then_some("copyaspath"),
+                (menu
+                    .quick
+                    .iter()
+                    .chain(menu.items.iter())
+                    .any(|id| id == "copy_path"))
+                .then_some("copyaspath"),
             )
             .collect();
         // The Recycle Bin's items take only its own entries: the row's Cut,
@@ -421,7 +474,11 @@ impl ExplorerPane {
             window,
             async move |this: WeakEntity<Self>, cx: &mut AsyncWindowContext| {
                 let (target, own_first, extended, intercept, hide, quick) = match &purpose {
-                    MenuPurpose::Listing { target, one_folder, extended } => {
+                    MenuPurpose::Listing {
+                        target,
+                        one_folder,
+                        extended,
+                    } => {
                         let files = matches!(target, Target::Items(_));
                         (
                             target.clone(),
@@ -430,7 +487,11 @@ impl ExplorerPane {
                             intercepted(*one_folder).to_vec(),
                             // Paste is Nohrs's own; on files the ones in the
                             // row above replace the Shell's.
-                            if files { &shell_hidden[..] } else { &["paste"][..] },
+                            if files {
+                                &shell_hidden[..]
+                            } else {
+                                &["paste"][..]
+                            },
                             files && !in_recycle_bin,
                         )
                     }
@@ -438,11 +499,18 @@ impl ExplorerPane {
                         Target::Items(vec![place.parsing_name.clone()]),
                         false,
                         false,
-                        if place.path.is_some() { vec!["open", "explore"] } else { Vec::new() },
+                        if place.path.is_some() {
+                            vec!["open", "explore"]
+                        } else {
+                            Vec::new()
+                        },
                         &[][..],
                         false,
                     ),
-                    MenuPurpose::Columns(_) | MenuPurpose::Filter | MenuPurpose::Tag(_) | MenuPurpose::NetworkPlace(_) => {
+                    MenuPurpose::Columns(_)
+                    | MenuPurpose::Filter
+                    | MenuPurpose::Tag(_)
+                    | MenuPurpose::NetworkPlace(_) => {
                         (Target::None, true, false, Vec::new(), &[][..], false)
                     }
                 };
@@ -462,14 +530,18 @@ impl ExplorerPane {
                 for item in &mut prepared.items {
                     item.from_windows = is_windows_entry(item, &own_labels);
                 }
-                prepared
-                    .items
-                    .retain(|item| !(item.from_windows && menu.hidden.iter().any(|hidden| *hidden == item.label)));
+                prepared.items.retain(|item| {
+                    !(item.from_windows && menu.hidden.iter().any(|hidden| *hidden == item.label))
+                });
                 let items = shell_menu::tidy(prepared.items);
                 this.update(cx, |pane, cx| {
                     pane.context_menu = Some(OpenMenu {
                         items,
-                        quick: if quick { quick_actions(&menu.quick) } else { Vec::new() },
+                        quick: if quick {
+                            quick_actions(&menu.quick)
+                        } else {
+                            Vec::new()
+                        },
                         position,
                         open_path: Vec::new(),
                         session: Some(prepared.session),
@@ -492,7 +564,13 @@ impl ExplorerPane {
 
     /// The pointer is over entry `index` of `level`: its submenu opens, and
     /// any deeper one closes.
-    pub(crate) fn hover_menu_entry(&mut self, level: usize, index: usize, submenu: bool, cx: &mut Context<Self>) {
+    pub(crate) fn hover_menu_entry(
+        &mut self,
+        level: usize,
+        index: usize,
+        submenu: bool,
+        cx: &mut Context<Self>,
+    ) {
         let Some(menu) = self.context_menu.as_mut() else {
             return;
         };
@@ -514,7 +592,8 @@ impl ExplorerPane {
     /// bring it back.
     pub(crate) fn hide_menu_entry(&mut self, label: String, cx: &mut Context<Self>) {
         if let Some(menu) = self.context_menu.as_mut() {
-            menu.items.retain(|item| !(item.from_windows && item.label == label));
+            menu.items
+                .retain(|item| !(item.from_windows && item.label == label));
             menu.items = shell_menu::tidy(std::mem::take(&mut menu.items));
             menu.open_path.clear();
         }
@@ -528,15 +607,28 @@ impl ExplorerPane {
             menu.hidden = hidden.clone();
             *current = Some(menu);
         }
-        let quoted: Vec<String> =
-            hidden.iter().map(|label| format!("\"{}\"", label.replace('\\', "\\\\").replace('"', "\\\""))).collect();
+        let quoted: Vec<String> = hidden
+            .iter()
+            .map(|label| format!("\"{}\"", label.replace('\\', "\\\\").replace('"', "\\\"")))
+            .collect();
         self.write_config("menu", "hidden", format!("[{}]", quoted.join(", ")), cx);
-        self.set_status(StatusLevel::Info, tf!("\"{label}\" escondido do menu. Volte com ele em Configurações › Menu.", label = label));
+        self.set_status(
+            StatusLevel::Info,
+            tf!(
+                "\"{label}\" escondido do menu. Volte com ele em Configurações › Menu.",
+                label = label
+            ),
+        );
         cx.notify();
     }
 
     /// Runs entry `id` of the open menu and closes it.
-    pub(crate) fn choose_menu_item(&mut self, id: u32, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn choose_menu_item(
+        &mut self,
+        id: u32,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(menu) = self.context_menu.take() else {
             return;
         };
@@ -555,15 +647,23 @@ impl ExplorerPane {
             window,
             async move |this: WeakEntity<Self>, cx: &mut AsyncWindowContext| {
                 let choice = shell_menu::run(session, id);
-                this.update_in(cx, |pane, window, cx| pane.apply_choice(purpose, choice, window, cx))
-                    .log_err();
+                this.update_in(cx, |pane, window, cx| {
+                    pane.apply_choice(purpose, choice, window, cx)
+                })
+                .log_err();
             },
         )
         .detach();
     }
 
     // What an entry does, by what the menu was opened for.
-    fn apply_choice(&mut self, purpose: MenuPurpose, choice: Choice, window: &mut Window, cx: &mut Context<Self>) {
+    fn apply_choice(
+        &mut self,
+        purpose: MenuPurpose,
+        choice: Choice,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         match purpose {
             MenuPurpose::Listing { .. } => self.apply_menu_choice(choice, window, cx),
             MenuPurpose::Place(place) => {
@@ -583,7 +683,9 @@ impl ExplorerPane {
                                 self.fit_column(column);
                             }
                         }
-                        Some(Command::FitAllColumns) => (0..4).for_each(|column| self.fit_column(column)),
+                        Some(Command::FitAllColumns) => {
+                            (0..4).for_each(|column| self.fit_column(column))
+                        }
                         Some(Command::ColumnType) => self.toggle_column(1),
                         Some(Command::ColumnSize) => self.toggle_column(2),
                         Some(Command::ColumnModified) => self.toggle_column(3),
@@ -596,8 +698,15 @@ impl ExplorerPane {
                 if let Choice::Own(id) = choice {
                     match Command::from_id(id) {
                         Some(Command::RenameTag) => {
-                            let name = super::tags::Tags::get(tag, cx).map(|tag| tag.name).unwrap_or_default();
-                            self.begin_sidebar_input(super::places::SidebarInputPurpose::RenameTag(tag), name, window, cx);
+                            let name = super::tags::Tags::get(tag, cx)
+                                .map(|tag| tag.name)
+                                .unwrap_or_default();
+                            self.begin_sidebar_input(
+                                super::places::SidebarInputPurpose::RenameTag(tag),
+                                name,
+                                window,
+                                cx,
+                            );
                         }
                         Some(Command::DeleteTag) => {
                             super::tags::Tags::delete(tag, cx);
@@ -640,11 +749,21 @@ impl ExplorerPane {
 
     // "Show more options": the classic Windows menu, with every entry an
     // extension draws itself, as Windows 11 keeps it.
-    fn show_classic_menu(&mut self, purpose: MenuPurpose, window: &mut Window, cx: &mut Context<Self>) {
+    fn show_classic_menu(
+        &mut self,
+        purpose: MenuPurpose,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(hwnd) = crate::ipc::window_hwnd(window) else {
             return;
         };
-        let MenuPurpose::Listing { target, one_folder, extended } = purpose.clone() else {
+        let MenuPurpose::Listing {
+            target,
+            one_folder,
+            extended,
+        } = purpose.clone()
+        else {
             return;
         };
         let own = match &target {
@@ -666,8 +785,10 @@ impl ExplorerPane {
                     intercept: intercepted(one_folder),
                     hide: &["paste"],
                 });
-                this.update_in(cx, |pane, window, cx| pane.apply_choice(purpose, choice, window, cx))
-                    .log_err();
+                this.update_in(cx, |pane, window, cx| {
+                    pane.apply_choice(purpose, choice, window, cx)
+                })
+                .log_err();
             },
         )
         .detach();
@@ -697,25 +818,39 @@ impl ExplorerPane {
             .iter()
             .enumerate()
             .map(|(index, (color, name))| {
-                Entry::radio(FIRST_TAG_COLOR + index as u32, nohrs_core::i18n::tr(name), current == Some(*color))
+                Entry::radio(
+                    FIRST_TAG_COLOR + index as u32,
+                    nohrs_core::i18n::tr(name),
+                    current == Some(*color),
+                )
             })
             .collect();
         let own = vec![
             Entry::command(Command::RenameTag as u32, t!("Renomear")).with_icon("icons/pencil.svg"),
             Entry::submenu(t!("Cor"), colors).with_icon("icons/palette-2.svg"),
             Entry::Separator,
-            Entry::command(Command::DeleteTag as u32, t!("Excluir tag")).with_icon("icons/trash-2.svg"),
+            Entry::command(Command::DeleteTag as u32, t!("Excluir tag"))
+                .with_icon("icons/trash-2.svg"),
         ];
         self.show_menu(MenuPurpose::Tag(tag), own, hwnd, window, cx);
     }
 
     /// A network place's menu in the sidebar.
-    pub(crate) fn open_network_place_menu(&mut self, address: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open_network_place_menu(
+        &mut self,
+        address: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(hwnd) = crate::ipc::window_hwnd(window) else {
             return;
         };
         let own = vec![
-            Entry::command(Command::RemoveNetworkPlace as u32, t!("Remover dos locais de rede")).with_icon("icons/trash-2.svg"),
+            Entry::command(
+                Command::RemoveNetworkPlace as u32,
+                t!("Remover dos locais de rede"),
+            )
+            .with_icon("icons/trash-2.svg"),
         ];
         self.show_menu(MenuPurpose::NetworkPlace(address), own, hwnd, window, cx);
     }
@@ -735,12 +870,23 @@ impl ExplorerPane {
             Entry::command(Command::FitColumn as u32, t!("Ajustar coluna ao conteúdo"))
                 .with_icon("icons/columns.svg")
                 .enabled(column.is_some_and(|column| self.column_visible(column))),
-            Entry::command(Command::FitAllColumns as u32, t!("Ajustar todas as colunas ao conteúdo"))
-                .with_icon("icons/table.svg"),
+            Entry::command(
+                Command::FitAllColumns as u32,
+                t!("Ajustar todas as colunas ao conteúdo"),
+            )
+            .with_icon("icons/table.svg"),
             Entry::Separator,
             Entry::check(Command::ColumnName as u32, t!("Nome"), true).enabled(false),
-            Entry::check(Command::ColumnType as u32, t!("Tipo"), self.column_visible(1)),
-            Entry::check(Command::ColumnSize as u32, t!("Tamanho"), self.column_visible(2)),
+            Entry::check(
+                Command::ColumnType as u32,
+                t!("Tipo"),
+                self.column_visible(1),
+            ),
+            Entry::check(
+                Command::ColumnSize as u32,
+                t!("Tamanho"),
+                self.column_visible(2),
+            ),
             Entry::check(
                 Command::ColumnModified as u32,
                 t!("Data de modificação"),
@@ -772,8 +918,12 @@ impl ExplorerPane {
                 KindFilter::Programs => "icons/app-window.svg",
             };
             own.push(
-                Entry::check(FIRST_KIND + index as u32, kind.menu_label(), kind == current)
-                    .with_icon(icon),
+                Entry::check(
+                    FIRST_KIND + index as u32,
+                    kind.menu_label(),
+                    kind == current,
+                )
+                .with_icon(icon),
             );
             // "Tudo", then folders and files, then the kinds of file.
             if matches!(kind, KindFilter::All | KindFilter::Files) {
@@ -812,7 +962,11 @@ impl ExplorerPane {
                         self.view_mode == ViewMode::List,
                     ),
                     Entry::Separator,
-                    Entry::check(Command::ToggleHidden as u32, t!("Itens ocultos"), self.show_hidden),
+                    Entry::check(
+                        Command::ToggleHidden as u32,
+                        t!("Itens ocultos"),
+                        self.show_hidden,
+                    ),
                     Entry::Separator,
                     Entry::submenu(
                         t!("Tema"),
@@ -844,10 +998,22 @@ impl ExplorerPane {
                     sort(Command::SortName, t!("Nome"), SortKey::Name),
                     sort(Command::SortType, t!("Tipo"), SortKey::Type),
                     sort(Command::SortSize, t!("Tamanho"), SortKey::Size),
-                    sort(Command::SortModified, t!("Data de modificação"), SortKey::Modified),
+                    sort(
+                        Command::SortModified,
+                        t!("Data de modificação"),
+                        SortKey::Modified,
+                    ),
                     Entry::Separator,
-                    Entry::radio(Command::SortAscending as u32, t!("Crescente"), self.sort_asc),
-                    Entry::radio(Command::SortDescending as u32, t!("Decrescente"), !self.sort_asc),
+                    Entry::radio(
+                        Command::SortAscending as u32,
+                        t!("Crescente"),
+                        self.sort_asc,
+                    ),
+                    Entry::radio(
+                        Command::SortDescending as u32,
+                        t!("Decrescente"),
+                        !self.sort_asc,
+                    ),
                 ],
             )
             .with_icon("icons/arrow-up-down.svg"),
@@ -857,7 +1023,11 @@ impl ExplorerPane {
                     group(Command::GroupNone, t!("Nenhum"), GroupBy::None),
                     Entry::Separator,
                     group(Command::GroupKind, t!("Tipo"), GroupBy::Kind),
-                    group(Command::GroupModified, t!("Data de modificação"), GroupBy::Modified),
+                    group(
+                        Command::GroupModified,
+                        t!("Data de modificação"),
+                        GroupBy::Modified,
+                    ),
                     group(Command::GroupSize, t!("Tamanho"), GroupBy::Size),
                 ],
             )
@@ -875,9 +1045,9 @@ impl ExplorerPane {
                     Some(super::file_ops::UndoKind::Trashed) | None => t!("Desfazer exclusão"),
                 },
             )
-                .with_icon("icons/undo-2.svg")
-                .with_shortcut(keys_of(Action::Undo))
-                .enabled(self.can_undo_trash()),
+            .with_icon("icons/undo-2.svg")
+            .with_shortcut(keys_of(Action::Undo))
+            .enabled(self.can_undo_trash()),
             Entry::command(Command::Redo as u32, t!("Refazer"))
                 .with_icon("icons/redo-2.svg")
                 .with_shortcut(keys_of(Action::Redo))
@@ -907,9 +1077,12 @@ impl ExplorerPane {
                     );
                 }
                 programs.push(
-                    Entry::command(Command::OpenFileExplorer as u32, t!("Explorador do Windows"))
-                        .with_icon("icons/folder-open.svg")
-                        .with_shortcut(keys_of(Action::OpenFileExplorer)),
+                    Entry::command(
+                        Command::OpenFileExplorer as u32,
+                        t!("Explorador do Windows"),
+                    )
+                    .with_icon("icons/folder-open.svg")
+                    .with_shortcut(keys_of(Action::OpenFileExplorer)),
                 );
                 programs
             })
@@ -939,13 +1112,12 @@ impl ExplorerPane {
                     }
                 }
                 "open" | "explore" => {
-                    let folder = self
-                        .selected_paths()
-                        .into_iter()
-                        .next()
-                        .and_then(|path| {
-                            self.filtered_entries.iter().find(|entry| entry.path == path).cloned()
-                        });
+                    let folder = self.selected_paths().into_iter().next().and_then(|path| {
+                        self.filtered_entries
+                            .iter()
+                            .find(|entry| entry.path == path)
+                            .cloned()
+                    });
                     if let Some(folder) = folder {
                         self.activate_entry(folder, window, cx);
                     }
@@ -975,7 +1147,10 @@ impl ExplorerPane {
         let target = crate::shell_menu::shortcut_target(&item).unwrap_or(item);
         let target_path = std::path::Path::new(&target);
         let Some(folder) = target_path.parent().filter(|_| target_path.exists()) else {
-            self.set_status(StatusLevel::Error, t!("O destino do atalho não existe mais").to_string());
+            self.set_status(
+                StatusLevel::Error,
+                t!("O destino do atalho não existe mais").to_string(),
+            );
             return;
         };
         let folder = folder.to_string_lossy().into_owned();
@@ -1031,9 +1206,17 @@ impl ExplorerPane {
                 // name it in: it keeps the name, renamed from its menu later.
                 if super::tags::in_sidebar() {
                     self.sidebar_visible = true;
-                    self.begin_sidebar_input(super::places::SidebarInputPurpose::RenameTag(id), name, window, cx);
+                    self.begin_sidebar_input(
+                        super::places::SidebarInputPurpose::RenameTag(id),
+                        name,
+                        window,
+                        cx,
+                    );
                 } else {
-                    self.set_status(super::types::StatusLevel::Info, nohrs_core::tf!("Tag {tag} criada", tag = name));
+                    self.set_status(
+                        super::types::StatusLevel::Info,
+                        nohrs_core::tf!("Tag {tag} criada", tag = name),
+                    );
                 }
             }
             Command::RemoveFromTag => {
@@ -1075,15 +1258,27 @@ impl ExplorerPane {
         }
     }
 
-    fn write_config(&mut self, section: &'static str, key: &'static str, value: String, cx: &mut Context<Self>) {
+    fn write_config(
+        &mut self,
+        section: &'static str,
+        key: &'static str,
+        value: String,
+        cx: &mut Context<Self>,
+    ) {
         let path = config::paths::config_file();
-        let write = cx.background_spawn(async move { config::set_value(&path, section, key, &value) });
+        let write =
+            cx.background_spawn(async move { config::set_value(&path, section, key, &value) });
         cx.spawn(async move |this: WeakEntity<Self>, cx| {
             if let Err(error) = write.await {
                 this.update(cx, |pane, cx| {
                     pane.set_status(
                         StatusLevel::Error,
-                        tf!("Não foi possível salvar {section}.{key}: {error}", section = section, key = key, error = error),
+                        tf!(
+                            "Não foi possível salvar {section}.{key}: {error}",
+                            section = section,
+                            key = key,
+                            error = error
+                        ),
                     );
                     cx.notify();
                 })
@@ -1107,14 +1302,21 @@ fn quick_actions(ids: &[String]) -> Vec<QuickAction> {
             let (command, label) = match id.as_str() {
                 "cut" => (Command::Cut, labelled(t!("Recortar"), Action::Cut)),
                 "copy" => (Command::Copy, labelled(t!("Copiar"), Action::Copy)),
-                "copy_path" => (Command::CopyPath, labelled(t!("Copiar como caminho"), Action::CopyPath)),
+                "copy_path" => (
+                    Command::CopyPath,
+                    labelled(t!("Copiar como caminho"), Action::CopyPath),
+                ),
                 "rename" => (Command::Rename, labelled(t!("Renomear"), Action::Rename)),
                 "delete" => (Command::Delete, labelled(t!("Excluir"), Action::Trash)),
                 "new_tab" => (Command::OpenInNewTab, t!("Abrir em nova aba")),
                 "properties" => (Command::Properties, t!("Propriedades")),
                 _ => return None,
             };
-            Some(QuickAction { id: command as u32, icon, label })
+            Some(QuickAction {
+                id: command as u32,
+                icon,
+                label,
+            })
         })
         .collect()
 }

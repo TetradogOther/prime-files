@@ -1,7 +1,8 @@
 name: Release
 
-# Builds the Windows installer. A tag `v*` publishes it as a GitHub release;
-# a manual run only uploads it as an artifact, to try before tagging.
+# Builds the Windows installer and the Debian package. A tag `v*` publishes
+# them as a GitHub release; a manual run only uploads them as artifacts, to
+# try before tagging.
 #
 # Built here rather than on a developer's machine on purpose: a Rust release
 # binary keeps the source paths of where it was compiled in its panic
@@ -79,3 +80,68 @@ jobs:
           files: |
             dist/PrimeFiles-Setup-${{ steps.version.outputs.version }}.exe
             dist/SHA256SUMS.txt
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dist
+
+      - name: Install the packages the program links against
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libxcb1-dev \
+            libvulkan-dev libx11-dev libfontconfig1-dev pkg-config
+
+      - name: Build
+        run: cargo build --profile dist -p nohrs --locked
+
+      - name: Version
+        id: version
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "nohrs") | .version')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "${{ github.ref_name }}" != "v${{ steps.version.outputs.version }}" ]; then
+            echo "tag ${{ github.ref_name }} does not match the workspace version ${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Build the Debian package
+        run: |
+          sudo apt-get install -y --no-install-recommends debhelper-compat dpkg-dev fakeroot
+          dpkg-buildpackage -b -us -uc
+
+      - name: Name the package and write the checksums
+        run: |
+          mkdir -p dist
+          package="../prime-files_${VERSION}_amd64.deb"
+          mv "$package" "dist/prime-files_${VERSION}_amd64.deb"
+          cd dist
+          sha256sum "prime-files_${VERSION}_amd64.deb" > SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debian
+          path: dist/*
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Prime Files ${{ steps.version.outputs.version }}
+          body_path: installer/RELEASE_NOTES.md
+          files: |
+            dist/prime-files_${{ steps.version.outputs.version }}_amd64.deb
+            dist/SHA256SUMS-linux.txt
