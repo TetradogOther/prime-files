@@ -118,7 +118,8 @@ jobs:
       - name: Build the Debian package
         run: |
           sudo apt-get install -y --no-install-recommends debhelper-compat dpkg-dev fakeroot
-          dpkg-buildpackage -b -us -uc
+          # `-r`: the package is built without root, as the runner's user.
+          dpkg-buildpackage -b -us -uc -rfakeroot
 
       - name: Name the package and write the checksums
         run: |
