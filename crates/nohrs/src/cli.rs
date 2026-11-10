@@ -9,7 +9,10 @@ use std::process::Command as ProcessCommand;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "nohrs",
+    // The program is called Prime Files; the name inside the code is the one
+    // it was born with, and the one the Windows installer and the crates
+    // still carry.
+    name = if cfg!(windows) { "nohrs" } else { "prime-files" },
     version,
     about = "Launcher × Explorer file workspace",
     // A path and a subcommand are two different invocations; without this a
